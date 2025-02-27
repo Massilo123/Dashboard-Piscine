@@ -1,0 +1,13 @@
+diff --git a/node_modules/@mapbox/mapbox-sdk/services/directions.js b/node_modules/@mapbox/mapbox-sdk/services/directions.js
+index a6f3c71..b561957 100644
+--- a/node_modules/@mapbox/mapbox-sdk/services/directions.js
++++ b/node_modules/@mapbox/mapbox-sdk/services/directions.js
+@@ -106,7 +106,7 @@ Directions.getDirections = function(config) {
+     ),
+     bannerInstructions: v.boolean,
+     continueStraight: v.boolean,
+-    exclude: v.string,
++    exclude: v.any,
+     geometries: v.string,
+     language: v.string,
+     overview: v.string,

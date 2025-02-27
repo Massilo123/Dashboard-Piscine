@@ -1,0 +1,13 @@
+diff --git a/node_modules/@types/mapbox__mapbox-sdk/index.d.ts b/node_modules/@types/mapbox__mapbox-sdk/index.d.ts
+index 81a8547..9079a09 100644
+--- a/node_modules/@types/mapbox__mapbox-sdk/index.d.ts
++++ b/node_modules/@types/mapbox__mapbox-sdk/index.d.ts
+@@ -492,7 +492,7 @@ declare module "@mapbox/mapbox-sdk/services/directions" {
+         }
+         | {
+             profile: "driving" | "driving-traffic";
+-            exclude?: Array<"ferry" | "toll" | "motorway"> | undefined;
++            exclude?: any| string | undefined;
+         };
+ 
+     type DirectionsRequest<T extends DirectionsGeometry = "polyline"> =

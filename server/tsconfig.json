@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2016",
+    "module": "commonjs",
+    "outDir": "./dist",           // Ajout important pour spécifier le dossier de sortie
+    "rootDir": "./src",           // Ajout important pour spécifier le dossier source
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",    // Ajout pour la résolution des modules
+    "resolveJsonModule": true,     // Ajout pour permettre l'import de fichiers JSON
+    "sourceMap": true             // Ajout pour le debugging
+  },
+  "include": [
+    "src/**/*"                    // Inclure tous les fichiers sous src
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
