@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared
+    container_name: cloudflared
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TOKEN}
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    networks:
+      - cloudflared
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - MAPBOX_TOKEN=${MAPBOX_TOKEN}
+      - SQUARE_ACCESS_TOKEN=${SQUARE_ACCESS_TOKEN}
+      - MONGODB_URI=${MONGODB_URI}
+    networks:
+      - cloudflared
+    depends_on:
+      - cloudflared
+
+networks:
+  cloudflared:
+    name: cloudflared
