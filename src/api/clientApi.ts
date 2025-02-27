@@ -7,7 +7,7 @@ export interface Client {
     date_preferee: string;
 }
   
-  const API_URL = 'http://localhost:5000/api';
+  const API_URL = 'https://dashboard.piscineaquarius.com/api';
   
   export const clientApi = {
     // Récupérer tous les clients

@@ -115,7 +115,7 @@ const RouteOptimizer = () => {
             
             const validAddresses = addresses.filter(addr => addr.trim());
             
-            const response = await fetch('http://localhost:3000/api/optimize', {
+            const response = await fetch('https://dashboard.piscineaquarius.com/api/optimize', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
