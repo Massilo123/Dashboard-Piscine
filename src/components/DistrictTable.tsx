@@ -57,7 +57,7 @@ const DistrictTable = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('https://dashboard.piscineaquarius.com/api/district-analysis');
+        const response = await axios.get('https://api.piscineaquarius.com/api/district-analysis');
         
         if (!response.data) {
           throw new Error('Pas de données reçues de l\'API');

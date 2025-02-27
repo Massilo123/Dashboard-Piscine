@@ -47,7 +47,7 @@ const RouteOptimizerSchedule = () => {
       setError('')
   
       try {
-        const response = await fetch('https://dashboard.piscineaquarius.com/api/optimize/bookings', {
+        const response = await fetch('https://api.piscineaquarius.com/api/optimize/bookings', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

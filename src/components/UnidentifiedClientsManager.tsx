@@ -144,7 +144,7 @@ const UnidentifiedClientsManager = () => {
   const fetchUnidentifiedClients = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('https://dashboard.piscineaquarius.com/api/district-analysis');
+      const response = await axios.get('https://api.piscineaquarius.com/api/district-analysis');
       setClients(response.data.unidentifiedClients);
     } catch (error) {
       console.error('Erreur:', error);

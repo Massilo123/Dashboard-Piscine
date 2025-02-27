@@ -85,7 +85,7 @@ const ClientSearch = () => {
             setError('');
             setSuggestions([]); 
             
-            const response = await fetch('https://dashboard.piscineaquarius.com/api/mapbox/clients-nearby', {
+            const response = await fetch('https://api.piscineaquarius.com/api/mapbox/clients-nearby', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
