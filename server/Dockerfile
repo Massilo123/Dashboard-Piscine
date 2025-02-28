@@ -1,11 +1,13 @@
 FROM node:22.14-alpine3.21
 
-WORKDIR /build
+WORKDIR /app
 COPY package*.json ./
 
 RUN npm install
 
-COPY . .
+COPY . ./
+
+RUN npm run build
 
 EXPOSE 3000
 

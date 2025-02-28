@@ -232,7 +232,7 @@ async function calculateDistanceMatrix(locations: { address: string; coordinates
                    { coordinates: locations[i].coordinates as [number, number] },
                    { coordinates: locations[j].coordinates as [number, number] }
                ],
-               exclude: 'toll'
+               exclude: ['toll']
            }).send();
 
            if (response.body.routes.length) {
@@ -278,7 +278,7 @@ async function getDetailedRoute(locations: { address: string; coordinates: numbe
    const response = await directionsService.getDirections({
        profile: 'driving-traffic',
        waypoints: waypoints.map(wp => ({ coordinates: wp.coordinates })),
-       exclude: 'toll'
+       exclude: ['toll']
    }).send();
 
    if (!response.body.routes.length) {

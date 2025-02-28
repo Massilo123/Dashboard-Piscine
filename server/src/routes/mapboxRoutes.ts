@@ -60,7 +60,7 @@ router.post('/clients-nearby', async (req: Request, res: Response): Promise<void
                         { coordinates: sourceCoords },
                         { coordinates: [client.coordinates.lng, client.coordinates.lat] }
                     ],
-                    exclude: 'toll' // Ajout de l'exclusion des péages
+                    exclude: ['toll'] // Ajout de l'exclusion des péages
                     
                 }).send();
 
