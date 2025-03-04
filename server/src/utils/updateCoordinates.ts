@@ -9,15 +9,33 @@ dotenv.config();
 const baseClient = mbxClient({ accessToken: process.env.MAPBOX_TOKEN! });
 const geocodingService = mbxGeocoding(baseClient);
 
-const updateCoordinates = async () => {
+// Récupère l'argument passé en ligne de commande (ID client s'il existe)
+const clientId = process.argv[2];
+
+const updateCoordinates = async (targetClientId?: string) => {
     try {
         await mongoose.connect(process.env.MONGODB_URI!);
         console.log('Connecté à MongoDB');
 
-        // Récupérer tous les clients qui ont une adresse
-        const clients = await Client.find({
-            addressLine1: { $exists: true, $ne: '' }
-        });
+        let clients;
+        
+        if (targetClientId) {
+            // Mode ciblé: uniquement le client spécifié
+            clients = await Client.find({
+                squareId: targetClientId,
+                addressLine1: { $exists: true, $ne: '' }
+            });
+            
+            if (clients.length === 0) {
+                console.log(`Aucun client trouvé avec l'ID ${targetClientId} ou adresse manquante`);
+                process.exit(0);
+            }
+        } else {
+            // Mode complet: tous les clients avec adresse
+            clients = await Client.find({
+                addressLine1: { $exists: true, $ne: '' }
+            });
+        }
 
         console.log(`Mise à jour des coordonnées pour ${clients.length} clients`);
 
@@ -55,17 +73,23 @@ const updateCoordinates = async () => {
                 console.error(`Erreur pour ${client.givenName}:`, error);
             }
 
-            // Petit délai pour éviter de surcharger l'API
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // N'ajoutez le délai que si nous traitons plusieurs clients
+            if (!targetClientId) {
+                // Petit délai pour éviter de surcharger l'API
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
         }
 
         console.log('Mise à jour terminée');
+        await mongoose.disconnect();
         process.exit(0);
 
     } catch (error) {
         console.error('Erreur:', error);
+        await mongoose.disconnect();
         process.exit(1);
     }
 };
 
-updateCoordinates();
+// Démarrer la mise à jour avec l'ID client s'il est fourni
+updateCoordinates(clientId);
