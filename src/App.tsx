@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import ClientSearch from './components/ClientSearch';
 import RouteOptimizer from './components/RouteOptimizer';
@@ -6,8 +6,15 @@ import RouteOptimizerSchedule from './components/RouteOptimizerSchedule';
 import OptimisationRdvClient from './components/OptimisationRdvClient';
 import DistrictTable from './components/DistrictTable';
 import UnidentifiedClientsManager from './components/UnidentifiedClientsManager';
+import { Menu, X } from 'lucide-react';
 
 function App() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
   return (
     <Router>
       <div className="min-h-screen w-full bg-gray-100">
@@ -15,50 +22,118 @@ function App() {
         <nav className="bg-white shadow-lg">
           <div className="container mx-auto px-4">
             <div className="flex justify-between items-center h-16">
-              <div className="flex space-x-8">
+              {/* Logo/Title - Hidden on mobile */}
+              <div className="hidden md:block">
+                <span className="text-blue-600 font-bold">Piscine Aquarius</span>
+              </div>
+
+              {/* Mobile menu button */}
+              <button
+                className="md:hidden flex items-center p-2 rounded-md text-gray-700 hover:text-blue-600 focus:outline-none"
+                onClick={toggleMobileMenu}
+              >
+                {mobileMenuOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
+              </button>
+
+              {/* Desktop Navigation */}
+              <div className="hidden md:flex md:space-x-2 lg:space-x-4">
                 <Link 
                   to="/client-search"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-700 hover:text-blue-600 px-2 py-2 rounded-md text-sm font-medium"
                 >
-                  Recherche Client Proche
+                  Recherche Client
                 </Link>
                 <Link 
                   to="/route-optimizer"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-700 hover:text-blue-600 px-2 py-2 rounded-md text-sm font-medium"
                 >
-                  Optimiseur de Route
+                  Optimiseur Route
                 </Link>
                 <Link 
                   to="/schedule"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-700 hover:text-blue-600 px-2 py-2 rounded-md text-sm font-medium"
                 >
                   Planning
                 </Link>
                 <Link 
                   to="/optimisation-rdv"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-700 hover:text-blue-600 px-2 py-2 rounded-md text-sm font-medium"
                 >
-                  Client Rendez-vous Proche
+                  RDV Proche
                 </Link>
                 <Link 
                   to="/district-table"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-700 hover:text-blue-600 px-2 py-2 rounded-md text-sm font-medium"
                 >
-                  Tableau des Quartiers
+                  Quartiers
                 </Link>
                 <Link 
                   to="/UnidentifiedClientsManager"
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-gray-700 hover:text-blue-600 px-2 py-2 rounded-md text-sm font-medium"
                 >
-                  Gestion ville clients
+                  Villes
                 </Link>
               </div>
             </div>
           </div>
+
+          {/* Mobile menu, show/hide based on menu state */}
+          {mobileMenuOpen && (
+            <div className="md:hidden">
+              <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <Link 
+                  to="/client-search"
+                  className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"
+                  onClick={toggleMobileMenu}
+                >
+                  Recherche Client
+                </Link>
+                <Link 
+                  to="/route-optimizer"
+                  className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"
+                  onClick={toggleMobileMenu}
+                >
+                  Optimiseur Route
+                </Link>
+                <Link 
+                  to="/schedule"
+                  className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"
+                  onClick={toggleMobileMenu}
+                >
+                  Planning
+                </Link>
+                <Link 
+                  to="/optimisation-rdv"
+                  className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"
+                  onClick={toggleMobileMenu}
+                >
+                  RDV Proche
+                </Link>
+                <Link 
+                  to="/district-table"
+                  className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"
+                  onClick={toggleMobileMenu}
+                >
+                  Quartiers
+                </Link>
+                <Link 
+                  to="/UnidentifiedClientsManager"
+                  className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"
+                  onClick={toggleMobileMenu}
+                >
+                  Villes
+                </Link>
+              </div>
+            </div>
+          )}
         </nav>
 
         {/* Content Area */}
-        <div className="container mx-auto py-8">
+        <div className="container mx-auto py-4 px-4">
           <Routes>
             <Route path="/" element={<Navigate to="/client-search" replace />} />
             <Route path="/client-search" element={<ClientSearch />} />

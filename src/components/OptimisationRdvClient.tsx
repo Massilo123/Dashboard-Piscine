@@ -1,4 +1,4 @@
-import { MapPin, Navigation, User, Calendar, Clock, Users, ChevronRight, ChevronLeft, Filter, X } from 'lucide-react'
+import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, Filter, X } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
@@ -190,11 +190,13 @@ const OptimisationRdvClient = () => {
       setClientData(newClientData);
       
       if (excludeDates.length > 0 && !specificDate) {
+        // Navigation suivante
         setVisitedClients(prev => [...prev, newClientData]);
         setNavigationIndex(prev => prev + 1);
       } else if (specificDate) {
-        // Navigation en arrière
+        // Navigation en arrière - on garde le même index
       } else {
+        // Premier client
         setVisitedClients([newClientData]);
         setNavigationIndex(0);
       }
@@ -216,6 +218,7 @@ const OptimisationRdvClient = () => {
       const previousIndex = navigationIndex - 1;
       const previousClient = visitedClients[previousIndex];
       
+      // Filtrer les dates traitées pour exclure la date du client précédent
       findNearestClient(
         processedDates.filter(date => date !== previousClient.booking.bookingDate),
         previousClient.booking.bookingDate
@@ -226,12 +229,12 @@ const OptimisationRdvClient = () => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-4 space-y-4" ref={wrapperRef}>
-      <div className="bg-white rounded-lg shadow p-6">
+    <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 space-y-4" ref={wrapperRef}>
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <MapPin className="h-6 w-6" />
-            <h2 className="text-xl font-semibold text-black">Client le plus proche</h2>
+            <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
+            <h2 className="text-lg sm:text-xl font-semibold text-black">Client le plus proche</h2>
           </div>
           <button 
             onClick={toggleDateFilter}
@@ -256,7 +259,7 @@ const OptimisationRdvClient = () => {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex flex-col">
                 <label htmlFor="startDate" className="text-xs text-gray-500 mb-1">Date début</label>
                 <input
@@ -284,7 +287,7 @@ const OptimisationRdvClient = () => {
         )}
         
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-grow">
               <input
                 type="text"
@@ -326,26 +329,28 @@ const OptimisationRdvClient = () => {
             <div className="mt-4">
               {/* Boutons de navigation */}
               <div className="flex justify-between items-center mb-4">
-                <div className="text-black font-medium flex items-center">
+                <div>
                   {navigationIndex > 0 && (
                     <button
                       onClick={handlePreviousClient}
                       disabled={loading}
-                      className="flex items-center gap-1 bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors mr-2"
+                      className="flex items-center gap-1 bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                   )}
                 </div>
-                {clientData.navigation.hasNext && (
-                  <button
-                    onClick={handleNextClient}
-                    disabled={loading}
-                    className="flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                )}
+                <div>
+                  {clientData.navigation.hasNext && (
+                    <button
+                      onClick={handleNextClient}
+                      disabled={loading}
+                      className="flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Carte client principale */}
@@ -354,7 +359,7 @@ const OptimisationRdvClient = () => {
                 <div className="bg-blue-500 text-white p-3 flex justify-between items-center">
                   <div className="flex items-center">
                     <User className="h-5 w-5 mr-2" />
-                    <span className="font-bold text-lg">{clientData.client.name}</span>
+                    <span className="font-bold text-base sm:text-lg">{clientData.client.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
@@ -370,15 +375,15 @@ const OptimisationRdvClient = () => {
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clientData.client.address)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 hover:underline block mb-3"
+                    className="text-blue-600 hover:text-blue-800 hover:underline block mb-3 break-words"
                   >
                     {clientData.client.address}
                   </a>
                   
-                  {/* Date et heure */}
-                  <div className="flex items-center mb-3 bg-gray-50 p-2 rounded">
-                    <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                    <span className="text-gray-800">{clientData.booking.date} · {clientData.booking.time}</span>
+                  {/* Date mise en évidence, sans l'heure */}
+                  <div className="flex items-center mb-3 bg-yellow-50 p-3 rounded border border-yellow-200">
+                    <Calendar className="h-5 w-5 mr-2 text-yellow-600" />
+                    <span className="text-gray-800 font-medium text-lg">{clientData.booking.date}</span>
                   </div>
                   
                   {/* Statistiques condensées */}
@@ -406,4 +411,4 @@ const OptimisationRdvClient = () => {
   )
 }
 
-export default OptimisationRdvClient
+export default OptimisationRdvClient  
