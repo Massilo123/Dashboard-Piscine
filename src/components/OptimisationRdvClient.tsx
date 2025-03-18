@@ -59,7 +59,7 @@ const OptimisationRdvClient = () => {
   const [error, setError] = useState<string>('')
   const [visitedClients, setVisitedClients] = useState<ClientData[]>([])
   const [navigationIndex, setNavigationIndex] = useState<number>(0)
-  const [allProcessedDates, setAllProcessedDates] = useState<string[]>([])
+  const [hasMoreClients, setHasMoreClients] = useState<boolean>(false)
   const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date().toISOString().split('T')[0],
@@ -118,10 +118,10 @@ const OptimisationRdvClient = () => {
     };
   }, [address, isAddressSelected]);
 
-  // Mise à jour des dates traitées
+  // Mise à jour du flag hasMoreClients quand clientData change
   useEffect(() => {
-    if (clientData?.navigation?.processedDates) {
-      setAllProcessedDates(clientData.navigation.processedDates);
+    if (clientData) {
+      setHasMoreClients(clientData.navigation.hasNext);
     }
   }, [clientData]);
 
@@ -147,12 +147,6 @@ const OptimisationRdvClient = () => {
     setAddress(suggestion.place_name);
     setSuggestions([]);
     setIsAddressSelected(true);
-  };
-
-  // Fonction pour obtenir les dates processées à exclure, sans la date courante
-  const getExcludeDatesExcept = (currentDate: string | null) => {
-    if (!currentDate) return allProcessedDates;
-    return allProcessedDates.filter(date => date !== currentDate);
   };
 
   const findNearestClient = async (excludeDates: string[] = [], specificDate: string | null = null) => {
@@ -192,31 +186,39 @@ const OptimisationRdvClient = () => {
         throw new Error(data.error || 'Une erreur est survenue')
       }
 
+      // Traitement différent selon le cas de navigation
       const newClientData = data.data;
       
-      if (excludeDates.length > 0 && !specificDate) {
-        // Navigation suivante - ajouter le nouveau client à l'historique
-        const updatedVisitedClients = [...visitedClients, newClientData];
-        setVisitedClients(updatedVisitedClients);
-        setNavigationIndex(updatedVisitedClients.length - 1);
-      } else if (specificDate) {
-        // Trouver l'index du client avec la date spécifique
-        const existingIndex = visitedClients.findIndex(
-          client => client.booking.bookingDate === specificDate
-        );
+      if (specificDate) {
+        // Navigation en arrière - recherche spécifique
+        // Remarque: le serveur nous retourne un client pour une date spécifique
+        setClientData(newClientData);
         
-        if (existingIndex >= 0) {
-          // Nous avons trouvé un client existant avec cette date, mettre à jour l'index
-          setNavigationIndex(existingIndex);
+        // On ne modifie pas visitedClients pour ne pas perdre l'historique
+      } else if (excludeDates.length > 0) {
+        // Navigation vers l'avant
+        setClientData(newClientData);
+        
+        // Mise à jour de l'historique des clients visités
+        if (navigationIndex === visitedClients.length - 1) {
+          // Si on est au dernier client connu, ajouter le nouveau
+          setVisitedClients([...visitedClients, newClientData]);
+          setNavigationIndex(navigationIndex + 1);
+        } else {
+          // Si on est sur un client intermédiaire, remplacer tout ce qui suit
+          const newVisited = [...visitedClients.slice(0, navigationIndex + 1), newClientData];
+          setVisitedClients(newVisited);
+          setNavigationIndex(navigationIndex + 1);
         }
       } else {
-        // Premier client - réinitialiser l'historique
+        // Première recherche
+        setClientData(newClientData);
         setVisitedClients([newClientData]);
         setNavigationIndex(0);
       }
       
-      // Toujours mettre à jour les données client
-      setClientData(newClientData);
+      // Mettre à jour le flag qui indique s'il y a d'autres clients
+      setHasMoreClients(newClientData.navigation.hasNext);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue')
@@ -225,28 +227,30 @@ const OptimisationRdvClient = () => {
     }
   }
 
-  // Navigation directe à un client spécifique dans l'historique
-  const navigateToClient = (index: number) => {
-    if (index >= 0 && index < visitedClients.length && index !== navigationIndex) {
-      const targetClient = visitedClients[index];
-      const targetDate = targetClient.booking.bookingDate;
-      
-      // Exclure toutes les autres dates sauf celle du client cible
-      const excludeDates = getExcludeDatesExcept(targetDate);
-      
-      findNearestClient(excludeDates, targetDate);
-    }
-  };
-
   const handleNextClient = () => {
-    if (clientData && clientData.navigation.hasNext) {
-      findNearestClient(allProcessedDates);
+    if (clientData && hasMoreClients) {
+      // Récupérer toutes les dates déjà visitées
+      const allVisitedDates = visitedClients.map(client => client.booking.bookingDate);
+      findNearestClient(allVisitedDates);
     }
   };
 
   const handlePreviousClient = () => {
     if (navigationIndex > 0) {
-      navigateToClient(navigationIndex - 1);
+      // Navigation vers le client précédent
+      const newIndex = navigationIndex - 1;
+      const prevClient = visitedClients[newIndex];
+      
+      // Récupérer ce client spécifique
+      findNearestClient([], prevClient.booking.bookingDate);
+      
+      // Mettre à jour l'index de navigation
+      setNavigationIndex(newIndex);
+      
+      // Réactiver le bouton suivant si nécessaire
+      if (newIndex < visitedClients.length - 1) {
+        setHasMoreClients(true);
+      }
     }
   };
 
@@ -365,9 +369,9 @@ const OptimisationRdvClient = () => {
                 
                 <button
                   onClick={handleNextClient}
-                  disabled={loading || !clientData.navigation.hasNext}
+                  disabled={loading || !hasMoreClients}
                   className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
-                    clientData.navigation.hasNext && !loading
+                    hasMoreClients && !loading
                       ? 'bg-green-500 text-white hover:bg-green-600' 
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
@@ -375,26 +379,6 @@ const OptimisationRdvClient = () => {
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
-
-              {/* Navigation par index (optionnel) - utile pour le débogage */}
-              {/*
-              <div className="flex justify-center mb-4 gap-2">
-                {visitedClients.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => navigateToClient(index)}
-                    disabled={index === navigationIndex || loading}
-                    className={`w-8 h-8 rounded-full ${
-                      index === navigationIndex 
-                        ? 'bg-blue-500 text-white' 
-                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-                    }`}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-              </div>
-              */}
 
               {/* Carte client principale */}
               <div className="border rounded-lg shadow overflow-hidden">
