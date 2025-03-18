@@ -9,6 +9,32 @@ const baseClient = mbxClient({ accessToken: process.env.MAPBOX_TOKEN! });
 const geocodingService = mbxGeocoding(baseClient);
 const directionsService = mbxDirections(baseClient);
 
+// Interface pour les statistiques journalières
+interface DailyStats {
+    totalDistance: number;
+    totalDuration: number;
+    clientCount: number;
+}
+
+// Fonction pour calculer les statistiques d'une journée spécifique
+const calculateDailyStats = (clients: any[], date: string): DailyStats => {
+    const clientsOnDate = clients.filter(client => client.bookingDate === date);
+    
+    const totalDistance = clientsOnDate.reduce((sum, client) => {
+        return sum + (client.distance || 0);
+    }, 0);
+    
+    const totalDuration = clientsOnDate.reduce((sum, client) => {
+        return sum + (client.duration || 0);
+    }, 0);
+    
+    return {
+        totalDistance: Math.round(totalDistance * 10) / 10, // Arrondir à 1 décimale
+        totalDuration,
+        clientCount: clientsOnDate.length
+    };
+};
+
 router.post('/', async (req: Request, res: Response) => {
     try {
         const { 
@@ -197,6 +223,9 @@ router.post('/', async (req: Request, res: Response) => {
             exclude: ['toll']
         }).send();
 
+        // Calculer les statistiques pour la journée du client sélectionné
+        const dailyStats = calculateDailyStats(clientsWithBookings, nearestClient.bookingDate);
+
         // Formater la date et l'heure du rendez-vous
         const bookingDate = new Date(nearestClient.startAt);
         const formattedDate = bookingDate.toLocaleDateString('fr-CA', {
@@ -236,7 +265,12 @@ router.post('/', async (req: Request, res: Response) => {
                 route: directionResponse.body.routes[0],
                 statistics: {
                     clientsOnSameDay: clientsOnSameDay,
-                    remainingDays: remainingDays
+                    remainingDays: remainingDays,
+                    dailyStats: {
+                        totalDistance: dailyStats.totalDistance,
+                        totalDuration: dailyStats.totalDuration,
+                        clientCount: dailyStats.clientCount
+                    }
                 },
                 navigation: {
                     hasNext: remainingDays > 1,

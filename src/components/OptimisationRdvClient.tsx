@@ -41,6 +41,11 @@ interface ClientData {
   statistics: {
     clientsOnSameDay: number
     remainingDays: number
+    dailyStats: {
+      totalDistance: number
+      totalDuration: number
+      clientCount: number
+    }
   }
   navigation: {
     hasNext: boolean
@@ -487,6 +492,31 @@ const OptimisationRdvClient = () => {
                       {remainingDays > 0 
                         ? `${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${remainingDays > 1 ? 's' : ''}`
                         : "0 jour restant"}
+                    </div>
+                  </div>
+                  
+                  {/* Nouvelle section: Statistiques journalières */}
+                  <div className="mb-3 p-3 bg-blue-50 rounded border border-blue-100">
+                    <h3 className="font-medium text-blue-800 mb-1 text-sm">Statistiques pour cette journée:</h3>
+                    <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div className="bg-white p-2 rounded shadow-sm">
+                        <div className="text-gray-500">Distance</div>
+                        <div className="font-bold text-blue-700">
+                          {clientData.statistics.dailyStats.totalDistance} km
+                        </div>
+                      </div>
+                      <div className="bg-white p-2 rounded shadow-sm">
+                        <div className="text-gray-500">Durée</div>
+                        <div className="font-bold text-blue-700">
+                          {clientData.statistics.dailyStats.totalDuration} min
+                        </div>
+                      </div>
+                      <div className="bg-white p-2 rounded shadow-sm">
+                        <div className="text-gray-500">Clients</div>
+                        <div className="font-bold text-blue-700">
+                          {clientData.statistics.dailyStats.clientCount}
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
