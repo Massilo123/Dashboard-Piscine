@@ -61,6 +61,7 @@ const OptimisationRdvClient = () => {
   const [currentIndex, setCurrentIndex] = useState<number>(0)
   const [fetchingNew, setFetchingNew] = useState<boolean>(false)
   const [allProcessedDates, setAllProcessedDates] = useState<string[]>([])
+  const [remainingDays, setRemainingDays] = useState<number>(0)
   const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date().toISOString().split('T')[0],
@@ -91,6 +92,27 @@ const OptimisationRdvClient = () => {
   useEffect(() => {
     if (visitedClients.length > 0 && currentIndex >= 0 && currentIndex < visitedClients.length) {
       setClientData(visitedClients[currentIndex]);
+      
+      // Calcul correct des jours restants
+      let daysLeft = 0;
+      
+      // Si nous ne sommes pas au dernier client, il y a au moins les jours des clients suivants
+      if (currentIndex < visitedClients.length - 1) {
+        // Compter les jours uniques restants parmi les clients déjà visités
+        const uniqueDatesAfterCurrent = new Set();
+        for (let i = currentIndex + 1; i < visitedClients.length; i++) {
+          uniqueDatesAfterCurrent.add(visitedClients[i].booking.bookingDate);
+        }
+        daysLeft = uniqueDatesAfterCurrent.size;
+      }
+      
+      // Si nous sommes au dernier client et qu'il y a d'autres clients non encore chargés
+      if (currentIndex === visitedClients.length - 1 && visitedClients[currentIndex].navigation.hasNext) {
+        // Ajouter 1 pour représenter les clients non encore chargés
+        daysLeft += 1;
+      }
+      
+      setRemainingDays(daysLeft);
     }
   }, [currentIndex, visitedClients]);
 
@@ -212,6 +234,7 @@ const OptimisationRdvClient = () => {
       setVisitedClients([newClient]);
       setCurrentIndex(0);
       setClientData(newClient);
+      setRemainingDays(newClient.navigation.hasNext ? 1 : 0);
     }
   }
 
@@ -231,16 +254,49 @@ const OptimisationRdvClient = () => {
         
         // Aller directement au nouveau client
         setCurrentIndex(updatedClients.length - 1);
+        
+        // Mettre à jour les jours restants
+        setRemainingDays(newClient.navigation.hasNext ? 1 : 0);
       }
     } else if (currentIndex < visitedClients.length - 1) {
       // Nous avons déjà ce client en mémoire, avancer simplement l'index
-      setCurrentIndex(prevIndex => prevIndex + 1);
+      const newIndex = currentIndex + 1;
+      setCurrentIndex(newIndex);
+      
+      // Recalculer les jours restants
+      const uniqueDatesAfterCurrent = new Set();
+      for (let i = newIndex + 1; i < visitedClients.length; i++) {
+        uniqueDatesAfterCurrent.add(visitedClients[i].booking.bookingDate);
+      }
+      
+      // Si nous sommes sur le dernier client connu et qu'il y a d'autres clients non chargés
+      let daysLeft = uniqueDatesAfterCurrent.size;
+      if (newIndex === visitedClients.length - 1 && visitedClients[newIndex].navigation.hasNext) {
+        daysLeft += 1;
+      }
+      
+      setRemainingDays(daysLeft);
     }
   }
 
   const handlePreviousClient = () => {
     if (currentIndex > 0) {
-      setCurrentIndex(prevIndex => prevIndex - 1);
+      const newIndex = currentIndex - 1;
+      setCurrentIndex(newIndex);
+      
+      // Recalculer les jours restants
+      const uniqueDatesAfterCurrent = new Set();
+      for (let i = newIndex + 1; i < visitedClients.length; i++) {
+        uniqueDatesAfterCurrent.add(visitedClients[i].booking.bookingDate);
+      }
+      
+      // Si le dernier client a hasNext, ajouter 1 pour les clients non chargés
+      let daysLeft = uniqueDatesAfterCurrent.size;
+      if (visitedClients[visitedClients.length - 1].navigation.hasNext) {
+        daysLeft += 1;
+      }
+      
+      setRemainingDays(daysLeft);
     }
   }
 
@@ -249,7 +305,7 @@ const OptimisationRdvClient = () => {
     
     if (currentIndex < visitedClients.length - 1) {
       // Nous avons déjà ce client en mémoire
-      setCurrentIndex(prevIndex => prevIndex + 1);
+      findNextClient();
     } else if (clientData?.navigation.hasNext) {
       // Besoin de chercher un nouveau client
       findNextClient();
@@ -424,14 +480,13 @@ const OptimisationRdvClient = () => {
                     <span className="text-gray-800 font-medium text-lg">{clientData.booking.date}</span>
                   </div>
                   
-                  {/* Statistiques condensées avec correction des jours restants */}
+                  {/* Statistiques condensées avec compteur de jours correct */}
                   <div className="flex justify-between text-sm text-gray-500 mb-3">
                     <div>{clientData.statistics.clientsOnSameDay} clients ce jour</div>
                     <div>
-                      {currentIndex === visitedClients.length - 1 && !clientData.navigation.hasNext
-                        ? "0 jours restants"
-                        : `${clientData.statistics.remainingDays} jours restants`
-                      }
+                      {remainingDays > 0 
+                        ? `${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${remainingDays > 1 ? 's' : ''}`
+                        : "0 jour restant"}
                     </div>
                   </div>
                   
