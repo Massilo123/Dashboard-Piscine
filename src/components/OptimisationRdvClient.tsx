@@ -424,10 +424,15 @@ const OptimisationRdvClient = () => {
                     <span className="text-gray-800 font-medium text-lg">{clientData.booking.date}</span>
                   </div>
                   
-                  {/* Statistiques condensées */}
+                  {/* Statistiques condensées avec correction des jours restants */}
                   <div className="flex justify-between text-sm text-gray-500 mb-3">
                     <div>{clientData.statistics.clientsOnSameDay} clients ce jour</div>
-                    <div>{clientData.statistics.remainingDays} jours restants</div>
+                    <div>
+                      {currentIndex === visitedClients.length - 1 && !clientData.navigation.hasNext
+                        ? "0 jours restants"
+                        : `${clientData.statistics.remainingDays} jours restants`
+                      }
+                    </div>
                   </div>
                   
                   {/* Bouton d'itinéraire */}
