@@ -27,7 +27,7 @@ interface ClientData {
     date: string
     time: string
     dateISO: string
-    bookingDate: string // Format YYYY-MM-DD
+    bookingDate: string
   }
   distance: {
     value: number | null
@@ -37,7 +37,7 @@ interface ClientData {
     value: number | null
     unit: string
   }
-  route: any // Type pour la route MapBox
+  route: any
   statistics: {
     clientsOnSameDay: number
     remainingDays: number
@@ -62,13 +62,13 @@ const OptimisationRdvClient = () => {
   const [processedDates, setProcessedDates] = useState<string[]>([])
   const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
   const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: new Date().toISOString().split('T')[0], // Format YYYY-MM-DD pour aujourd'hui
-    endDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0] // Format YYYY-MM-DD pour 30 jours après
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
   })
   const wrapperRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLDivElement>(null)
 
-  // Gestion du clic en dehors du composant pour fermer les suggestions
+  // Gestion du clic en dehors du composant
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -118,7 +118,7 @@ const OptimisationRdvClient = () => {
     };
   }, [address, isAddressSelected]);
 
-  // Mise à jour des dates traitées lorsque clientData change
+  // Mise à jour des dates traitées
   useEffect(() => {
     if (clientData?.navigation?.processedDates) {
       setProcessedDates(clientData.navigation.processedDates);
@@ -155,7 +155,6 @@ const OptimisationRdvClient = () => {
       return
     }
 
-    // Valider l'intervalle de dates
     if (dateRange.startDate > dateRange.endDate) {
       setError('La date de début doit être antérieure à la date de fin');
       return;
@@ -191,13 +190,11 @@ const OptimisationRdvClient = () => {
       setClientData(newClientData);
       
       if (excludeDates.length > 0 && !specificDate) {
-        // Si on avance, on ajoute au tableau des clients visités
         setVisitedClients(prev => [...prev, newClientData]);
         setNavigationIndex(prev => prev + 1);
       } else if (specificDate) {
-        // Si on navigue en arrière, ne pas modifier le tableau
+        // Navigation en arrière
       } else {
-        // Nouvelle recherche, réinitialiser
         setVisitedClients([newClientData]);
         setNavigationIndex(0);
       }
@@ -219,9 +216,7 @@ const OptimisationRdvClient = () => {
       const previousIndex = navigationIndex - 1;
       const previousClient = visitedClients[previousIndex];
       
-      // Utiliser specificDate pour revenir exactement au client précédent
       findNearestClient(
-        // Exclure toutes les dates sauf celle du client précédent
         processedDates.filter(date => date !== previousClient.booking.bookingDate),
         previousClient.booking.bookingDate
       );
@@ -236,14 +231,14 @@ const OptimisationRdvClient = () => {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MapPin className="h-6 w-6" />
-            <h2 className="text-xl font-semibold text-black">Trouver le client le plus proche</h2>
+            <h2 className="text-xl font-semibold text-black">Client le plus proche</h2>
           </div>
           <button 
             onClick={toggleDateFilter}
             className="flex items-center gap-1 text-gray-600 px-2 py-1 rounded hover:bg-gray-100"
           >
             <Filter className="h-4 w-4" />
-            <span>Filtre de dates</span>
+            <span>Dates</span>
           </button>
         </div>
 
@@ -261,10 +256,9 @@ const OptimisationRdvClient = () => {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <h3 className="text-sm font-medium mb-2 text-gray-700">Filtrer par période</h3>
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex flex-col">
-                <label htmlFor="startDate" className="text-xs text-gray-500 mb-1">Date de début</label>
+                <label htmlFor="startDate" className="text-xs text-gray-500 mb-1">Date début</label>
                 <input
                   type="date"
                   id="startDate"
@@ -275,7 +269,7 @@ const OptimisationRdvClient = () => {
                 />
               </div>
               <div className="flex flex-col">
-                <label htmlFor="endDate" className="text-xs text-gray-500 mb-1">Date de fin</label>
+                <label htmlFor="endDate" className="text-xs text-gray-500 mb-1">Date fin</label>
                 <input
                   type="date"
                   id="endDate"
@@ -285,13 +279,6 @@ const OptimisationRdvClient = () => {
                   className="border rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {clientData?.navigation?.dateRange ? (
-                <span>Recherche active entre {clientData.navigation.dateRange.startDate} et {clientData.navigation.dateRange.endDate}</span>
-              ) : (
-                <span>Le filtre sera appliqué à la prochaine recherche</span>
-              )}
             </div>
           </div>
         )}
@@ -325,7 +312,7 @@ const OptimisationRdvClient = () => {
               disabled={loading}
               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Recherche...' : 'Trouver'}
+              {loading ? '...' : 'Trouver'}
             </button>
           </div>
 
@@ -336,9 +323,9 @@ const OptimisationRdvClient = () => {
           )}
 
           {clientData && (
-            <div className="mt-4 space-y-4">
-              {/* En-tête avec navigation */}
-              <div className="flex justify-between items-center">
+            <div className="mt-4">
+              {/* Boutons de navigation */}
+              <div className="flex justify-between items-center mb-4">
                 <div className="text-black font-medium flex items-center">
                   {navigationIndex > 0 && (
                     <button
@@ -346,13 +333,8 @@ const OptimisationRdvClient = () => {
                       disabled={loading}
                       className="flex items-center gap-1 bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors mr-2"
                     >
-                      <ChevronLeft className="h-4 w-4" /> Précédent
+                      <ChevronLeft className="h-4 w-4" />
                     </button>
-                  )}
-                  {navigationIndex > 0 && (
-                    <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-full text-sm">
-                      Client {navigationIndex + 1}
-                    </span>
                   )}
                 </div>
                 {clientData.navigation.hasNext && (
@@ -361,74 +343,58 @@ const OptimisationRdvClient = () => {
                     disabled={loading}
                     className="flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                   >
-                    Suivant <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-4 w-4" />
                   </button>
                 )}
               </div>
 
-              {/* Statistiques */}
-              <div className="border rounded p-4 bg-purple-50">
-                <h3 className="text-lg font-semibold mb-2 text-black flex items-center">
-                  <Users className="h-5 w-5 mr-2" />
-                  Statistiques
-                </h3>
-                <div className="text-black space-y-1">
-                  <div className="font-medium">Clients programmés le {clientData.booking.date.split(" ").slice(0, -1).join(" ")}: {clientData.statistics.clientsOnSameDay}</div>
-                  <div className="font-medium">Jours avec rendez-vous restants: {clientData.statistics.remainingDays}</div>
+              {/* Carte client principale */}
+              <div className="border rounded-lg shadow overflow-hidden">
+                {/* En-tête de la carte avec nom client & distance */}
+                <div className="bg-blue-500 text-white p-3 flex justify-between items-center">
+                  <div className="flex items-center">
+                    <User className="h-5 w-5 mr-2" />
+                    <span className="font-bold text-lg">{clientData.client.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span className="font-bold">{clientData.duration.value} min</span>
+                    <span className="text-xs">({clientData.distance.value} km)</span>
+                  </div>
                 </div>
-              </div>
-
-              <div className="border rounded p-4 bg-blue-50">
-                <h3 className="text-lg font-semibold mb-2 text-black flex items-center">
-                  <User className="h-5 w-5 mr-2" />
-                  Informations du client
-                </h3>
-                <div className="space-y-2 text-black">
-                  <div className="font-medium">{clientData.client.name}</div>
+                
+                {/* Corps de la carte */}
+                <div className="p-3 bg-white">
+                  {/* Adresse */}
                   <a 
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clientData.client.address)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 hover:underline block"
+                    className="text-blue-600 hover:text-blue-800 hover:underline block mb-3"
                   >
                     {clientData.client.address}
                   </a>
-                </div>
-              </div>
-
-              <div className="border rounded p-4 bg-green-50">
-                <h3 className="text-lg font-semibold mb-2 text-black flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  Rendez-vous
-                </h3>
-                <div className="space-y-2 text-black">
-                  <div className="font-medium">{clientData.booking.date}</div>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    <span>{clientData.booking.time}</span>
+                  
+                  {/* Date et heure */}
+                  <div className="flex items-center mb-3 bg-gray-50 p-2 rounded">
+                    <Calendar className="h-4 w-4 mr-2 text-gray-500" />
+                    <span className="text-gray-800">{clientData.booking.date} · {clientData.booking.time}</span>
                   </div>
-                </div>
-              </div>
-
-              <div className="border rounded p-4 bg-yellow-50">
-                <h3 className="text-lg font-semibold mb-2 text-black flex items-center">
-                  <Navigation className="h-5 w-5 mr-2" />
-                  Itinéraire
-                </h3>
-                <div className="space-y-2 text-black">
-                  <div className="font-medium">
-                    Distance: {clientData.distance.value} {clientData.distance.unit}
+                  
+                  {/* Statistiques condensées */}
+                  <div className="flex justify-between text-sm text-gray-500 mb-3">
+                    <div>{clientData.statistics.clientsOnSameDay} clients ce jour</div>
+                    <div>{clientData.statistics.remainingDays} jours restants</div>
                   </div>
-                  <div className="font-medium">
-                    Durée estimée: {clientData.duration.value} {clientData.duration.unit}
-                  </div>
+                  
+                  {/* Bouton d'itinéraire */}
                   <a
                     href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(clientData.client.address)}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-2 inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+                    className="block w-full bg-blue-500 text-white text-center py-2 rounded hover:bg-blue-600 transition-colors"
                   >
-                    Ouvrir dans Google Maps
+                    <Navigation className="h-4 w-4 inline-block mr-1" /> Itinéraire
                   </a>
                 </div>
               </div>
