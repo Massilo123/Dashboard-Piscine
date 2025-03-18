@@ -59,7 +59,7 @@ const OptimisationRdvClient = () => {
   const [error, setError] = useState<string>('')
   const [visitedClients, setVisitedClients] = useState<ClientData[]>([])
   const [navigationIndex, setNavigationIndex] = useState<number>(0)
-  const [processedDates, setProcessedDates] = useState<string[]>([])
+  const [allProcessedDates, setAllProcessedDates] = useState<string[]>([])
   const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date().toISOString().split('T')[0],
@@ -121,7 +121,7 @@ const OptimisationRdvClient = () => {
   // Mise à jour des dates traitées
   useEffect(() => {
     if (clientData?.navigation?.processedDates) {
-      setProcessedDates(clientData.navigation.processedDates);
+      setAllProcessedDates(clientData.navigation.processedDates);
     }
   }, [clientData]);
 
@@ -147,6 +147,12 @@ const OptimisationRdvClient = () => {
     setAddress(suggestion.place_name);
     setSuggestions([]);
     setIsAddressSelected(true);
+  };
+
+  // Fonction pour obtenir les dates processées à exclure, sans la date courante
+  const getExcludeDatesExcept = (currentDate: string | null) => {
+    if (!currentDate) return allProcessedDates;
+    return allProcessedDates.filter(date => date !== currentDate);
   };
 
   const findNearestClient = async (excludeDates: string[] = [], specificDate: string | null = null) => {
@@ -189,19 +195,27 @@ const OptimisationRdvClient = () => {
       const newClientData = data.data;
       
       if (excludeDates.length > 0 && !specificDate) {
-        // Navigation suivante
-        setVisitedClients(prev => [...prev, newClientData]);
-        setNavigationIndex(prev => prev + 1);
+        // Navigation suivante - ajouter le nouveau client à l'historique
+        const updatedVisitedClients = [...visitedClients, newClientData];
+        setVisitedClients(updatedVisitedClients);
+        setNavigationIndex(updatedVisitedClients.length - 1);
       } else if (specificDate) {
-        // Navigation en arrière - on récupère un client déjà visité à l'index précédent
-        setNavigationIndex(prev => prev - 1);
+        // Trouver l'index du client avec la date spécifique
+        const existingIndex = visitedClients.findIndex(
+          client => client.booking.bookingDate === specificDate
+        );
+        
+        if (existingIndex >= 0) {
+          // Nous avons trouvé un client existant avec cette date, mettre à jour l'index
+          setNavigationIndex(existingIndex);
+        }
       } else {
-        // Premier client
+        // Premier client - réinitialiser l'historique
         setVisitedClients([newClientData]);
         setNavigationIndex(0);
       }
       
-      // Toujours mettre à jour les données client avec les plus récentes
+      // Toujours mettre à jour les données client
       setClientData(newClientData);
       
     } catch (err) {
@@ -211,28 +225,30 @@ const OptimisationRdvClient = () => {
     }
   }
 
+  // Navigation directe à un client spécifique dans l'historique
+  const navigateToClient = (index: number) => {
+    if (index >= 0 && index < visitedClients.length && index !== navigationIndex) {
+      const targetClient = visitedClients[index];
+      const targetDate = targetClient.booking.bookingDate;
+      
+      // Exclure toutes les autres dates sauf celle du client cible
+      const excludeDates = getExcludeDatesExcept(targetDate);
+      
+      findNearestClient(excludeDates, targetDate);
+    }
+  };
+
   const handleNextClient = () => {
-    if (clientData) {
-      findNearestClient(processedDates);
+    if (clientData && clientData.navigation.hasNext) {
+      findNearestClient(allProcessedDates);
     }
   };
 
   const handlePreviousClient = () => {
     if (navigationIndex > 0) {
-      const previousIndex = navigationIndex - 1;
-      const previousClient = visitedClients[previousIndex];
-      
-      // Filtrer les dates traitées pour exclure la date du client précédent
-      findNearestClient(
-        processedDates.filter(date => date !== previousClient.booking.bookingDate),
-        previousClient.booking.bookingDate
-      );
+      navigateToClient(navigationIndex - 1);
     }
   };
-
-  // Vérification de la disponibilité des boutons de navigation
-  const canGoBack = navigationIndex > 0;
-  const canGoForward = clientData?.navigation?.hasNext || false;
 
   return (
     <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 space-y-4" ref={wrapperRef}>
@@ -333,13 +349,13 @@ const OptimisationRdvClient = () => {
 
           {clientData && (
             <div className="mt-4">
-              {/* Boutons de navigation - ils sont toujours affichés, mais désactivés si navigation impossible */}
+              {/* Boutons de navigation */}
               <div className="flex justify-between items-center mb-4">
                 <button
                   onClick={handlePreviousClient}
-                  disabled={!canGoBack || loading}
+                  disabled={loading || navigationIndex <= 0}
                   className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
-                    canGoBack 
+                    navigationIndex > 0 && !loading
                       ? 'bg-gray-500 text-white hover:bg-gray-600' 
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
@@ -349,9 +365,9 @@ const OptimisationRdvClient = () => {
                 
                 <button
                   onClick={handleNextClient}
-                  disabled={!canGoForward || loading}
+                  disabled={loading || !clientData.navigation.hasNext}
                   className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
-                    canGoForward 
+                    clientData.navigation.hasNext && !loading
                       ? 'bg-green-500 text-white hover:bg-green-600' 
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
@@ -359,6 +375,26 @@ const OptimisationRdvClient = () => {
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
+
+              {/* Navigation par index (optionnel) - utile pour le débogage */}
+              {/*
+              <div className="flex justify-center mb-4 gap-2">
+                {visitedClients.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => navigateToClient(index)}
+                    disabled={index === navigationIndex || loading}
+                    className={`w-8 h-8 rounded-full ${
+                      index === navigationIndex 
+                        ? 'bg-blue-500 text-white' 
+                        : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                    }`}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+              </div>
+              */}
 
               {/* Carte client principale */}
               <div className="border rounded-lg shadow overflow-hidden">
