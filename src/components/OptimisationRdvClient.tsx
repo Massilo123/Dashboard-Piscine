@@ -187,19 +187,23 @@ const OptimisationRdvClient = () => {
       }
 
       const newClientData = data.data;
-      setClientData(newClientData);
       
       if (excludeDates.length > 0 && !specificDate) {
         // Navigation suivante
         setVisitedClients(prev => [...prev, newClientData]);
         setNavigationIndex(prev => prev + 1);
       } else if (specificDate) {
-        // Navigation en arrière - on garde le même index
+        // Navigation en arrière - on récupère un client déjà visité à l'index précédent
+        setNavigationIndex(prev => prev - 1);
       } else {
         // Premier client
         setVisitedClients([newClientData]);
         setNavigationIndex(0);
       }
+      
+      // Toujours mettre à jour les données client avec les plus récentes
+      setClientData(newClientData);
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue')
     } finally {
@@ -223,10 +227,12 @@ const OptimisationRdvClient = () => {
         processedDates.filter(date => date !== previousClient.booking.bookingDate),
         previousClient.booking.bookingDate
       );
-      
-      setNavigationIndex(previousIndex);
     }
   };
+
+  // Vérification de la disponibilité des boutons de navigation
+  const canGoBack = navigationIndex > 0;
+  const canGoForward = clientData?.navigation?.hasNext || false;
 
   return (
     <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 space-y-4" ref={wrapperRef}>
@@ -297,7 +303,7 @@ const OptimisationRdvClient = () => {
                 className="w-full border rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               {suggestions.length > 0 && (
-                <div className="absolute z-10 w-full bg-white mt-1 border rounded-md shadow-lg">
+                <div className="absolute z-10 w-full bg-white mt-1 border rounded-md shadow-lg max-h-60 overflow-y-auto">
                   {suggestions.map((suggestion, index) => (
                     <div
                       key={index}
@@ -327,30 +333,31 @@ const OptimisationRdvClient = () => {
 
           {clientData && (
             <div className="mt-4">
-              {/* Boutons de navigation */}
+              {/* Boutons de navigation - ils sont toujours affichés, mais désactivés si navigation impossible */}
               <div className="flex justify-between items-center mb-4">
-                <div>
-                  {navigationIndex > 0 && (
-                    <button
-                      onClick={handlePreviousClient}
-                      disabled={loading}
-                      className="flex items-center gap-1 bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-                <div>
-                  {clientData.navigation.hasNext && (
-                    <button
-                      onClick={handleNextClient}
-                      disabled={loading}
-                      className="flex items-center gap-1 bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
+                <button
+                  onClick={handlePreviousClient}
+                  disabled={!canGoBack || loading}
+                  className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
+                    canGoBack 
+                      ? 'bg-gray-500 text-white hover:bg-gray-600' 
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                
+                <button
+                  onClick={handleNextClient}
+                  disabled={!canGoForward || loading}
+                  className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
+                    canGoForward 
+                      ? 'bg-green-500 text-white hover:bg-green-600' 
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
 
               {/* Carte client principale */}
@@ -411,4 +418,4 @@ const OptimisationRdvClient = () => {
   )
 }
 
-export default OptimisationRdvClient  
+export default OptimisationRdvClient
