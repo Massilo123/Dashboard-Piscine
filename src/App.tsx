@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-ro
 import ClientSearch from './components/ClientSearch';
 import RouteOptimizer from './components/RouteOptimizer';
 import RouteOptimizerSchedule from './components/RouteOptimizerSchedule';
+import OptimisationRdvClient from './components/OptimisationRdvClient';
 import DistrictTable from './components/DistrictTable';
 import UnidentifiedClientsManager from './components/UnidentifiedClientsManager';
 
@@ -34,16 +35,22 @@ function App() {
                   Planning
                 </Link>
                 <Link 
-                    to="/district-table"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  to="/optimisation-rdv"
+                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
                 >
-                    Tableau des Quartiers
+                  Client Rendez-vous Proche
                 </Link>
                 <Link 
-                    to="/UnidentifiedClientsManager"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  to="/district-table"
+                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
                 >
-                    Gestion ville clients
+                  Tableau des Quartiers
+                </Link>
+                <Link 
+                  to="/UnidentifiedClientsManager"
+                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Gestion ville clients
                 </Link>
               </div>
             </div>
@@ -57,9 +64,9 @@ function App() {
             <Route path="/client-search" element={<ClientSearch />} />
             <Route path="/route-optimizer" element={<RouteOptimizer />} />
             <Route path="/schedule" element={<RouteOptimizerSchedule />} />
+            <Route path="/optimisation-rdv" element={<OptimisationRdvClient />} />
             <Route path="/district-table" element={<DistrictTable />} />
             <Route path="/UnidentifiedClientsManager" element={<UnidentifiedClientsManager />} />
-            <Route path="/" element={<ClientSearch />} /> {/* Default route */}
           </Routes>
         </div>
       </div>

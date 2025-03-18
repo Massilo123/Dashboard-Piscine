@@ -6,6 +6,7 @@ import squareRoutes from './routes/squareRoutes';
 import clientRoutes from './routes/clientRoutes';
 import mapboxRoutes from './routes/mapboxRoutes';
 import routeOptimizer from './routes/routeOptimizer';
+import clientRdvOptimizer from './routes/clientRdvOptimizer';
 import clientDistrictsRoutes from './routes/clientDistrictsRoutes'
 import manualDistrictAssignment from './routes/manualDistrictAssignment';
 import webhookRoutes from './routes/webhookRoutes';
@@ -32,6 +33,7 @@ app.use('/api/square', squareRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/mapbox', mapboxRoutes);
 app.use('/api/optimize', routeOptimizer);
+app.use('/api/client-rdv', clientRdvOptimizer);
 app.use('/', manualDistrictAssignment);
 app.use('/', clientDistrictsRoutes);
 app.use('/api', webhookRoutes);
