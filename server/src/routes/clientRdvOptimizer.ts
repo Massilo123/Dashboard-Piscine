@@ -1,5 +1,3 @@
-// Modifications dans clientRdvOptimizer.ts
-
 import { Router, Request, Response } from 'express';
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
@@ -112,50 +110,13 @@ async function getDetailedRoute(locations: { address: string; coordinates: numbe
     };
 }
 
-// Fonction pour calculer l'itinéraire optimisé
-async function calculateOptimizedRoute(sourceAddress: string, clientAddresses: string[]) {
-    // Ajouter l'adresse source au début de la liste
-    const allAddresses = [sourceAddress, ...clientAddresses];
-    
-    // Convertir toutes les adresses en coordonnées
-    const coordinates = await Promise.all(
-        allAddresses.map(async (address) => {
-            const response = await geocodingService.forwardGeocode({
-                query: address,
-                countries: ['ca'],
-                limit: 1
-            }).send();
-
-            if (!response.body.features.length) {
-                throw new Error(`Adresse non trouvée : ${address}`);
-            }
-
-            return {
-                address,
-                coordinates: response.body.features[0].geometry.coordinates
-            };
-        })
-    );
-
-    // Calculer la matrice des distances
-    const matrix = await calculateDistanceMatrix(coordinates);
-    
-    // Trouver l'ordre optimal
-    const optimalRoute = findOptimalRoute(matrix, coordinates.length);
-    
-    // Obtenir l'itinéraire détaillé
-    const finalRoute = await getDetailedRoute(coordinates, optimalRoute);
-    
-    return finalRoute;
-}
-
 router.post('/', async (req: Request, res: Response) => {
     try {
         const { 
             address, 
             excludeDates = [], 
             specificDate = null,
-            dateRange = null
+            dateRange = null  // Nouvel attribut pour filtrer par intervalle de dates
         } = req.body;
 
         if (!address) {
@@ -353,8 +314,52 @@ router.post('/', async (req: Request, res: Response) => {
                 // Récupérer uniquement les adresses des clients
                 const clientAddresses = clientsOnSameDay.map(client => client.address);
                 
-                // Calculer l'itinéraire optimisé
-                optimizedRoute = await calculateOptimizedRoute(address, clientAddresses);
+                // Ajouter l'adresse source au début de la liste (l'adresse saisie par l'utilisateur)
+                const allAddresses = [address, ...clientAddresses];
+                
+                // Convertir toutes les adresses en coordonnées
+                const coordinates = await Promise.all(
+                    allAddresses.map(async (addr) => {
+                        // Pour l'adresse source, utiliser les coordonnées déjà obtenues
+                        if (addr === address) {
+                            return {
+                                address: addr,
+                                coordinates: sourceCoordinates
+                            };
+                        }
+                        
+                        // Pour les adresses clients, obtenir les coordonnées
+                        const response = await geocodingService.forwardGeocode({
+                            query: addr,
+                            countries: ['ca'],
+                            limit: 1
+                        }).send();
+
+                        if (!response.body.features.length) {
+                            throw new Error(`Adresse non trouvée : ${addr}`);
+                        }
+
+                        return {
+                            address: addr,
+                            coordinates: response.body.features[0].geometry.coordinates
+                        };
+                    })
+                );
+
+                // Calculer la matrice des distances
+                const matrix = await calculateDistanceMatrix(coordinates);
+                
+                // Trouver l'ordre optimal
+                const optimalRoute = findOptimalRoute(matrix, coordinates.length);
+                
+                // Obtenir l'itinéraire détaillé
+                const detailedRoute = await getDetailedRoute(coordinates, optimalRoute);
+                
+                optimizedRoute = {
+                    waypoints: detailedRoute.waypoints,
+                    totalDuration: detailedRoute.totalDuration,
+                    totalDistance: detailedRoute.totalDistance
+                };
             }
         } catch (error) {
             console.error("Erreur lors de l'optimisation de l'itinéraire:", error);
