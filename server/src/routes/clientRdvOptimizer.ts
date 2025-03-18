@@ -4,7 +4,6 @@ import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 import mbxDirections from '@mapbox/mapbox-sdk/services/directions';
 import squareClient from '../config/square';
 
-
 const router = Router();
 const baseClient = mbxClient({ accessToken: process.env.MAPBOX_TOKEN! });
 const geocodingService = mbxGeocoding(baseClient);
@@ -12,7 +11,7 @@ const directionsService = mbxDirections(baseClient);
 
 router.post('/', async (req: Request, res: Response) => {
     try {
-        const { address } = req.body;
+        const { address, excludeDates = [] } = req.body;
 
         if (!address) {
             return res.status(400).json({
@@ -40,9 +39,16 @@ router.post('/', async (req: Request, res: Response) => {
         // 2. Obtenir la date actuelle pour filtrer seulement les rendez-vous futurs
         const currentDate = new Date();
         
-        // Rechercher les réservations pour les 30 prochains jours
+        // On cherche d'abord les rendez-vous pour aujourd'hui
+        const todayStart = new Date(currentDate);
+        todayStart.setHours(0, 0, 0, 0);
+        
+        const todayEnd = new Date(currentDate);
+        todayEnd.setHours(23, 59, 59, 999);
+        
+        // Ensuite, on cherche pour les 30 prochains jours
         const futureDate = new Date();
-        futureDate.setDate(currentDate.getDate() + 10);
+        futureDate.setDate(currentDate.getDate() + 30);
 
         const bookingsResponse = await squareClient.bookings.list({
             startAtMin: currentDate.toISOString(),
@@ -50,7 +56,32 @@ router.post('/', async (req: Request, res: Response) => {
             locationId: "L24K8X13MB1A7"
         });
 
-        // 3. Récupérer les informations des clients avec adresses
+        // Récupérer les clients avec rendez-vous pour aujourd'hui
+        const todayBookings = await squareClient.bookings.list({
+            startAtMin: todayStart.toISOString(),
+            startAtMax: todayEnd.toISOString(),
+            locationId: "L24K8X13MB1A7"
+        });
+        
+        // Compter les rendez-vous valides d'aujourd'hui (ceux qui ont un client avec une adresse)
+        let todayValidBookingsCount = 0;
+        for await (const booking of todayBookings) {
+            if (booking.customerId) {
+                try {
+                    const customerResponse = await squareClient.customers.get({
+                        customerId: booking.customerId
+                    });
+                    
+                    if (customerResponse.customer && customerResponse.customer.address?.addressLine1) {
+                        todayValidBookingsCount++;
+                    }
+                } catch (error) {
+                    console.error(`Erreur récupération client ${booking.customerId}:`, error);
+                }
+            }
+        }
+
+        // 3. Récupérer les informations des clients avec adresses pour tous les rendez-vous futurs
         const clientsWithBookings: {
             bookingId: string;
             customerId: string;
@@ -58,12 +89,27 @@ router.post('/', async (req: Request, res: Response) => {
             address: string;
             coordinates: number[];
             startAt: string;
+            bookingDate: string; // Date du rendez-vous (YYYY-MM-DD)
             distance: number | null;
             duration: number | null;
         }[] = [];
 
+        // Map pour suivre les dates de rendez-vous déjà traitées
+        const processedDates = new Map<string, boolean>();
+        excludeDates.forEach((date: string) => {
+            processedDates.set(date, true);
+        });
+
         for await (const booking of bookingsResponse) {
             if (booking.customerId && booking.startAt) {
+                // Vérifier si cette date a déjà été exclue
+                const bookingDate = new Date(booking.startAt);
+                const dateString = bookingDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
+                
+                if (processedDates.has(dateString)) {
+                    continue; // Sauter ce rendez-vous car sa date est exclue
+                }
+
                 try {
                     const customerResponse = await squareClient.customers.get({
                         customerId: booking.customerId
@@ -105,6 +151,7 @@ router.post('/', async (req: Request, res: Response) => {
                                 address: customerResponse.customer.address.addressLine1,
                                 coordinates: clientCoordinates,
                                 startAt: booking.startAt,
+                                bookingDate: dateString,
                                 distance,
                                 duration
                             });
@@ -131,6 +178,10 @@ router.post('/', async (req: Request, res: Response) => {
         });
 
         const nearestClient = clientsWithBookings[0];
+
+        // Obtenir les dates uniques disponibles (pour le compteur de jours restants)
+        const uniqueDates = [...new Set(clientsWithBookings.map(c => c.bookingDate))];
+        const remainingDays = uniqueDates.length;
 
         // 5. Obtenir l'itinéraire détaillé vers ce client
         const directionResponse = await directionsService.getDirections({
@@ -167,7 +218,8 @@ router.post('/', async (req: Request, res: Response) => {
                     id: nearestClient.bookingId,
                     date: formattedDate,
                     time: formattedTime,
-                    dateISO: nearestClient.startAt
+                    dateISO: nearestClient.startAt,
+                    bookingDate: nearestClient.bookingDate
                 },
                 distance: {
                     value: nearestClient.distance,
@@ -177,7 +229,15 @@ router.post('/', async (req: Request, res: Response) => {
                     value: nearestClient.duration,
                     unit: 'minutes'
                 },
-                route: directionResponse.body.routes[0]
+                route: directionResponse.body.routes[0],
+                statistics: {
+                    totalBookingsToday: todayValidBookingsCount,
+                    remainingDays: remainingDays
+                },
+                navigation: {
+                    hasNext: remainingDays > 1,
+                    processedDates: [...processedDates.keys(), nearestClient.bookingDate]
+                }
             }
         });
 
