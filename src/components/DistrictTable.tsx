@@ -149,27 +149,28 @@ const DistrictTable = () => {
   const sortedDistricts = [...filteredDistricts].sort((a, b) => b.count - a.count);
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-4">Distribution des Clients par Quartier</h1>
+    <div className="p-2 sm:p-6">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold mb-4">Distribution des Clients par Quartier</h1>
         
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="text-2xl font-bold text-blue-700">{data.stats.totalProcessed}</div>
-            <div className="text-sm text-blue-600">Clients traités</div>
+        {/* Statistiques responsives */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-blue-50 p-2 sm:p-4 rounded-lg">
+            <div className="text-lg sm:text-2xl font-bold text-blue-700">{data.stats.totalProcessed}</div>
+            <div className="text-xs sm:text-sm text-blue-600">Clients traités</div>
           </div>
-          <div className="bg-yellow-50 p-4 rounded-lg">
-            <div className="text-2xl font-bold text-yellow-700">{data.stats.totalUnidentified}</div>
-            <div className="text-sm text-yellow-600">Non identifiés</div>
+          <div className="bg-yellow-50 p-2 sm:p-4 rounded-lg">
+            <div className="text-lg sm:text-2xl font-bold text-yellow-700">{data.stats.totalUnidentified}</div>
+            <div className="text-xs sm:text-sm text-yellow-600">Non identifiés</div>
           </div>
-          <div className="bg-green-50 p-4 rounded-lg">
-            <div className="text-2xl font-bold text-green-700">{data.stats.totalDistrictsFound}</div>
-            <div className="text-sm text-green-600">Districts trouvés</div>
+          <div className="bg-green-50 p-2 sm:p-4 rounded-lg">
+            <div className="text-lg sm:text-2xl font-bold text-green-700">{data.stats.totalDistrictsFound}</div>
+            <div className="text-xs sm:text-sm text-green-600">Districts trouvés</div>
           </div>
         </div>
 
         <select 
-          className="w-64 p-2 border rounded-md shadow-sm"
+          className="w-full sm:w-64 p-2 border rounded-md shadow-sm"
           value={selectedCity}
           onChange={(e) => setSelectedCity(e.target.value)}
         >
@@ -182,7 +183,8 @@ const DistrictTable = () => {
         </select>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      {/* Version desktop du tableau - caché sur mobile */}
+      <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
         <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr>
@@ -249,6 +251,55 @@ const DistrictTable = () => {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Version mobile - visible uniquement sur petits écrans */}
+      <div className="md:hidden">
+        {sortedDistricts.map((district) => (
+          <div key={district.id} className="mb-4 bg-white rounded-lg shadow overflow-hidden">
+            <div className="border-b border-gray-200 p-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-medium text-gray-900">{district.city}</h3>
+                  <p className="text-sm text-gray-700">{district.neighborhood}</p>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {district.count} clients
+                  </span>
+                  <button
+                    onClick={() => setExpandedDistrict(
+                      expandedDistrict === district.id ? null : district.id
+                    )}
+                    className="mt-2 text-xs text-blue-600 hover:text-blue-900"
+                  >
+                    {expandedDistrict === district.id ? 'Masquer' : 'Voir les clients'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            {expandedDistrict === district.id && (
+              <div className="p-4 bg-gray-50">
+                <div className="space-y-3">
+                  {district.clients.map((client) => (
+                    <div key={client.id} className="border-b border-gray-200 pb-2">
+                      <div className="font-medium">{client.name}</div>
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.address)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 hover:underline text-sm break-words"
+                      >
+                        {client.address}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
