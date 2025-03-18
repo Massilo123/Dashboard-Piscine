@@ -11,7 +11,12 @@ const directionsService = mbxDirections(baseClient);
 
 router.post('/', async (req: Request, res: Response) => {
     try {
-        const { address, excludeDates = [] } = req.body;
+        const { 
+            address, 
+            excludeDates = [], 
+            specificDate = null,
+            dateRange = null  // Nouvel attribut pour filtrer par intervalle de dates
+        } = req.body;
 
         if (!address) {
             return res.status(400).json({
@@ -36,50 +41,30 @@ router.post('/', async (req: Request, res: Response) => {
 
         const sourceCoordinates = geocodeResponse.body.features[0].geometry.coordinates;
 
-        // 2. Obtenir la date actuelle pour filtrer seulement les rendez-vous futurs
+        // 2. Configurer la plage de dates pour la recherche
         const currentDate = new Date();
+        let startDate, endDate;
         
-        // On cherche d'abord les rendez-vous pour aujourd'hui
-        const todayStart = new Date(currentDate);
-        todayStart.setHours(0, 0, 0, 0);
-        
-        const todayEnd = new Date(currentDate);
-        todayEnd.setHours(23, 59, 59, 999);
-        
-        // Ensuite, on cherche pour les 30 prochains jours
-        const futureDate = new Date();
-        futureDate.setDate(currentDate.getDate() + 30);
+        if (dateRange && dateRange.startDate && dateRange.endDate) {
+            // Utiliser l'intervalle de dates fourni par l'utilisateur
+            startDate = new Date(dateRange.startDate);
+            startDate.setHours(0, 0, 0, 0);
+            
+            endDate = new Date(dateRange.endDate);
+            endDate.setHours(23, 59, 59, 999);
+        } else {
+            // Par défaut: rechercher dans les 30 prochains jours
+            startDate = new Date(currentDate);
+            
+            endDate = new Date(currentDate);
+            endDate.setDate(endDate.getDate() + 30);
+        }
 
         const bookingsResponse = await squareClient.bookings.list({
-            startAtMin: currentDate.toISOString(),
-            startAtMax: futureDate.toISOString(),
+            startAtMin: startDate.toISOString(),
+            startAtMax: endDate.toISOString(),
             locationId: "L24K8X13MB1A7"
         });
-
-        // Récupérer les clients avec rendez-vous pour aujourd'hui
-        const todayBookings = await squareClient.bookings.list({
-            startAtMin: todayStart.toISOString(),
-            startAtMax: todayEnd.toISOString(),
-            locationId: "L24K8X13MB1A7"
-        });
-        
-        // Compter les rendez-vous valides d'aujourd'hui (ceux qui ont un client avec une adresse)
-        let todayValidBookingsCount = 0;
-        for await (const booking of todayBookings) {
-            if (booking.customerId) {
-                try {
-                    const customerResponse = await squareClient.customers.get({
-                        customerId: booking.customerId
-                    });
-                    
-                    if (customerResponse.customer && customerResponse.customer.address?.addressLine1) {
-                        todayValidBookingsCount++;
-                    }
-                } catch (error) {
-                    console.error(`Erreur récupération client ${booking.customerId}:`, error);
-                }
-            }
-        }
 
         // 3. Récupérer les informations des clients avec adresses pour tous les rendez-vous futurs
         const clientsWithBookings: {
@@ -100,13 +85,29 @@ router.post('/', async (req: Request, res: Response) => {
             processedDates.set(date, true);
         });
 
+        // Map pour compter les clients par date
+        const clientsByDate = new Map<string, number>();
+
         for await (const booking of bookingsResponse) {
             if (booking.customerId && booking.startAt) {
-                // Vérifier si cette date a déjà été exclue
+                // Extraire la date du rendez-vous
                 const bookingDate = new Date(booking.startAt);
                 const dateString = bookingDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
                 
-                if (processedDates.has(dateString)) {
+                // Incrémenter le compteur pour cette date
+                if (clientsByDate.has(dateString)) {
+                    clientsByDate.set(dateString, clientsByDate.get(dateString)! + 1);
+                } else {
+                    clientsByDate.set(dateString, 1);
+                }
+                
+                // Si on cherche une date spécifique et que ce n'est pas celle-ci, sauter ce rendez-vous
+                if (specificDate && dateString !== specificDate) {
+                    continue;
+                }
+                
+                // Vérifier si cette date a déjà été exclue
+                if (processedDates.has(dateString) && !specificDate) {
                     continue; // Sauter ce rendez-vous car sa date est exclue
                 }
 
@@ -166,7 +167,7 @@ router.post('/', async (req: Request, res: Response) => {
         if (clientsWithBookings.length === 0) {
             return res.status(404).json({
                 success: false,
-                error: 'Aucun client avec rendez-vous futur trouvé'
+                error: 'Aucun client avec rendez-vous trouvé dans cet intervalle de dates'
             });
         }
 
@@ -182,6 +183,9 @@ router.post('/', async (req: Request, res: Response) => {
         // Obtenir les dates uniques disponibles (pour le compteur de jours restants)
         const uniqueDates = [...new Set(clientsWithBookings.map(c => c.bookingDate))];
         const remainingDays = uniqueDates.length;
+
+        // Nombre de clients à la date du client le plus proche
+        const clientsOnSameDay = clientsByDate.get(nearestClient.bookingDate) || 0;
 
         // 5. Obtenir l'itinéraire détaillé vers ce client
         const directionResponse = await directionsService.getDirections({
@@ -231,12 +235,17 @@ router.post('/', async (req: Request, res: Response) => {
                 },
                 route: directionResponse.body.routes[0],
                 statistics: {
-                    totalBookingsToday: todayValidBookingsCount,
+                    clientsOnSameDay: clientsOnSameDay,
                     remainingDays: remainingDays
                 },
                 navigation: {
                     hasNext: remainingDays > 1,
-                    processedDates: [...processedDates.keys(), nearestClient.bookingDate]
+                    processedDates: [...processedDates.keys(), nearestClient.bookingDate],
+                    allDates: Array.from(clientsByDate.keys()).sort(),
+                    dateRange: dateRange ? {
+                        startDate: dateRange.startDate,
+                        endDate: dateRange.endDate
+                    } : null
                 }
             }
         });

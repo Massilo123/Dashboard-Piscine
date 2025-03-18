@@ -1,4 +1,4 @@
-import { MapPin, Navigation, User, Calendar, Clock, Users, ChevronRight } from 'lucide-react'
+import { MapPin, Navigation, User, Calendar, Clock, Users, ChevronRight, ChevronLeft, Filter, X } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
@@ -9,6 +9,11 @@ const geocodingService = mbxGeocoding(baseClient);
 interface Suggestion {
   place_name: string;
   text: string;
+}
+
+interface DateRange {
+  startDate: string;
+  endDate: string;
 }
 
 interface ClientData {
@@ -34,12 +39,14 @@ interface ClientData {
   }
   route: any // Type pour la route MapBox
   statistics: {
-    totalBookingsToday: number
+    clientsOnSameDay: number
     remainingDays: number
   }
   navigation: {
     hasNext: boolean
     processedDates: string[]
+    allDates: string[]
+    dateRange: DateRange | null
   }
 }
 
@@ -50,9 +57,16 @@ const OptimisationRdvClient = () => {
   const [loading, setLoading] = useState<boolean>(false)
   const [clientData, setClientData] = useState<ClientData | null>(null)
   const [error, setError] = useState<string>('')
+  const [visitedClients, setVisitedClients] = useState<ClientData[]>([])
+  const [navigationIndex, setNavigationIndex] = useState<number>(0)
   const [processedDates, setProcessedDates] = useState<string[]>([])
-  const [navigationCount, setNavigationCount] = useState<number>(0)
+  const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: new Date().toISOString().split('T')[0], // Format YYYY-MM-DD pour aujourd'hui
+    endDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0] // Format YYYY-MM-DD pour 30 jours après
+  })
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const filterRef = useRef<HTMLDivElement>(null)
 
   // Gestion du clic en dehors du composant pour fermer les suggestions
   useEffect(() => {
@@ -60,13 +74,17 @@ const OptimisationRdvClient = () => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setSuggestions([]);
       }
+      
+      if (filterRef.current && !filterRef.current.contains(event.target as Node) && showDateFilter) {
+        setShowDateFilter(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [showDateFilter]);
 
   // Gestion des suggestions d'adresses
   useEffect(() => {
@@ -113,16 +131,34 @@ const OptimisationRdvClient = () => {
     setIsAddressSelected(false)
   }
 
+  const handleDateRangeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setDateRange(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  }
+
+  const toggleDateFilter = () => {
+    setShowDateFilter(!showDateFilter);
+  }
+
   const selectSuggestion = (suggestion: Suggestion) => {
     setAddress(suggestion.place_name);
     setSuggestions([]);
     setIsAddressSelected(true);
   };
 
-  const findNearestClient = async (excludeDates: string[] = []) => {
+  const findNearestClient = async (excludeDates: string[] = [], specificDate: string | null = null) => {
     if (!address) {
       setError('Veuillez entrer une adresse')
       return
+    }
+
+    // Valider l'intervalle de dates
+    if (dateRange.startDate > dateRange.endDate) {
+      setError('La date de début doit être antérieure à la date de fin');
+      return;
     }
 
     setLoading(true)
@@ -136,7 +172,12 @@ const OptimisationRdvClient = () => {
         },
         body: JSON.stringify({ 
           address,
-          excludeDates
+          excludeDates,
+          specificDate,
+          dateRange: {
+            startDate: dateRange.startDate,
+            endDate: dateRange.endDate
+          }
         }),
       })
 
@@ -146,12 +187,19 @@ const OptimisationRdvClient = () => {
         throw new Error(data.error || 'Une erreur est survenue')
       }
 
-      setClientData(data.data)
+      const newClientData = data.data;
+      setClientData(newClientData);
       
-      if (excludeDates.length > 0) {
-        setNavigationCount(prev => prev + 1);
+      if (excludeDates.length > 0 && !specificDate) {
+        // Si on avance, on ajoute au tableau des clients visités
+        setVisitedClients(prev => [...prev, newClientData]);
+        setNavigationIndex(prev => prev + 1);
+      } else if (specificDate) {
+        // Si on navigue en arrière, ne pas modifier le tableau
       } else {
-        setNavigationCount(0);
+        // Nouvelle recherche, réinitialiser
+        setVisitedClients([newClientData]);
+        setNavigationIndex(0);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue')
@@ -166,13 +214,87 @@ const OptimisationRdvClient = () => {
     }
   };
 
+  const handlePreviousClient = () => {
+    if (navigationIndex > 0) {
+      const previousIndex = navigationIndex - 1;
+      const previousClient = visitedClients[previousIndex];
+      
+      // Utiliser specificDate pour revenir exactement au client précédent
+      findNearestClient(
+        // Exclure toutes les dates sauf celle du client précédent
+        processedDates.filter(date => date !== previousClient.booking.bookingDate),
+        previousClient.booking.bookingDate
+      );
+      
+      setNavigationIndex(previousIndex);
+    }
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto p-4 space-y-4" ref={wrapperRef}>
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <MapPin className="h-6 w-6" />
-          <h2 className="text-xl font-semibold text-black">Trouver le client le plus proche</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-6 w-6" />
+            <h2 className="text-xl font-semibold text-black">Trouver le client le plus proche</h2>
+          </div>
+          <button 
+            onClick={toggleDateFilter}
+            className="flex items-center gap-1 text-gray-600 px-2 py-1 rounded hover:bg-gray-100"
+          >
+            <Filter className="h-4 w-4" />
+            <span>Filtre de dates</span>
+          </button>
         </div>
+
+        {/* Filtre par date - Visible uniquement lorsque activé */}
+        {showDateFilter && (
+          <div 
+            ref={filterRef}
+            className="mb-4 p-3 border border-gray-200 rounded-md bg-gray-50 relative"
+          >
+            <div className="absolute top-2 right-2">
+              <button
+                onClick={() => setShowDateFilter(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <h3 className="text-sm font-medium mb-2 text-gray-700">Filtrer par période</h3>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col">
+                <label htmlFor="startDate" className="text-xs text-gray-500 mb-1">Date de début</label>
+                <input
+                  type="date"
+                  id="startDate"
+                  name="startDate"
+                  value={dateRange.startDate}
+                  onChange={handleDateRangeChange}
+                  className="border rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex flex-col">
+                <label htmlFor="endDate" className="text-xs text-gray-500 mb-1">Date de fin</label>
+                <input
+                  type="date"
+                  id="endDate"
+                  name="endDate"
+                  value={dateRange.endDate}
+                  onChange={handleDateRangeChange}
+                  className="border rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 mt-2">
+              {clientData?.navigation?.dateRange ? (
+                <span>Recherche active entre {clientData.navigation.dateRange.startDate} et {clientData.navigation.dateRange.endDate}</span>
+              ) : (
+                <span>Le filtre sera appliqué à la prochaine recherche</span>
+              )}
+            </div>
+          </div>
+        )}
         
         <div className="flex flex-col gap-4">
           <div className="flex flex-col md:flex-row gap-4">
@@ -215,12 +337,21 @@ const OptimisationRdvClient = () => {
 
           {clientData && (
             <div className="mt-4 space-y-4">
-              {/* En-tête avec navigation et compteur */}
+              {/* En-tête avec navigation */}
               <div className="flex justify-between items-center">
-                <div className="text-black font-medium">
-                  {navigationCount > 0 && (
+                <div className="text-black font-medium flex items-center">
+                  {navigationIndex > 0 && (
+                    <button
+                      onClick={handlePreviousClient}
+                      disabled={loading}
+                      className="flex items-center gap-1 bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors mr-2"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Précédent
+                    </button>
+                  )}
+                  {navigationIndex > 0 && (
                     <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-full text-sm">
-                      Client {navigationCount + 1}
+                      Client {navigationIndex + 1}
                     </span>
                   )}
                 </div>
@@ -235,14 +366,14 @@ const OptimisationRdvClient = () => {
                 )}
               </div>
 
-              {/* Statistiques de la journée */}
+              {/* Statistiques */}
               <div className="border rounded p-4 bg-purple-50">
                 <h3 className="text-lg font-semibold mb-2 text-black flex items-center">
                   <Users className="h-5 w-5 mr-2" />
                   Statistiques
                 </h3>
                 <div className="text-black space-y-1">
-                  <div className="font-medium">Nombre total de clients aujourd'hui: {clientData.statistics.totalBookingsToday}</div>
+                  <div className="font-medium">Clients programmés le {clientData.booking.date.split(" ").slice(0, -1).join(" ")}: {clientData.statistics.clientsOnSameDay}</div>
                   <div className="font-medium">Jours avec rendez-vous restants: {clientData.statistics.remainingDays}</div>
                 </div>
               </div>
