@@ -16,6 +16,17 @@ interface DateRange {
   endDate: string;
 }
 
+interface Waypoint {
+  address: string;
+  coordinates?: [number, number];
+}
+
+interface OptimizedRoute {
+  totalDistance: number;
+  totalDuration: number;
+  waypoints: Waypoint[];
+}
+
 interface ClientData {
   client: {
     id: string
@@ -45,6 +56,7 @@ interface ClientData {
       totalDistance: number
       totalDuration: number
       clientCount: number
+      optimizedRoute: OptimizedRoute | null
     }
   }
   navigation: {
@@ -495,20 +507,30 @@ const OptimisationRdvClient = () => {
                     </div>
                   </div>
                   
-                  {/* Nouvelle section: Statistiques journalières */}
+                  {/* Nouvelle section: Statistiques journalières avec itinéraire optimisé */}
                   <div className="mb-3 p-3 bg-blue-50 rounded border border-blue-100">
-                    <h3 className="font-medium text-blue-800 mb-1 text-sm">Statistiques pour cette journée:</h3>
+                    <h3 className="font-medium text-blue-800 mb-2 text-sm flex justify-between items-center">
+                      <span>Statistiques pour cette journée:</span>
+                      {clientData.statistics.dailyStats.optimizedRoute && 
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Itinéraire optimisé</span>
+                      }
+                    </h3>
+                    
                     <div className="grid grid-cols-3 gap-2 text-sm">
                       <div className="bg-white p-2 rounded shadow-sm">
                         <div className="text-gray-500">Distance</div>
                         <div className="font-bold text-blue-700">
-                          {clientData.statistics.dailyStats.totalDistance} km
+                          {clientData.statistics.dailyStats.optimizedRoute ? 
+                            `${clientData.statistics.dailyStats.optimizedRoute.totalDistance} km` : 
+                            `${clientData.statistics.dailyStats.totalDistance} km`}
                         </div>
                       </div>
                       <div className="bg-white p-2 rounded shadow-sm">
                         <div className="text-gray-500">Durée</div>
                         <div className="font-bold text-blue-700">
-                          {clientData.statistics.dailyStats.totalDuration} min
+                          {clientData.statistics.dailyStats.optimizedRoute ? 
+                            `${clientData.statistics.dailyStats.optimizedRoute.totalDuration} min` : 
+                            `${clientData.statistics.dailyStats.totalDuration} min`}
                         </div>
                       </div>
                       <div className="bg-white p-2 rounded shadow-sm">
@@ -518,6 +540,18 @@ const OptimisationRdvClient = () => {
                         </div>
                       </div>
                     </div>
+                    
+                    {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
+                      <div className="mt-2 text-xs text-gray-600">
+                        <div className="font-medium mb-1">Ordre de visite optimisé:</div>
+                        <ol className="list-decimal pl-5">
+                          <li className="mb-1">Point de départ: {address}</li>
+                          {clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map((wp, index) => (
+                            <li key={index} className="mb-1">{wp.address}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Bouton d'itinéraire */}
@@ -525,10 +559,22 @@ const OptimisationRdvClient = () => {
                     href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(clientData.client.address)}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block w-full bg-blue-500 text-white text-center py-2 rounded hover:bg-blue-600 transition-colors"
+                    className="block w-full bg-blue-500 text-white text-center py-2 rounded hover:bg-blue-600 transition-colors mb-2"
                   >
                     <Navigation className="h-4 w-4 inline-block mr-1" /> Itinéraire
                   </a>
+
+                  {/* Bouton d'itinéraire optimisé (visible uniquement si disponible) */}
+                  {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(address)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full bg-green-500 text-white text-center py-2 rounded hover:bg-green-600 transition-colors"
+                    >
+                      <Navigation className="h-4 w-4 inline-block mr-1" /> Itinéraire optimisé (tous les clients)
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

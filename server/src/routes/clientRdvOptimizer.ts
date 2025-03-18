@@ -1,3 +1,5 @@
+// Modifications dans clientRdvOptimizer.ts
+
 import { Router, Request, Response } from 'express';
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
@@ -35,13 +37,125 @@ const calculateDailyStats = (clients: any[], date: string): DailyStats => {
     };
 };
 
+// Fonction pour calculer la matrice des distances
+async function calculateDistanceMatrix(locations: { address: string; coordinates: number[] }[]) {
+    const matrix: number[][] = Array(locations.length).fill(0).map(() => Array(locations.length).fill(0));
+    
+    for (let i = 0; i < locations.length; i++) {
+        for (let j = i + 1; j < locations.length; j++) {
+            const response = await directionsService.getDirections({
+                profile: 'driving-traffic',
+                waypoints: [
+                    { coordinates: locations[i].coordinates as [number, number] },
+                    { coordinates: locations[j].coordinates as [number, number] }
+                ],
+                exclude: ['toll']
+            }).send();
+
+            if (response.body.routes.length) {
+                const duration = response.body.routes[0].duration / 60; // en minutes
+                matrix[i][j] = duration;
+                matrix[j][i] = duration;
+            }
+        }
+    }
+    return matrix;
+}
+
+// Fonction pour trouver l'itinéraire optimal
+function findOptimalRoute(matrix: number[][], n: number): number[] {
+    const visited = new Array(n).fill(false);
+    const route = [0];
+    visited[0] = true;
+
+    for (let i = 1; i < n; i++) {
+        const lastPoint = route[route.length - 1];
+        let nextPoint = -1;
+        let minDuration = Infinity;
+
+        for (let j = 0; j < n; j++) {
+            if (!visited[j] && matrix[lastPoint][j] < minDuration) {
+                minDuration = matrix[lastPoint][j];
+                nextPoint = j;
+            }
+        }
+
+        route.push(nextPoint);
+        visited[nextPoint] = true;
+    }
+
+    return route;
+}
+
+// Fonction pour obtenir l'itinéraire détaillé
+async function getDetailedRoute(locations: { address: string; coordinates: number[] }[], route: number[]) {
+    const waypoints = route.map(index => ({
+        coordinates: locations[index].coordinates as [number, number],
+        address: locations[index].address
+    }));
+
+    const response = await directionsService.getDirections({
+        profile: 'driving-traffic',
+        waypoints: waypoints.map(wp => ({ coordinates: wp.coordinates })),
+        exclude: ['toll']
+    }).send();
+
+    if (!response.body.routes.length) {
+        throw new Error('Impossible de calculer l\'itinéraire détaillé');
+    }
+
+    return {
+        waypoints: waypoints,
+        route: response.body.routes[0],
+        totalDuration: Math.round(response.body.routes[0].duration / 60), // minutes
+        totalDistance: Math.round(response.body.routes[0].distance / 100) / 10 // km
+    };
+}
+
+// Fonction pour calculer l'itinéraire optimisé
+async function calculateOptimizedRoute(sourceAddress: string, clientAddresses: string[]) {
+    // Ajouter l'adresse source au début de la liste
+    const allAddresses = [sourceAddress, ...clientAddresses];
+    
+    // Convertir toutes les adresses en coordonnées
+    const coordinates = await Promise.all(
+        allAddresses.map(async (address) => {
+            const response = await geocodingService.forwardGeocode({
+                query: address,
+                countries: ['ca'],
+                limit: 1
+            }).send();
+
+            if (!response.body.features.length) {
+                throw new Error(`Adresse non trouvée : ${address}`);
+            }
+
+            return {
+                address,
+                coordinates: response.body.features[0].geometry.coordinates
+            };
+        })
+    );
+
+    // Calculer la matrice des distances
+    const matrix = await calculateDistanceMatrix(coordinates);
+    
+    // Trouver l'ordre optimal
+    const optimalRoute = findOptimalRoute(matrix, coordinates.length);
+    
+    // Obtenir l'itinéraire détaillé
+    const finalRoute = await getDetailedRoute(coordinates, optimalRoute);
+    
+    return finalRoute;
+}
+
 router.post('/', async (req: Request, res: Response) => {
     try {
         const { 
             address, 
             excludeDates = [], 
             specificDate = null,
-            dateRange = null  // Nouvel attribut pour filtrer par intervalle de dates
+            dateRange = null
         } = req.body;
 
         if (!address) {
@@ -226,6 +340,27 @@ router.post('/', async (req: Request, res: Response) => {
         // Calculer les statistiques pour la journée du client sélectionné
         const dailyStats = calculateDailyStats(clientsWithBookings, nearestClient.bookingDate);
 
+        // 6. NOUVEAU: Calculer l'itinéraire optimisé pour tous les clients de cette journée
+        let optimizedRoute = null;
+        try {
+            // Récupérer tous les clients de la même journée
+            const clientsOnSameDay = clientsWithBookings.filter(
+                client => client.bookingDate === nearestClient.bookingDate
+            );
+            
+            // Si nous avons plus d'un client ce jour-là, calculer un itinéraire optimisé
+            if (clientsOnSameDay.length > 1) {
+                // Récupérer uniquement les adresses des clients
+                const clientAddresses = clientsOnSameDay.map(client => client.address);
+                
+                // Calculer l'itinéraire optimisé
+                optimizedRoute = await calculateOptimizedRoute(address, clientAddresses);
+            }
+        } catch (error) {
+            console.error("Erreur lors de l'optimisation de l'itinéraire:", error);
+            // En cas d'erreur, on continue sans l'itinéraire optimisé
+        }
+
         // Formater la date et l'heure du rendez-vous
         const bookingDate = new Date(nearestClient.startAt);
         const formattedDate = bookingDate.toLocaleDateString('fr-CA', {
@@ -269,7 +404,14 @@ router.post('/', async (req: Request, res: Response) => {
                     dailyStats: {
                         totalDistance: dailyStats.totalDistance,
                         totalDuration: dailyStats.totalDuration,
-                        clientCount: dailyStats.clientCount
+                        clientCount: dailyStats.clientCount,
+                        optimizedRoute: optimizedRoute ? {
+                            totalDistance: optimizedRoute.totalDistance,
+                            totalDuration: optimizedRoute.totalDuration,
+                            waypoints: optimizedRoute.waypoints.map(wp => ({
+                                address: wp.address
+                            }))
+                        } : null
                     }
                 },
                 navigation: {
