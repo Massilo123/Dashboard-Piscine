@@ -58,8 +58,9 @@ const OptimisationRdvClient = () => {
   const [clientData, setClientData] = useState<ClientData | null>(null)
   const [error, setError] = useState<string>('')
   const [visitedClients, setVisitedClients] = useState<ClientData[]>([])
-  const [navigationIndex, setNavigationIndex] = useState<number>(0)
-  const [hasMoreClients, setHasMoreClients] = useState<boolean>(false)
+  const [currentIndex, setCurrentIndex] = useState<number>(0)
+  const [fetchingNew, setFetchingNew] = useState<boolean>(false)
+  const [allProcessedDates, setAllProcessedDates] = useState<string[]>([])
   const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date().toISOString().split('T')[0],
@@ -85,6 +86,20 @@ const OptimisationRdvClient = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showDateFilter]);
+
+  // Mise à jour du clientData lorsque l'index change
+  useEffect(() => {
+    if (visitedClients.length > 0 && currentIndex >= 0 && currentIndex < visitedClients.length) {
+      setClientData(visitedClients[currentIndex]);
+    }
+  }, [currentIndex, visitedClients]);
+
+  // Mise à jour des dates traitées
+  useEffect(() => {
+    if (clientData?.navigation?.processedDates) {
+      setAllProcessedDates(clientData.navigation.processedDates);
+    }
+  }, [clientData]);
 
   // Gestion des suggestions d'adresses
   useEffect(() => {
@@ -118,13 +133,6 @@ const OptimisationRdvClient = () => {
     };
   }, [address, isAddressSelected]);
 
-  // Mise à jour du flag hasMoreClients quand clientData change
-  useEffect(() => {
-    if (clientData) {
-      setHasMoreClients(clientData.navigation.hasNext);
-    }
-  }, [clientData]);
-
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAddress(e.target.value)
     setError('')
@@ -149,19 +157,20 @@ const OptimisationRdvClient = () => {
     setIsAddressSelected(true);
   };
 
-  const findNearestClient = async (excludeDates: string[] = [], specificDate: string | null = null) => {
+  const fetchClient = async (excludeDates: string[] = []) => {
     if (!address) {
       setError('Veuillez entrer une adresse')
-      return
+      return null;
     }
 
     if (dateRange.startDate > dateRange.endDate) {
       setError('La date de début doit être antérieure à la date de fin');
-      return;
+      return null;
     }
 
     setLoading(true)
     setError('')
+    setFetchingNew(true);
 
     try {
       const response = await fetch('https://api.piscineaquarius.com/api/client-rdv', {
@@ -172,7 +181,7 @@ const OptimisationRdvClient = () => {
         body: JSON.stringify({ 
           address,
           excludeDates,
-          specificDate,
+          specificDate: null,
           dateRange: {
             startDate: dateRange.startDate,
             endDate: dateRange.endDate
@@ -186,73 +195,69 @@ const OptimisationRdvClient = () => {
         throw new Error(data.error || 'Une erreur est survenue')
       }
 
-      // Traitement différent selon le cas de navigation
-      const newClientData = data.data;
-      
-      if (specificDate) {
-        // Navigation en arrière - recherche spécifique
-        // Remarque: le serveur nous retourne un client pour une date spécifique
-        setClientData(newClientData);
-        
-        // On ne modifie pas visitedClients pour ne pas perdre l'historique
-      } else if (excludeDates.length > 0) {
-        // Navigation vers l'avant
-        setClientData(newClientData);
-        
-        // Mise à jour de l'historique des clients visités
-        if (navigationIndex === visitedClients.length - 1) {
-          // Si on est au dernier client connu, ajouter le nouveau
-          setVisitedClients([...visitedClients, newClientData]);
-          setNavigationIndex(navigationIndex + 1);
-        } else {
-          // Si on est sur un client intermédiaire, remplacer tout ce qui suit
-          const newVisited = [...visitedClients.slice(0, navigationIndex + 1), newClientData];
-          setVisitedClients(newVisited);
-          setNavigationIndex(navigationIndex + 1);
-        }
-      } else {
-        // Première recherche
-        setClientData(newClientData);
-        setVisitedClients([newClientData]);
-        setNavigationIndex(0);
-      }
-      
-      // Mettre à jour le flag qui indique s'il y a d'autres clients
-      setHasMoreClients(newClientData.navigation.hasNext);
-      
+      return data.data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+      return null;
     } finally {
       setLoading(false)
+      setFetchingNew(false);
+    }
+  }
+
+  const findFirstClient = async () => {
+    const newClient = await fetchClient([]);
+    
+    if (newClient) {
+      setVisitedClients([newClient]);
+      setCurrentIndex(0);
+      setClientData(newClient);
+    }
+  }
+
+  const findNextClient = async () => {
+    // Si nous sommes déjà sur le dernier client connu et qu'il y a plus de clients disponibles
+    if (currentIndex === visitedClients.length - 1 && clientData?.navigation.hasNext) {
+      // Récupérer toutes les dates déjà visitées
+      const alreadyVisitedDates = visitedClients.map(client => client.booking.bookingDate);
+      
+      // Chercher un nouveau client
+      const newClient = await fetchClient(alreadyVisitedDates);
+      
+      if (newClient) {
+        // Ajouter le nouveau client à notre liste
+        const updatedClients = [...visitedClients, newClient];
+        setVisitedClients(updatedClients);
+        
+        // Aller directement au nouveau client
+        setCurrentIndex(updatedClients.length - 1);
+      }
+    } else if (currentIndex < visitedClients.length - 1) {
+      // Nous avons déjà ce client en mémoire, avancer simplement l'index
+      setCurrentIndex(prevIndex => prevIndex + 1);
+    }
+  }
+
+  const handlePreviousClient = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prevIndex => prevIndex - 1);
     }
   }
 
   const handleNextClient = () => {
-    if (clientData && hasMoreClients) {
-      // Récupérer toutes les dates déjà visitées
-      const allVisitedDates = visitedClients.map(client => client.booking.bookingDate);
-      findNearestClient(allVisitedDates);
+    if (fetchingNew) return; // Éviter les clics multiples pendant le chargement
+    
+    if (currentIndex < visitedClients.length - 1) {
+      // Nous avons déjà ce client en mémoire
+      setCurrentIndex(prevIndex => prevIndex + 1);
+    } else if (clientData?.navigation.hasNext) {
+      // Besoin de chercher un nouveau client
+      findNextClient();
     }
-  };
+  }
 
-  const handlePreviousClient = () => {
-    if (navigationIndex > 0) {
-      // Navigation vers le client précédent
-      const newIndex = navigationIndex - 1;
-      const prevClient = visitedClients[newIndex];
-      
-      // Récupérer ce client spécifique
-      findNearestClient([], prevClient.booking.bookingDate);
-      
-      // Mettre à jour l'index de navigation
-      setNavigationIndex(newIndex);
-      
-      // Réactiver le bouton suivant si nécessaire
-      if (newIndex < visitedClients.length - 1) {
-        setHasMoreClients(true);
-      }
-    }
-  };
+  const canGoLeft = currentIndex > 0;
+  const canGoRight = currentIndex < visitedClients.length - 1 || (clientData?.navigation.hasNext || false);
 
   return (
     <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 space-y-4" ref={wrapperRef}>
@@ -337,7 +342,7 @@ const OptimisationRdvClient = () => {
               )}
             </div>
             <button
-              onClick={() => findNearestClient([])}
+              onClick={findFirstClient}
               disabled={loading}
               className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
@@ -353,13 +358,13 @@ const OptimisationRdvClient = () => {
 
           {clientData && (
             <div className="mt-4">
-              {/* Boutons de navigation */}
+              {/* Boutons de navigation avec indicateur de position */}
               <div className="flex justify-between items-center mb-4">
                 <button
                   onClick={handlePreviousClient}
-                  disabled={loading || navigationIndex <= 0}
+                  disabled={loading || !canGoLeft}
                   className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
-                    navigationIndex > 0 && !loading
+                    canGoLeft && !loading
                       ? 'bg-gray-500 text-white hover:bg-gray-600' 
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
@@ -367,11 +372,17 @@ const OptimisationRdvClient = () => {
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 
+                {/* Indicateur de position (optionnel) */}
+                <span className="text-xs text-gray-500">
+                  {currentIndex + 1}/{visitedClients.length}
+                  {clientData.navigation.hasNext && currentIndex === visitedClients.length - 1 ? "+" : ""}
+                </span>
+                
                 <button
                   onClick={handleNextClient}
-                  disabled={loading || !hasMoreClients}
+                  disabled={loading || !canGoRight}
                   className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
-                    hasMoreClients && !loading
+                    canGoRight && !loading
                       ? 'bg-green-500 text-white hover:bg-green-600' 
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
