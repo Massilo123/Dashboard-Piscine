@@ -4,9 +4,6 @@ import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css';  // N'oubliez pas d'importer le CSS
 
-
-
-
 const baseClient = mbxClient({ 
     accessToken: import.meta.env.VITE_MAPBOX_TOKEN || '' 
 });
@@ -114,9 +111,9 @@ const ClientSearch = () => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-4" ref={wrapperRef}>
+        <div className="max-w-4xl mx-auto p-4 bg-gray-900 rounded-lg shadow-lg" ref={wrapperRef}>
             <div className="mb-8">
-                <h2 className="text-2xl text-black font-bold mb-4">Rechercher des clients à proximité</h2>
+                <h2 className="text-2xl text-white font-bold mb-4">Rechercher des clients à proximité</h2>
                 <div className="relative">
                     <div className="flex gap-4">
                         <div className="flex-1 relative">
@@ -129,15 +126,15 @@ const ClientSearch = () => {
                             }}
                             onKeyDown={handleKeyDown}
                             placeholder="Entrez une adresse..."
-                            className="w-full p-2 border rounded"
+                            className="w-full p-2 border border-gray-600 rounded bg-gray-800 text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 placeholder-gray-400"
                         />
                             
                             {suggestions.length > 0 && (
-                                <div className="absolute z-10 w-full bg-white mt-1 border rounded-md shadow-lg">
+                                <div className="absolute z-10 w-full bg-gray-800 mt-1 border border-gray-700 rounded-md shadow-lg">
                                     {suggestions.map((suggestion, index) => (
                                         <div
                                             key={index}
-                                            className="p-2 hover:bg-green-100 cursor-pointer text-black"
+                                            className="p-2 hover:bg-gray-700 cursor-pointer text-gray-200"
                                             onClick={() => {
                                                 setAddress(suggestion.place_name);
                                                 setSuggestions([]);
@@ -153,10 +150,10 @@ const ClientSearch = () => {
                         <button
                             onClick={searchClients}
                             disabled={loading || !address.trim()}
-                            className={`px-4 py-2 rounded ${
+                            className={`px-4 py-2 rounded transition-colors ${
                                 loading || !address.trim()
-                                    ? 'bg-gray-300'
-                                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
                             }`}
                         >
                             {loading ? 'Recherche...' : 'Rechercher'}
@@ -164,42 +161,42 @@ const ClientSearch = () => {
                     </div>
                 </div>
                 {error && (
-                    <p className="text-red-500 mt-2">{error}</p>
+                    <p className="text-red-300 mt-2 p-2 bg-red-900 bg-opacity-40 rounded border border-red-800">{error}</p>
                 )}
             </div>
 
             
             {clients.length === 0 && address !== '' && !loading && !error && (
-                <div className="text-center p-4">
-                    <p className="text-gray-600">Aucun client trouvé à proximité de cette adresse.</p>
+                <div className="text-center p-4 bg-gray-800 rounded border border-gray-700">
+                    <p className="text-gray-300">Aucun client trouvé à proximité de cette adresse.</p>
                 </div>
             )}
 
             {clients.length > 0 && (
                 <div>
-                    <h3 className="text-xl text-black font-semibold mb-4">Clients à proximité</h3>
+                    <h3 className="text-xl text-white font-semibold mb-4">Clients à proximité</h3>
                     <div className="grid gap-4">
                         {clients.map((client) => (
                             <div
                                 key={client.id}
-                                className="p-4 border rounded hover:bg-gray-50"
+                                className="p-4 border border-gray-700 rounded bg-gray-800 hover:bg-gray-700 transition-colors"
                             >
-                                <h4 className="text-black font-medium">{client.name}</h4>
+                                <h4 className="text-white font-medium">{client.name}</h4>
                                 <a 
                                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.address)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                                    className="text-indigo-400 hover:text-indigo-300 hover:underline"
                                 >
                                     {client.address}
                                 </a>
                                 <a 
                                     href={`tel:${client.phoneNumber}`}
-                                    className="block text-blue-600 hover:text-blue-800 hover:underline"
+                                    className="block text-indigo-400 hover:text-indigo-300 hover:underline"
                                 >
                                     {client.phoneNumber}
                                 </a>
-                                <div className="mt-2 text-sm text-gray-500">
+                                <div className="mt-2 text-sm text-gray-400">
                                     <span className="mr-4">Distance: {client.distance} km</span>
                                     <span>Durée: {client.duration} min</span>
                                 </div>

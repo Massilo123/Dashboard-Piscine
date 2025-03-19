@@ -69,10 +69,10 @@ const RouteOptimizerSchedule = () => {
   
     return (
       <div className="w-full max-w-4xl mx-auto p-2 sm:p-4 space-y-4">
-        <div className="bg-white rounded-lg shadow p-3 sm:p-6">
+        <div className="bg-gray-800 rounded-lg shadow-lg p-3 sm:p-6 border border-gray-700">
           <div className="mb-4 flex items-center gap-2">
-            <Calendar className="h-5 w-5 sm:h-6 sm:w-6" />
-            <h2 className="text-lg sm:text-xl font-semibold text-black">Optimisation des rendez-vous</h2>
+            <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-400" />
+            <h2 className="text-lg sm:text-xl font-semibold text-white">Optimisation des rendez-vous</h2>
           </div>
           
           <div className="flex flex-col gap-4">
@@ -82,7 +82,7 @@ const RouteOptimizerSchedule = () => {
                 type="date"
                 value={date}
                 onChange={handleDateChange}
-                className="border rounded p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-auto"
+                className="border border-gray-600 rounded p-2 bg-gray-800 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full sm:w-auto"
               />
               <div className="flex gap-2 sm:gap-4">
                 <button
@@ -92,7 +92,7 @@ const RouteOptimizerSchedule = () => {
                     setDate(formattedDate);
                     setShouldFetch(true);
                   }}
-                  className="flex-1 sm:flex-none bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors text-sm sm:text-base"
+                  className="flex-1 sm:flex-none bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors text-sm sm:text-base"
                 >
                   Aujourd'hui
                 </button>
@@ -100,7 +100,7 @@ const RouteOptimizerSchedule = () => {
                 <button
                   onClick={fetchOptimizedRoute}
                   disabled={loading}
-                  className="flex-1 sm:flex-none bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
+                  className="flex-1 sm:flex-none bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
                 >
                   {loading ? '...' : 'Optimiser'}
                 </button>
@@ -108,49 +108,49 @@ const RouteOptimizerSchedule = () => {
             </div>
 
             {error && (
-              <div className="text-red-500 p-2 bg-red-50 rounded text-sm">
+              <div className="text-red-300 p-2 bg-red-900 bg-opacity-40 rounded text-sm border border-red-800">
                 {error}
               </div>
             )}
   
             {routeData && (
               <div className="mt-4">
-                <h3 className="text-base sm:text-lg font-semibold mb-2 text-black">Itinéraire optimisé</h3>
+                <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">Itinéraire optimisé</h3>
                 <div className="space-y-2">
                   {routeData.waypoints.map((waypoint, index) => (
                     <div
                       key={index}
-                      className="p-2 sm:p-3 border rounded hover:bg-gray-50 transition-colors text-black"
+                      className="p-2 sm:p-3 border border-gray-700 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
                     >
                       <div>
                         {waypoint.type === 'starting_point' ? (
                           <div className="break-words">
-                            <span className="font-medium text-black text-sm sm:text-base">Point de départ:</span>
+                            <span className="font-medium text-gray-200 text-sm sm:text-base">Point de départ:</span>
                             <a 
                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 hover:underline ml-1 text-sm sm:text-base"
+                              className="text-indigo-400 hover:text-indigo-300 hover:underline ml-1 text-sm sm:text-base"
                             >
                               {waypoint.address}
                             </a>
                           </div>
                         ) : (
                           <div>
-                            <div className="font-medium text-sm sm:text-base">
-                              <span className="font-bold mr-2">{index}.</span>
+                            <div className="font-medium text-sm sm:text-base text-white">
+                              <span className="font-bold mr-2 text-indigo-300">{index}.</span>
                               {waypoint.customerName}
                             </div>
                             <a 
                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 hover:underline text-xs sm:text-sm break-words"
+                              className="text-indigo-400 hover:text-indigo-300 hover:underline text-xs sm:text-sm break-words"
                             >
                               {waypoint.address}
                             </a>
                             {waypoint.startAt && (
-                              <div className="text-black text-xs sm:text-sm">
+                              <div className="text-gray-300 text-xs sm:text-sm">
                                 Heure: {
                                   new Date(waypoint.startAt).getHours() === 0 
                                   ? "Toute la journée" 
@@ -167,9 +167,9 @@ const RouteOptimizerSchedule = () => {
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 p-2 sm:p-3 bg-gray-50 rounded">
-                  <div className="font-medium text-black text-sm sm:text-base">Durée totale: {routeData.totalDuration} minutes</div>
-                  <div className="font-medium text-black text-sm sm:text-base">Distance totale: {routeData.totalDistance} km</div>
+                <div className="mt-4 p-2 sm:p-3 bg-gray-700 rounded border border-gray-600">
+                  <div className="font-medium text-indigo-300 text-sm sm:text-base">Durée totale: <span className="text-white">{routeData.totalDuration} minutes</span></div>
+                  <div className="font-medium text-indigo-300 text-sm sm:text-base">Distance totale: <span className="text-white">{routeData.totalDistance} km</span></div>
                 </div>
               </div>
             )}
