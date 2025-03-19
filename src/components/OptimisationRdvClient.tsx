@@ -6,6 +6,9 @@ import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 const baseClient = mbxClient({ accessToken: import.meta.env.VITE_MAPBOX_TOKEN || '' });
 const geocodingService = mbxGeocoding(baseClient);
 
+// Point de départ fixe pour l'affichage
+const STARTING_POINT = "1829 rue capitol";
+
 interface Suggestion {
   place_name: string;
   text: string;
@@ -541,11 +544,11 @@ const OptimisationRdvClient = () => {
                       </div>
                     </div>
                     
-                    {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
+                    {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 0 && (
                       <div className="mt-2 text-xs text-gray-600">
                         <div className="font-medium mb-1">Ordre de visite optimisé:</div>
                         <ol className="list-decimal pl-5">
-                          <li className="mb-1">Point de départ: {address}</li>
+                          <li className="mb-1">Point de départ: {STARTING_POINT}</li>
                           {clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map((wp, index) => (
                             <li key={index} className="mb-1">{wp.address}</li>
                           ))}
@@ -565,9 +568,9 @@ const OptimisationRdvClient = () => {
                   </a>
 
                   {/* Bouton d'itinéraire optimisé (visible uniquement si disponible) */}
-                  {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
+                  {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 0 && (
                     <a
-                      href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(address)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
+                      href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(STARTING_POINT)}&destination=${encodeURIComponent(STARTING_POINT)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block w-full bg-green-500 text-white text-center py-2 rounded hover:bg-green-600 transition-colors"

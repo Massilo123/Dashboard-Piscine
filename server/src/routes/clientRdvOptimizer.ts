@@ -9,6 +9,9 @@ const baseClient = mbxClient({ accessToken: process.env.MAPBOX_TOKEN! });
 const geocodingService = mbxGeocoding(baseClient);
 const directionsService = mbxDirections(baseClient);
 
+// Définir l'adresse fixe du point de départ
+const STARTING_POINT = "1829 rue capitol";
+
 // Interface pour les statistiques journalières
 interface DailyStats {
     totalDistance: number;
@@ -309,22 +312,35 @@ router.post('/', async (req: Request, res: Response) => {
                 client => client.bookingDate === nearestClient.bookingDate
             );
             
-            // Si nous avons plus d'un client ce jour-là, calculer un itinéraire optimisé
-            if (clientsOnSameDay.length > 1) {
+            // Si nous avons des clients ce jour-là, calculer un itinéraire optimisé
+            if (clientsOnSameDay.length > 0) {
                 // Récupérer uniquement les adresses des clients
                 const clientAddresses = clientsOnSameDay.map(client => client.address);
                 
-                // Ajouter l'adresse source au début de la liste (l'adresse saisie par l'utilisateur)
-                const allAddresses = [address, ...clientAddresses];
+                // Obtenir les coordonnées du point de départ fixe
+                const startPointResponse = await geocodingService.forwardGeocode({
+                    query: STARTING_POINT,
+                    countries: ['ca'],
+                    limit: 1
+                }).send();
+
+                if (!startPointResponse.body.features.length) {
+                    throw new Error(`Adresse de point de départ non trouvée : ${STARTING_POINT}`);
+                }
+
+                const startPointCoordinates = startPointResponse.body.features[0].geometry.coordinates;
+                
+                // Ajouter le point de départ fixe au début de la liste
+                const allAddresses = [STARTING_POINT, ...clientAddresses];
                 
                 // Convertir toutes les adresses en coordonnées
                 const coordinates = await Promise.all(
-                    allAddresses.map(async (addr) => {
-                        // Pour l'adresse source, utiliser les coordonnées déjà obtenues
-                        if (addr === address) {
+                    allAddresses.map(async (addr, index) => {
+                        // Pour l'adresse de départ, utiliser les coordonnées déjà obtenues
+                        if (index === 0) {
                             return {
                                 address: addr,
-                                coordinates: sourceCoordinates
+                                coordinates: startPointCoordinates
                             };
                         }
                         
