@@ -278,7 +278,7 @@ const OptimisationRdvClient = () => {
         // Mettre à jour les jours restants
         setRemainingDays(newClient.navigation.hasNext ? 1 : 0);
       }
-    } else if (currentIndex < visitedClients.length - a) {
+    } else if (currentIndex < visitedClients.length - 1) {
       // Nous avons déjà ce client en mémoire, avancer simplement l'index
       const newIndex = currentIndex + 1;
       setCurrentIndex(newIndex);
@@ -336,8 +336,8 @@ const OptimisationRdvClient = () => {
   const canGoRight = currentIndex < visitedClients.length - 1 || (clientData?.navigation.hasNext || false);
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 space-y-4 bg-gray-900 min-h-screen py-6" ref={wrapperRef}>
-      <div className="bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6 border border-gray-700">
+    <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 space-y-4 py-6" ref={wrapperRef}>
+      <div className="bg-gray-800/60 backdrop-blur-sm rounded-xl shadow-xl p-4 sm:p-6 border border-indigo-900/30">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-400" />
@@ -345,7 +345,7 @@ const OptimisationRdvClient = () => {
           </div>
           <button 
             onClick={toggleDateFilter}
-            className="flex items-center gap-1 text-gray-300 px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-1 text-gray-300 px-3 py-1.5 rounded-full hover:bg-indigo-700/50 transition-colors"
           >
             <Filter className="h-4 w-4" />
             <span>Dates</span>
@@ -356,12 +356,12 @@ const OptimisationRdvClient = () => {
         {showDateFilter && (
           <div 
             ref={filterRef}
-            className="mb-4 p-3 border border-gray-700 rounded-md bg-gray-700 relative"
+            className="mb-4 p-3 border border-indigo-900/50 rounded-lg bg-gray-800/70 backdrop-blur-sm relative"
           >
             <div className="absolute top-2 right-2">
               <button
                 onClick={() => setShowDateFilter(false)}
-                className="text-gray-400 hover:text-gray-200"
+                className="text-gray-400 hover:text-gray-200 transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -375,7 +375,7 @@ const OptimisationRdvClient = () => {
                   name="startDate"
                   value={dateRange.startDate}
                   onChange={handleDateRangeChange}
-                  className="border bg-gray-800 text-white border-gray-600 rounded p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="border bg-gray-800/80 text-white border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div className="flex flex-col">
@@ -386,7 +386,7 @@ const OptimisationRdvClient = () => {
                   name="endDate"
                   value={dateRange.endDate}
                   onChange={handleDateRangeChange}
-                  className="border bg-gray-800 text-white border-gray-600 rounded p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="border bg-gray-800/80 text-white border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
             </div>
@@ -401,14 +401,14 @@ const OptimisationRdvClient = () => {
                 value={address}
                 onChange={handleAddressChange}
                 placeholder="Entrez une adresse"
-                className="w-full border bg-gray-800 text-white border-gray-600 rounded p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-400"
+                className="w-full border bg-gray-800/60 text-white border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-400"
               />
               {suggestions.length > 0 && (
-                <div className="absolute z-10 w-full bg-gray-800 mt-1 border border-gray-700 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute z-10 w-full bg-gray-800/90 backdrop-blur-md mt-1 border border-indigo-900/50 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                   {suggestions.map((suggestion, index) => (
                     <div
                       key={index}
-                      className="p-2 hover:bg-gray-700 cursor-pointer text-gray-200"
+                      className="p-2 hover:bg-indigo-700/40 cursor-pointer text-gray-200 transition-colors"
                       onClick={() => selectSuggestion(suggestion)}
                     >
                       {suggestion.place_name}
@@ -420,14 +420,14 @@ const OptimisationRdvClient = () => {
             <button
               onClick={findFirstClient}
               disabled={loading}
-              className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+              className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors shadow-lg"
             >
               {loading ? '...' : 'Trouver'}
             </button>
           </div>
 
           {error && (
-            <div className="text-red-300 p-2 bg-red-900 bg-opacity-40 rounded border border-red-800">
+            <div className="text-red-300 p-2 bg-red-900/40 backdrop-blur-sm rounded-lg border border-red-800/50">
               {error}
             </div>
           )}
@@ -439,17 +439,17 @@ const OptimisationRdvClient = () => {
                 <button
                   onClick={handlePreviousClient}
                   disabled={loading || !canGoLeft}
-                  className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors ${
                     canGoLeft && !loading
-                      ? 'bg-indigo-700 text-white hover:bg-indigo-800' 
-                      : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      ? 'bg-indigo-700/70 text-white hover:bg-indigo-800/90' 
+                      : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                   }`}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 
                 {/* Indicateur de position (optionnel) */}
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-300 px-2 py-1 bg-gray-800/60 rounded-full">
                   {currentIndex + 1}/{visitedClients.length}
                   {clientData.navigation.hasNext && currentIndex === visitedClients.length - 1 ? "+" : ""}
                 </span>
@@ -457,10 +457,10 @@ const OptimisationRdvClient = () => {
                 <button
                   onClick={handleNextClient}
                   disabled={loading || !canGoRight}
-                  className={`flex items-center gap-1 px-3 py-1 rounded transition-colors ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors ${
                     canGoRight && !loading
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
-                      : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      ? 'bg-indigo-600/70 text-white hover:bg-indigo-700/90' 
+                      : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
                   }`}
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -468,9 +468,9 @@ const OptimisationRdvClient = () => {
               </div>
 
               {/* Carte client principale */}
-              <div className="border border-gray-700 rounded-lg shadow-lg overflow-hidden bg-gray-800">
+              <div className="border border-indigo-900/30 rounded-xl shadow-xl overflow-hidden bg-gray-800/60 backdrop-blur-sm">
                 {/* En-tête de la carte avec nom client & distance */}
-                <div className="bg-indigo-700 text-white p-3 flex justify-between items-center">
+                <div className="bg-indigo-700/80 backdrop-blur-sm text-white p-3 flex justify-between items-center">
                   <div className="flex items-center">
                     <User className="h-5 w-5 mr-2" />
                     <span className="font-bold text-base sm:text-lg">{clientData.client.name}</span>
@@ -483,7 +483,7 @@ const OptimisationRdvClient = () => {
                 </div>
                 
                 {/* Corps de la carte */}
-                <div className="p-3 bg-gray-800">
+                <div className="p-3 bg-gray-800/50">
                   {/* Adresse */}
                   <a 
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clientData.client.address)}`}
@@ -495,13 +495,13 @@ const OptimisationRdvClient = () => {
                   </a>
                   
                   {/* Date mise en évidence, sans l'heure */}
-                  <div className="flex items-center mb-3 bg-gray-700 p-3 rounded border border-gray-600">
+                  <div className="flex items-center mb-3 bg-gray-700/70 backdrop-blur-sm p-3 rounded-lg border border-indigo-900/30 shadow-md">
                     <Calendar className="h-5 w-5 mr-2 text-indigo-400" />
                     <span className="text-gray-200 font-medium text-lg">{clientData.booking.date}</span>
                   </div>
                   
                   {/* Statistiques condensées avec compteur de jours correct */}
-                  <div className="flex justify-between text-sm text-gray-400 mb-3">
+                  <div className="flex justify-between text-sm text-gray-300 mb-3 p-2 bg-gray-700/30 rounded-lg">
                     <div>{clientData.statistics.clientsOnSameDay} clients ce jour</div>
                     <div>
                       {remainingDays > 0 
@@ -511,16 +511,16 @@ const OptimisationRdvClient = () => {
                   </div>
                   
                   {/* Nouvelle section: Statistiques journalières avec itinéraire optimisé */}
-                  <div className="mb-3 p-3 bg-gray-700 rounded border border-gray-600">
+                  <div className="mb-3 p-3 bg-gray-700/50 backdrop-blur-sm rounded-lg border border-indigo-900/30 shadow-md">
                     <h3 className="font-medium text-indigo-300 mb-2 text-sm flex justify-between items-center">
                       <span>Statistiques pour cette journée:</span>
                       {clientData.statistics.dailyStats.optimizedRoute && 
-                        <span className="text-xs bg-indigo-800 text-indigo-200 px-2 py-1 rounded">Itinéraire optimisé</span>
+                        <span className="text-xs bg-indigo-800/70 backdrop-blur-sm text-indigo-200 px-2 py-1 rounded-full">Itinéraire optimisé</span>
                       }
                     </h3>
                     
                     <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div className="bg-gray-800 p-2 rounded shadow-md border border-gray-700">
+                      <div className="bg-gray-800/60 backdrop-blur-sm p-2 rounded-lg shadow-md border border-indigo-900/20">
                         <div className="text-gray-400">Distance</div>
                         <div className="font-bold text-indigo-300">
                           {clientData.statistics.dailyStats.optimizedRoute ? 
@@ -528,7 +528,7 @@ const OptimisationRdvClient = () => {
                             `${clientData.statistics.dailyStats.totalDistance} km`}
                         </div>
                       </div>
-                      <div className="bg-gray-800 p-2 rounded shadow-md border border-gray-700">
+                      <div className="bg-gray-800/60 backdrop-blur-sm p-2 rounded-lg shadow-md border border-indigo-900/20">
                         <div className="text-gray-400">Durée</div>
                         <div className="font-bold text-indigo-300">
                           {clientData.statistics.dailyStats.optimizedRoute ? 
@@ -536,7 +536,7 @@ const OptimisationRdvClient = () => {
                             `${clientData.statistics.dailyStats.totalDuration} min`}
                         </div>
                       </div>
-                      <div className="bg-gray-800 p-2 rounded shadow-md border border-gray-700">
+                      <div className="bg-gray-800/60 backdrop-blur-sm p-2 rounded-lg shadow-md border border-indigo-900/20">
                         <div className="text-gray-400">Clients</div>
                         <div className="font-bold text-indigo-300">
                           {clientData.statistics.dailyStats.clientCount}
@@ -562,7 +562,7 @@ const OptimisationRdvClient = () => {
                     href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(clientData.client.address)}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block w-full bg-indigo-600 text-white text-center py-2 rounded hover:bg-indigo-700 transition-colors mb-2"
+                    className="block w-full bg-indigo-600/80 backdrop-blur-sm text-white text-center py-2 rounded-lg hover:bg-indigo-700/90 transition-colors mb-2 shadow-md"
                   >
                     <Navigation className="h-4 w-4 inline-block mr-1" /> Itinéraire
                   </a>
@@ -573,7 +573,7 @@ const OptimisationRdvClient = () => {
                       href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(STARTING_POINT)}&destination=${encodeURIComponent(STARTING_POINT)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full bg-purple-600 text-white text-center py-2 rounded hover:bg-purple-700 transition-colors"
+                      className="block w-full bg-purple-600/80 backdrop-blur-sm text-white text-center py-2 rounded-lg hover:bg-purple-700/90 transition-colors shadow-md"
                     >
                       <Navigation className="h-4 w-4 inline-block mr-1" /> Itinéraire optimisé (tous les clients)
                     </a>
