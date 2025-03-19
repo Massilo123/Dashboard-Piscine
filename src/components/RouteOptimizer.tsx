@@ -150,17 +150,18 @@ const RouteOptimizer = () => {
                 <div className="space-y-4 mb-6">
                     {addresses.map((address, index) => (
                         <div key={index} className="relative">
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-2">
                                 <input
                                     type="text"
                                     value={address}
                                     onChange={(e) => updateAddress(index, e.target.value)}
                                     placeholder="Entrez une adresse..."
-                                    className="flex-1 p-2.5 border border-indigo-900/30 rounded-lg bg-gray-800/60 text-white placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 backdrop-blur-sm shadow-md"
+                                    className="flex-1 min-w-0 p-2.5 border border-indigo-900/30 rounded-lg bg-gray-800/60 text-white placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 backdrop-blur-sm shadow-md"
                                 />
                                 <button
                                     onClick={() => removeAddress(index)}
-                                    className="px-3 py-2 bg-red-800/70 text-white rounded-lg hover:bg-red-700/90 transition-colors shadow-md backdrop-blur-sm"
+                                    className="whitespace-nowrap px-2 py-2 bg-red-800/70 text-white rounded-lg hover:bg-red-700/90 transition-colors shadow-md backdrop-blur-sm flex-shrink-0 text-sm"
+                                    aria-label="Supprimer cette adresse"
                                 >
                                     Supprimer
                                 </button>
