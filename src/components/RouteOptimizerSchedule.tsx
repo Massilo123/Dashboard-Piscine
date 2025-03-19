@@ -1,4 +1,4 @@
-import { Calendar } from 'lucide-react'
+import { Calendar, Clock, MapPin, Navigation, CheckCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 interface Waypoint {
@@ -69,7 +69,7 @@ const RouteOptimizerSchedule = () => {
   
     return (
       <div className="w-full max-w-4xl mx-auto p-2 sm:p-4 space-y-4">
-        <div className="bg-gray-800 rounded-lg shadow-lg p-3 sm:p-6 border border-gray-700">
+        <div className="bg-gray-800/60 backdrop-blur-sm rounded-xl shadow-xl p-4 sm:p-6 border border-indigo-900/30">
           <div className="mb-4 flex items-center gap-2">
             <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-400" />
             <h2 className="text-lg sm:text-xl font-semibold text-white">Optimisation des rendez-vous</h2>
@@ -82,7 +82,7 @@ const RouteOptimizerSchedule = () => {
                 type="date"
                 value={date}
                 onChange={handleDateChange}
-                className="border border-gray-600 rounded p-2 bg-gray-800 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full sm:w-auto"
+                className="border border-indigo-900/30 rounded-lg p-2.5 bg-gray-800/60 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full sm:w-auto backdrop-blur-sm shadow-md"
               />
               <div className="flex gap-2 sm:gap-4">
                 <button
@@ -92,84 +92,128 @@ const RouteOptimizerSchedule = () => {
                     setDate(formattedDate);
                     setShouldFetch(true);
                   }}
-                  className="flex-1 sm:flex-none bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors text-sm sm:text-base"
+                  className="flex-1 sm:flex-none bg-gray-700/70 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg hover:bg-gray-600/90 transition-colors text-sm sm:text-base shadow-md flex items-center justify-center"
                 >
+                  <Calendar className="h-4 w-4 mr-1.5" />
                   Aujourd'hui
                 </button>
                
                 <button
                   onClick={fetchOptimizedRoute}
                   disabled={loading}
-                  className="flex-1 sm:flex-none bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm sm:text-base"
+                  className="flex-1 sm:flex-none bg-indigo-600/80 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg hover:bg-indigo-700/90 disabled:bg-gray-600/70 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm sm:text-base shadow-md flex items-center justify-center"
                 >
-                  {loading ? '...' : 'Optimiser'}
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Optimisation...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-1.5" />
+                      Optimiser
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
             {error && (
-              <div className="text-red-300 p-2 bg-red-900 bg-opacity-40 rounded text-sm border border-red-800">
+              <div className="text-red-300 p-3 bg-red-900/40 backdrop-blur-sm rounded-lg text-sm border border-red-800/50 shadow-md flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
                 {error}
               </div>
             )}
   
             {routeData && (
               <div className="mt-4">
-                <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">Itinéraire optimisé</h3>
+                <h3 className="text-base sm:text-lg font-semibold mb-3 text-white flex items-center">
+                  <Navigation className="h-5 w-5 mr-2 text-indigo-400" />
+                  Itinéraire optimisé
+                </h3>
                 <div className="space-y-2">
                   {routeData.waypoints.map((waypoint, index) => (
                     <div
                       key={index}
-                      className="p-2 sm:p-3 border border-gray-700 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
+                      className="p-3 sm:p-4 border border-indigo-900/30 rounded-lg bg-gray-800/60 backdrop-blur-sm hover:bg-gray-700/70 transition-colors shadow-md"
                     >
                       <div>
                         {waypoint.type === 'starting_point' ? (
-                          <div className="break-words">
-                            <span className="font-medium text-gray-200 text-sm sm:text-base">Point de départ:</span>
-                            <a 
-                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-indigo-400 hover:text-indigo-300 hover:underline ml-1 text-sm sm:text-base"
-                            >
-                              {waypoint.address}
-                            </a>
+                          <div className="break-words flex items-start">
+                            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-indigo-900/70 rounded-full text-white text-sm font-bold mr-3">
+                              <MapPin className="h-4 w-4" />
+                            </div>
+                            <div className="flex-grow">
+                              <span className="font-medium text-gray-200 text-sm sm:text-base">Point de départ:</span>
+                              <a 
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-400 hover:text-indigo-300 hover:underline ml-1 text-sm sm:text-base block"
+                              >
+                                {waypoint.address}
+                              </a>
+                            </div>
                           </div>
                         ) : (
-                          <div>
-                            <div className="font-medium text-sm sm:text-base text-white">
-                              <span className="font-bold mr-2 text-indigo-300">{index}.</span>
-                              {waypoint.customerName}
+                          <div className="flex items-start">
+                            <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-indigo-600/70 rounded-full text-white text-sm font-bold mr-3">
+                              {index}
                             </div>
-                            <a 
-                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-indigo-400 hover:text-indigo-300 hover:underline text-xs sm:text-sm break-words"
-                            >
-                              {waypoint.address}
-                            </a>
-                            {waypoint.startAt && (
-                              <div className="text-gray-300 text-xs sm:text-sm">
-                                Heure: {
-                                  new Date(waypoint.startAt).getHours() === 0 
-                                  ? "Toute la journée" 
-                                  : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', {
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })
-                                }
+                            <div className="flex-grow">
+                              <div className="font-medium text-sm sm:text-base text-white mb-1">
+                                {waypoint.customerName}
                               </div>
-                            )}
+                              <a 
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-400 hover:text-indigo-300 hover:underline text-xs sm:text-sm break-words block"
+                              >
+                                {waypoint.address}
+                              </a>
+                              {waypoint.startAt && (
+                                <div className="text-gray-300 text-xs sm:text-sm mt-1 flex items-center">
+                                  <Clock className="h-3.5 w-3.5 mr-1 text-indigo-400" />
+                                  Heure: {
+                                    new Date(waypoint.startAt).getHours() === 0 
+                                    ? "Toute la journée" 
+                                    : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                  }
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 p-2 sm:p-3 bg-gray-700 rounded border border-gray-600">
-                  <div className="font-medium text-indigo-300 text-sm sm:text-base">Durée totale: <span className="text-white">{routeData.totalDuration} minutes</span></div>
-                  <div className="font-medium text-indigo-300 text-sm sm:text-base">Distance totale: <span className="text-white">{routeData.totalDistance} km</span></div>
+                <div className="mt-4 p-4 bg-indigo-900/30 backdrop-blur-sm rounded-lg border border-indigo-900/30 shadow-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-gray-800/60 backdrop-blur-sm rounded-lg border border-indigo-900/20 shadow-md">
+                      <div className="font-medium text-indigo-300 text-sm sm:text-base flex items-center">
+                        <Clock className="h-4 w-4 mr-1.5 text-indigo-400" />
+                        Durée totale: <span className="text-white ml-1">{routeData.totalDuration} minutes</span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-gray-800/60 backdrop-blur-sm rounded-lg border border-indigo-900/20 shadow-md">
+                      <div className="font-medium text-indigo-300 text-sm sm:text-base flex items-center">
+                        <Navigation className="h-4 w-4 mr-1.5 text-indigo-400" />
+                        Distance totale: <span className="text-white ml-1">{routeData.totalDistance} km</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

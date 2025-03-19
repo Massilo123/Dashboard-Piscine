@@ -6,7 +6,17 @@ import RouteOptimizerSchedule from './components/RouteOptimizerSchedule';
 import OptimisationRdvClient from './components/OptimisationRdvClient';
 import DistrictTable from './components/DistrictTable';
 import UnidentifiedClientsManager from './components/UnidentifiedClientsManager';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, PenTool, Search, Map, Calendar, MapPin, LayoutGrid, Users } from 'lucide-react';
+
+// Vous devrez remplacer ceci par votre logo réel importé
+const AquariusLogo = () => (
+  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center overflow-hidden">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white">
+      <path d="M19.071 19.071C23.976 14.165 23.976 6.003 19.071 1.098C14.165 -3.808 6.003 -3.808 1.098 1.098C-3.808 6.003 -3.808 14.165 1.098 19.071C6.003 23.976 14.165 23.976 19.071 19.071Z" fill="currentColor"/>
+      <path d="M12 6.5C8.5 6.5 7 9 7 12C7 15 9 16.5 11 16.5C14 16.5 13.5 14 13.5 14H16C16 14 16.5 16.5 14 16.5C11.5 16.5 9.5 15 9.5 12C9.5 9 11 8.5 12 8.5C13 8.5 14 8.75 14 11H16C16 8.25 14.5 6.5 12 6.5Z" fill="#0d182d"/>
+    </svg>
+  </div>
+);
 
 function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -37,122 +47,172 @@ function App() {
           <div className="absolute w-48 h-48 rounded-full bg-purple-800/5 top-3/4 left-10 animate-float-delay-4"></div>
         </div>
 
-        {/* Navigation Bar */}
-        <nav className="bg-gray-800/80 shadow-xl border-b border-gray-700 backdrop-blur-sm relative z-10">
-          <div className="container mx-auto px-4">
-            <div className="flex justify-between items-center h-16">
-              {/* Logo/Title - Hidden on mobile */}
-              <div className="hidden md:block">
-                <span className="text-indigo-400 font-bold">Piscine Aquarius</span>
+        {/* Header Élégant */}
+        <header className="fixed top-0 left-0 right-0 z-50">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-900 via-indigo-950 to-gray-900 opacity-90"></div>
+          
+          {/* Contenu du header */}
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <div className="flex items-center justify-between h-16 md:h-20">
+              {/* Logo et nom */}
+              <div className="flex items-center space-x-3">
+                <AquariusLogo />
+                <span className="text-xl font-bold text-white">Piscine Aquarius</span>
               </div>
-
-              {/* Mobile menu button */}
-              <button
-                className="md:hidden flex items-center p-2 rounded-md text-gray-300 hover:text-indigo-400 focus:outline-none"
-                onClick={toggleMobileMenu}
-              >
-                {mobileMenuOpen ? (
-                  <X className="h-6 w-6" />
-                ) : (
-                  <Menu className="h-6 w-6" />
-                )}
-              </button>
-
-              {/* Desktop Navigation */}
-              <div className="hidden md:flex md:space-x-2 lg:space-x-4">
+              
+              {/* Navigation Desktop */}
+              <nav className="hidden md:flex items-center space-x-1 lg:space-x-3">
                 <Link 
                   to="/client-search"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
                 >
-                  Recherche Client
+                  <div className="flex items-center gap-1.5">
+                    <Search className="h-4 w-4" />
+                    <span>Recherche Client</span>
+                  </div>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
                 <Link 
                   to="/route-optimizer"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
                 >
-                  Optimiseur Route
+                  <div className="flex items-center gap-1.5">
+                    <Map className="h-4 w-4" />
+                    <span>Optimiseur Route</span>
+                  </div>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
                 <Link 
                   to="/schedule"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
                 >
-                  Planning
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4" />
+                    <span>Planning</span>
+                  </div>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
                 <Link 
                   to="/optimisation-rdv"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
                 >
-                  RDV Proche
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4" />
+                    <span>RDV Proche</span>
+                  </div>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
                 <Link 
                   to="/district-table"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
                 >
-                  Quartiers
+                  <div className="flex items-center gap-1.5">
+                    <LayoutGrid className="h-4 w-4" />
+                    <span>Quartiers</span>
+                  </div>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
                 <Link 
                   to="/UnidentifiedClientsManager"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
                 >
-                  Villes
+                  <div className="flex items-center gap-1.5">
+                    <Users className="h-4 w-4" />
+                    <span>Villes</span>
+                  </div>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
+              </nav>
+              
+              {/* Bouton RDV et menu mobile */}
+              <div className="flex items-center space-x-3">
+                <a
+                  href="#"
+                  className="hidden md:inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                >
+                  <PenTool className="h-4 w-4 mr-1.5" />
+                  RENDEZ-VOUS
+                </a>
+                
+                {/* Mobile menu button */}
+                <button
+                  onClick={toggleMobileMenu}
+                  className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-300 hover:text-white hover:bg-gray-700 focus:outline-none"
+                >
+                  {mobileMenuOpen ? (
+                    <X className="block h-6 w-6" aria-hidden="true" />
+                  ) : (
+                    <Menu className="block h-6 w-6" aria-hidden="true" />
+                  )}
+                </button>
               </div>
             </div>
           </div>
-
-          {/* Mobile menu, show/hide based on menu state */}
-          {mobileMenuOpen && (
-            <div className="md:hidden bg-gray-800/90 backdrop-blur-sm border-t border-gray-700">
-              <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                <Link 
-                  to="/client-search"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                  onClick={toggleMobileMenu}
-                >
-                  Recherche Client
-                </Link>
-                <Link 
-                  to="/route-optimizer"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                  onClick={toggleMobileMenu}
-                >
-                  Optimiseur Route
-                </Link>
-                <Link 
-                  to="/schedule"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                  onClick={toggleMobileMenu}
-                >
-                  Planning
-                </Link>
-                <Link 
-                  to="/optimisation-rdv"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                  onClick={toggleMobileMenu}
-                >
-                  RDV Proche
-                </Link>
-                <Link 
-                  to="/district-table"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                  onClick={toggleMobileMenu}
-                >
-                  Quartiers
-                </Link>
-                <Link 
-                  to="/UnidentifiedClientsManager"
-                  className="text-gray-300 hover:text-indigo-400 hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                  onClick={toggleMobileMenu}
-                >
-                  Villes
-                </Link>
-              </div>
+          
+          {/* Mobile menu */}
+          <div className={`md:hidden ${mobileMenuOpen ? 'block' : 'hidden'}`}>
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700">
+              <Link
+                to="/client-search"
+                className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
+                onClick={toggleMobileMenu}
+              >
+                <Search className="h-5 w-5" />
+                <span>Recherche Client</span>
+              </Link>
+              <Link
+                to="/route-optimizer"
+                className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
+                onClick={toggleMobileMenu}
+              >
+                <Map className="h-5 w-5" />
+                <span>Optimiseur Route</span>
+              </Link>
+              <Link
+                to="/schedule"
+                className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
+                onClick={toggleMobileMenu}
+              >
+                <Calendar className="h-5 w-5" />
+                <span>Planning</span>
+              </Link>
+              <Link
+                to="/optimisation-rdv"
+                className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
+                onClick={toggleMobileMenu}
+              >
+                <MapPin className="h-5 w-5" />
+                <span>RDV Proche</span>
+              </Link>
+              <Link
+                to="/district-table"
+                className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
+                onClick={toggleMobileMenu}
+              >
+                <LayoutGrid className="h-5 w-5" />
+                <span>Quartiers</span>
+              </Link>
+              <Link
+                to="/UnidentifiedClientsManager"
+                className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
+                onClick={toggleMobileMenu}
+              >
+                <Users className="h-5 w-5" />
+                <span>Villes</span>
+              </Link>
+              <a
+                href="#"
+                className="text-white bg-indigo-600 hover:bg-indigo-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2 mt-4"
+              >
+                <PenTool className="h-5 w-5" />
+                <span>RENDEZ-VOUS</span>
+              </a>
             </div>
-          )}
-        </nav>
+          </div>
+        </header>
 
-        {/* Content Area */}
-        <div className="container mx-auto py-4 px-4 relative z-10">
+        {/* Content Area avec spacing pour le header fixe */}
+        <div className="container mx-auto py-4 px-4 relative z-10 mt-20">
           <Routes>
             <Route path="/" element={<Navigate to="/client-search" replace />} />
             <Route path="/client-search" element={<ClientSearch />} />
