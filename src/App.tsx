@@ -7,15 +7,13 @@ import OptimisationRdvClient from './components/OptimisationRdvClient';
 import DistrictTable from './components/DistrictTable';
 import UnidentifiedClientsManager from './components/UnidentifiedClientsManager';
 import { Menu, X, PenTool, Search, Map, Calendar, MapPin, LayoutGrid, Users } from 'lucide-react';
+import logo_mauve from './assets/logo_mauve.png';
 import 'leaflet/dist/leaflet.css'
 
 // Vous devrez remplacer ceci par votre logo réel importé
 const AquariusLogo = () => (
-  <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center overflow-hidden">
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white">
-      <path d="M19.071 19.071C23.976 14.165 23.976 6.003 19.071 1.098C14.165 -3.808 6.003 -3.808 1.098 1.098C-3.808 6.003 -3.808 14.165 1.098 19.071C6.003 23.976 14.165 23.976 19.071 19.071Z" fill="currentColor"/>
-      <path d="M12 6.5C8.5 6.5 7 9 7 12C7 15 9 16.5 11 16.5C14 16.5 13.5 14 13.5 14H16C16 14 16.5 16.5 14 16.5C11.5 16.5 9.5 15 9.5 12C9.5 9 11 8.5 12 8.5C13 8.5 14 8.75 14 11H16C16 8.25 14.5 6.5 12 6.5Z" fill="#0d182d"/>
-    </svg>
+  <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center overflow-hidden">
+    <img src={logo_mauve} alt="Logo Aquarius" className="w-full h-full object-contain" />
   </div>
 );
 
