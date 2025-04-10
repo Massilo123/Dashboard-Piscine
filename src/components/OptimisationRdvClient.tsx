@@ -341,7 +341,7 @@ const OptimisationRdvClient = () => {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-400" />
-            <h2 className="text-lg sm:text-xl font-semibold text-white">Client le plus proche</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-white">Client le plus proche.</h2>
           </div>
           <button 
             onClick={toggleDateFilter}
