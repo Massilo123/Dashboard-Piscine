@@ -2,6 +2,7 @@ import React from 'react';
 import { Calendar, Clock, MapPin, Navigation, CheckCircle, Timer } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 // Hack pour corriger l'icône de marqueur par défaut en CSS
 // Nécessaire car les images relatives ne fonctionnent pas correctement avec les importations webpack

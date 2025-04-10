@@ -8,7 +8,7 @@ import DistrictTable from './components/DistrictTable';
 import UnidentifiedClientsManager from './components/UnidentifiedClientsManager';
 import { Menu, X, PenTool, Search, Map, Calendar, MapPin, LayoutGrid, Users } from 'lucide-react';
 import logo_mauve from './assets/logo_mauve.png';
-
+import 'leaflet/dist/leaflet.css'
 
 // Vous devrez remplacer ceci par votre logo réel importé
 const AquariusLogo = () => (
