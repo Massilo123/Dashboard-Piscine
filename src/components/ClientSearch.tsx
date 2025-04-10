@@ -285,7 +285,7 @@ const ClientSearch = () => {
 
                 {clients.length === 0 && address !== '' && !loading && !error && (
                     <div className="text-center p-4 bg-gray-800/70 backdrop-blur-sm rounded-lg border border-indigo-900/30 shadow-md">
-                        <p className="text-gray-300">Aucun client trouvé à proximité de cette adresse.</p>
+                        <p className="text-gray-300">Aucun client trouvé à proximité de cette adresse.  </p>
                     </div>
                 )}
 
