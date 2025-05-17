@@ -25,6 +25,7 @@ services:
       - cloudflared
     depends_on:
       - cloudflared
+    restart: unless-stopped
 
 networks:
   cloudflared:
