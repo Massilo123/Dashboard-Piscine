@@ -126,6 +126,15 @@ router.post('/bookings', async (req: Request, res: Response) => {
         const bookingDetails: BookingDetail[] = [];
         
         for await (const booking of bookingsResponse) {
+            // FILTRE POUR LES STATUTS ACTIFS UNIQUEMENT
+            console.log('Statut de la réservation:', booking.id, '- Status:', booking.status);
+            
+            // Ne traiter que les réservations avec un statut actif
+            if (booking.status !== 'ACCEPTED' && booking.status !== 'PENDING') {
+                console.log(`Réservation ${booking.id} ignorée - statut: ${booking.status}`);
+                continue;
+            }
+
             const bookingDate = new Date(booking.startAt || '');
             console.log('Réservation date (UTC):', booking.startAt);
             console.log('En local:', bookingDate.toLocaleString());
@@ -155,7 +164,7 @@ router.post('/bookings', async (req: Request, res: Response) => {
             }
         }
 
-        console.log('Nombre de réservations trouvées:', bookingDetails.length);
+        console.log('Nombre de réservations actives trouvées:', bookingDetails.length);
         
 
         if (bookingDetails.length === 0) {
