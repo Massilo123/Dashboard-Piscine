@@ -3,15 +3,11 @@ import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 import mbxDirections from '@mapbox/mapbox-sdk/services/directions';
 import squareClient from '../config/square';
-import NodeCache from 'node-cache';
 
 const router = Router();
 const baseClient = mbxClient({ accessToken: process.env.MAPBOX_TOKEN! });
 const geocodingService = mbxGeocoding(baseClient);
 const directionsService = mbxDirections(baseClient);
-
-// Cache avec TTL très court pour synchronisation instantanée
-const bookingCache = new NodeCache({ stdTTL: 10, checkperiod: 5 });
 
 // Définir l'adresse fixe du point de départ
 const STARTING_POINT = "1829 rue capitol";
@@ -22,85 +18,6 @@ interface DailyStats {
     totalDuration: number;
     clientCount: number;
 }
-
-// Fonction pour invalider le cache
-const invalidateCache = () => {
-    bookingCache.flushAll();
-    console.log('🗑️ Cache invalidé - données fraîches garanties');
-};
-
-// Fonction de récupération et validation en temps réel des rendez-vous
-const getValidBookingsRealTime = async (locationId: string, startDate: Date, endDate: Date, forceRefresh: boolean = false) => {
-    const cacheKey = `bookings_${locationId}_${startDate.getTime()}_${endDate.getTime()}`;
-    
-    // Si forceRefresh, ignorer le cache
-    if (!forceRefresh) {
-        const cached = bookingCache.get(cacheKey);
-        if (cached && Date.now() - (cached as any).timestamp < 10000) {
-            console.log('📋 Utilisation du cache (< 10s)');
-            return (cached as any).data;
-        }
-    }
-
-    try {
-        console.log('🔄 Récupération fraîche des données Square...');
-        
-        // Récupérer tous les rendez-vous de Square
-        const bookingsResponse = await squareClient.bookings.list({
-            startAtMin: startDate.toISOString(),
-            startAtMax: endDate.toISOString(),
-            locationId: locationId
-        });
-
-        const validBookings = [];
-        
-        // Valider chaque rendez-vous individuellement en temps réel
-        for await (const booking of bookingsResponse) {
-            try {
-                // RE-VÉRIFIER chaque rendez-vous individuellement avec Square
-                const currentBooking = await squareClient.bookings.get({
-                    bookingId: booking.id!
-                });
-
-                const bookingData = currentBooking.booking;
-                
-                // Vérifications strictes - seulement les rendez-vous acceptés et valides
-                if (bookingData && 
-                    bookingData.status === 'ACCEPTED' && // Seulement les rendez-vous acceptés
-                    bookingData.customerId &&
-                    bookingData.startAt) {
-                    
-                    // Vérifier que la date est bien dans la plage demandée
-                    const bookingDate = new Date(bookingData.startAt);
-                    if (bookingDate >= startDate && bookingDate <= endDate) {
-                        validBookings.push(bookingData);
-                        console.log(`✅ Rendez-vous ${booking.id} validé`);
-                    }
-                } else {
-                    console.log(`⚠️ Rendez-vous ${booking.id} ignoré - statut: ${bookingData?.status || 'unknown'}`);
-                }
-            } catch (bookingError) {
-                // Si on ne peut pas récupérer le rendez-vous, il n'existe probablement plus
-                console.log(`❌ Rendez-vous ${booking.id} ignoré - probablement supprimé/annulé`);
-            }
-        }
-
-        // Mettre en cache pour 10 secondes maximum
-        const result = {
-            data: validBookings,
-            timestamp: Date.now()
-        };
-        
-        bookingCache.set(cacheKey, result);
-        console.log(`✅ ${validBookings.length} rendez-vous valides récupérés et mis en cache`);
-        
-        return validBookings;
-        
-    } catch (error) {
-        console.error('❌ Erreur récupération rendez-vous:', error);
-        throw error;
-    }
-};
 
 // Fonction pour calculer les statistiques d'une journée spécifique
 const calculateDailyStats = (clients: any[], date: string): DailyStats => {
@@ -115,7 +32,7 @@ const calculateDailyStats = (clients: any[], date: string): DailyStats => {
     }, 0);
     
     return {
-        totalDistance: Math.round(totalDistance * 10) / 10,
+        totalDistance: Math.round(totalDistance * 10) / 10, // Arrondir à 1 décimale
         totalDuration,
         clientCount: clientsOnDate.length
     };
@@ -137,7 +54,7 @@ async function calculateDistanceMatrix(locations: { address: string; coordinates
             }).send();
 
             if (response.body.routes.length) {
-                const duration = response.body.routes[0].duration / 60;
+                const duration = response.body.routes[0].duration / 60; // en minutes
                 matrix[i][j] = duration;
                 matrix[j][i] = duration;
             }
@@ -191,8 +108,8 @@ async function getDetailedRoute(locations: { address: string; coordinates: numbe
     return {
         waypoints: waypoints,
         route: response.body.routes[0],
-        totalDuration: Math.round(response.body.routes[0].duration / 60),
-        totalDistance: Math.round(response.body.routes[0].distance / 100) / 10
+        totalDuration: Math.round(response.body.routes[0].duration / 60), // minutes
+        totalDistance: Math.round(response.body.routes[0].distance / 100) / 10 // km
     };
 }
 
@@ -202,16 +119,8 @@ router.post('/', async (req: Request, res: Response) => {
             address, 
             excludeDates = [], 
             specificDate = null,
-            dateRange = null,
-            forceRefresh = false // NOUVEAU: paramètre pour forcer la synchronisation
+            dateRange = null  // Nouvel attribut pour filtrer par intervalle de dates
         } = req.body;
-
-        console.log(`🚀 Début traitement - forceRefresh: ${forceRefresh}`);
-
-        // Si forceRefresh est true, invalider tout le cache
-        if (forceRefresh) {
-            invalidateCache();
-        }
 
         if (!address) {
             return res.status(400).json({
@@ -241,21 +150,27 @@ router.post('/', async (req: Request, res: Response) => {
         let startDate, endDate;
         
         if (dateRange && dateRange.startDate && dateRange.endDate) {
+            // Utiliser l'intervalle de dates fourni par l'utilisateur
             startDate = new Date(dateRange.startDate);
             startDate.setHours(0, 0, 0, 0);
             
             endDate = new Date(dateRange.endDate);
             endDate.setHours(23, 59, 59, 999);
         } else {
+            // Par défaut: rechercher dans les 30 prochains jours
             startDate = new Date(currentDate);
+            
             endDate = new Date(currentDate);
             endDate.setDate(endDate.getDate() + 30);
         }
 
-        // 3. UTILISER LA VALIDATION TEMPS RÉEL
-        const validBookings = await getValidBookingsRealTime("L24K8X13MB1A7", startDate, endDate, forceRefresh);
+        const bookingsResponse = await squareClient.bookings.list({
+            startAtMin: startDate.toISOString(),
+            startAtMax: endDate.toISOString(),
+            locationId: "L24K8X13MB1A7"
+        });
 
-        // 4. Récupérer les informations des clients avec adresses pour tous les rendez-vous validés
+        // 3. Récupérer les informations des clients avec adresses pour tous les rendez-vous futurs
         const clientsWithBookings: {
             bookingId: string;
             customerId: string;
@@ -263,40 +178,50 @@ router.post('/', async (req: Request, res: Response) => {
             address: string;
             coordinates: number[];
             startAt: string;
-            bookingDate: string;
+            bookingDate: string; // Date du rendez-vous (YYYY-MM-DD)
             distance: number | null;
             duration: number | null;
         }[] = [];
 
+        // Map pour suivre les dates de rendez-vous déjà traitées
         const processedDates = new Map<string, boolean>();
         excludeDates.forEach((date: string) => {
             processedDates.set(date, true);
         });
 
+        // Map pour compter les clients par date
         const clientsByDate = new Map<string, number>();
 
-        for (const booking of validBookings) {
+        for await (const booking of bookingsResponse) {
             if (booking.customerId && booking.startAt) {
+                // Extraire la date du rendez-vous
                 const bookingDate = new Date(booking.startAt);
-                const dateString = bookingDate.toISOString().split('T')[0];
+                const dateString = bookingDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
                 
-                clientsByDate.set(dateString, (clientsByDate.get(dateString) || 0) + 1);
+                // Incrémenter le compteur pour cette date
+                if (clientsByDate.has(dateString)) {
+                    clientsByDate.set(dateString, clientsByDate.get(dateString)! + 1);
+                } else {
+                    clientsByDate.set(dateString, 1);
+                }
                 
+                // Si on cherche une date spécifique et que ce n'est pas celle-ci, sauter ce rendez-vous
                 if (specificDate && dateString !== specificDate) {
                     continue;
                 }
                 
+                // Vérifier si cette date a déjà été exclue
                 if (processedDates.has(dateString) && !specificDate) {
-                    continue;
+                    continue; // Sauter ce rendez-vous car sa date est exclue
                 }
 
                 try {
-                    // RE-VÉRIFIER que le client existe toujours
                     const customerResponse = await squareClient.customers.get({
                         customerId: booking.customerId
                     });
 
                     if (customerResponse.customer && customerResponse.customer.address?.addressLine1) {
+                        // Obtenir les coordonnées du client
                         const clientGeocodeResponse = await geocodingService.forwardGeocode({
                             query: customerResponse.customer.address.addressLine1,
                             countries: ['ca'],
@@ -306,6 +231,7 @@ router.post('/', async (req: Request, res: Response) => {
                         if (clientGeocodeResponse.body.features.length) {
                             const clientCoordinates = clientGeocodeResponse.body.features[0].geometry.coordinates;
                             
+                            // Calculer la distance et la durée entre l'adresse source et l'adresse du client
                             const directionsResponse = await directionsService.getDirections({
                                 profile: 'driving-traffic',
                                 waypoints: [
@@ -319,8 +245,8 @@ router.post('/', async (req: Request, res: Response) => {
                             let duration = null;
 
                             if (directionsResponse.body.routes.length) {
-                                distance = Math.round(directionsResponse.body.routes[0].distance / 100) / 10;
-                                duration = Math.round(directionsResponse.body.routes[0].duration / 60);
+                                distance = Math.round(directionsResponse.body.routes[0].distance / 100) / 10; // km
+                                duration = Math.round(directionsResponse.body.routes[0].duration / 60); // minutes
                             }
 
                             clientsWithBookings.push({
@@ -334,12 +260,10 @@ router.post('/', async (req: Request, res: Response) => {
                                 distance,
                                 duration
                             });
-
-                            console.log(`✅ Client ${customerResponse.customer.givenName} ${customerResponse.customer.familyName} ajouté`);
                         }
                     }
                 } catch (error) {
-                    console.error(`❌ Client ${booking.customerId} ignoré - probablement supprimé:`, error);
+                    console.error(`Erreur récupération client ${booking.customerId}:`, error);
                 }
             }
         }
@@ -347,11 +271,11 @@ router.post('/', async (req: Request, res: Response) => {
         if (clientsWithBookings.length === 0) {
             return res.status(404).json({
                 success: false,
-                error: 'Aucun client avec rendez-vous VALIDE trouvé dans cet intervalle de dates'
+                error: 'Aucun client avec rendez-vous trouvé dans cet intervalle de dates'
             });
         }
 
-        // 5. Trier les clients par distance et trouver le plus proche
+        // 4. Trier les clients par distance et trouver le plus proche
         clientsWithBookings.sort((a, b) => {
             if (a.distance === null) return 1;
             if (b.distance === null) return -1;
@@ -360,11 +284,14 @@ router.post('/', async (req: Request, res: Response) => {
 
         const nearestClient = clientsWithBookings[0];
 
+        // Obtenir les dates uniques disponibles (pour le compteur de jours restants)
         const uniqueDates = [...new Set(clientsWithBookings.map(c => c.bookingDate))];
         const remainingDays = uniqueDates.length;
+
+        // Nombre de clients à la date du client le plus proche
         const clientsOnSameDay = clientsByDate.get(nearestClient.bookingDate) || 0;
 
-        // 6. Obtenir l'itinéraire détaillé vers ce client
+        // 5. Obtenir l'itinéraire détaillé vers ce client
         const directionResponse = await directionsService.getDirections({
             profile: 'driving-traffic',
             waypoints: [
@@ -374,18 +301,23 @@ router.post('/', async (req: Request, res: Response) => {
             exclude: ['toll']
         }).send();
 
+        // Calculer les statistiques pour la journée du client sélectionné
         const dailyStats = calculateDailyStats(clientsWithBookings, nearestClient.bookingDate);
 
-        // 7. Calculer l'itinéraire optimisé pour tous les clients de cette journée
+        // 6. NOUVEAU: Calculer l'itinéraire optimisé pour tous les clients de cette journée
         let optimizedRoute = null;
         try {
+            // Récupérer tous les clients de la même journée
             const clientsOnSameDay = clientsWithBookings.filter(
                 client => client.bookingDate === nearestClient.bookingDate
             );
             
+            // Si nous avons des clients ce jour-là, calculer un itinéraire optimisé
             if (clientsOnSameDay.length > 0) {
+                // Récupérer uniquement les adresses des clients
                 const clientAddresses = clientsOnSameDay.map(client => client.address);
                 
+                // Obtenir les coordonnées du point de départ fixe
                 const startPointResponse = await geocodingService.forwardGeocode({
                     query: STARTING_POINT,
                     countries: ['ca'],
@@ -397,10 +329,14 @@ router.post('/', async (req: Request, res: Response) => {
                 }
 
                 const startPointCoordinates = startPointResponse.body.features[0].geometry.coordinates;
+                
+                // Ajouter le point de départ fixe au début de la liste
                 const allAddresses = [STARTING_POINT, ...clientAddresses];
                 
+                // Convertir toutes les adresses en coordonnées
                 const coordinates = await Promise.all(
                     allAddresses.map(async (addr, index) => {
+                        // Pour l'adresse de départ, utiliser les coordonnées déjà obtenues
                         if (index === 0) {
                             return {
                                 address: addr,
@@ -408,6 +344,7 @@ router.post('/', async (req: Request, res: Response) => {
                             };
                         }
                         
+                        // Pour les adresses clients, obtenir les coordonnées
                         const response = await geocodingService.forwardGeocode({
                             query: addr,
                             countries: ['ca'],
@@ -425,8 +362,13 @@ router.post('/', async (req: Request, res: Response) => {
                     })
                 );
 
+                // Calculer la matrice des distances
                 const matrix = await calculateDistanceMatrix(coordinates);
+                
+                // Trouver l'ordre optimal
                 const optimalRoute = findOptimalRoute(matrix, coordinates.length);
+                
+                // Obtenir l'itinéraire détaillé
                 const detailedRoute = await getDetailedRoute(coordinates, optimalRoute);
                 
                 optimizedRoute = {
@@ -436,10 +378,11 @@ router.post('/', async (req: Request, res: Response) => {
                 };
             }
         } catch (error) {
-            console.error("❌ Erreur lors de l'optimisation de l'itinéraire:", error);
+            console.error("Erreur lors de l'optimisation de l'itinéraire:", error);
+            // En cas d'erreur, on continue sans l'itinéraire optimisé
         }
 
-        // 8. Formater la réponse
+        // Formater la date et l'heure du rendez-vous
         const bookingDate = new Date(nearestClient.startAt);
         const formattedDate = bookingDate.toLocaleDateString('fr-CA', {
             year: 'numeric',
@@ -451,8 +394,6 @@ router.post('/', async (req: Request, res: Response) => {
             hour: '2-digit',
             minute: '2-digit'
         });
-
-        console.log(`✅ Traitement terminé - Client le plus proche: ${nearestClient.customerName}`);
 
         res.json({
             success: true,
@@ -502,72 +443,14 @@ router.post('/', async (req: Request, res: Response) => {
                         startDate: dateRange.startDate,
                         endDate: dateRange.endDate
                     } : null
-                },
-                // NOUVEAUX champs pour la synchronisation
-                freshTimestamp: Date.now(),
-                cacheStatus: forceRefresh ? 'forced_fresh' : 'fresh',
-                syncInfo: {
-                    totalBookingsChecked: validBookings.length,
-                    validBookingsFound: clientsWithBookings.length,
-                    lastSyncTime: new Date().toISOString()
                 }
             }
         });
 
     } catch (error) {
-        console.error('❌ Erreur générale:', error);
         res.status(500).json({
             success: false,
             error: error instanceof Error ? error.message : 'Erreur inconnue'
-        });
-    }
-});
-
-// Route pour forcer l'invalidation du cache
-router.post('/invalidate-cache', async (req: Request, res: Response) => {
-    try {
-        invalidateCache();
-        res.json({
-            success: true,
-            message: 'Cache invalidé avec succès'
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Erreur lors de l\'invalidation du cache'
-        });
-    }
-});
-
-// Route pour vérifier le statut d'un rendez-vous spécifique
-router.post('/check-booking', async (req: Request, res: Response) => {
-    try {
-        const { bookingId } = req.body;
-        
-        if (!bookingId) {
-            return res.status(400).json({
-                success: false,
-                error: 'ID de rendez-vous manquant'
-            });
-        }
-
-        const bookingCheck = await squareClient.bookings.get({
-            bookingId: bookingId
-        });
-        
-        res.json({
-            success: true,
-            exists: !!bookingCheck.booking,
-            status: bookingCheck.booking?.status,
-            startAt: bookingCheck.booking?.startAt,
-            customerId: bookingCheck.booking?.customerId
-        });
-        
-    } catch (error) {
-        res.json({
-            success: false,
-            exists: false,
-            error: error instanceof Error ? error.message : 'Rendez-vous introuvable'
         });
     }
 });

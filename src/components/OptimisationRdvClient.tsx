@@ -1,4 +1,4 @@
-import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, Filter, X, RefreshCw, Zap } from 'lucide-react'
+import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, Filter, X } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
@@ -28,12 +28,6 @@ interface OptimizedRoute {
   totalDistance: number;
   totalDuration: number;
   waypoints: Waypoint[];
-}
-
-interface SyncInfo {
-  totalBookingsChecked: number;
-  validBookingsFound: number;
-  lastSyncTime: string;
 }
 
 interface ClientData {
@@ -74,9 +68,6 @@ interface ClientData {
     allDates: string[]
     dateRange: DateRange | null
   }
-  freshTimestamp?: number
-  cacheStatus?: string
-  syncInfo?: SyncInfo
 }
 
 const OptimisationRdvClient = () => {
@@ -96,9 +87,6 @@ const OptimisationRdvClient = () => {
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
   })
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
-  const [isSyncing, setIsSyncing] = useState<boolean>(false)
-  
   const wrapperRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLDivElement>(null)
 
@@ -128,7 +116,9 @@ const OptimisationRdvClient = () => {
       // Calcul correct des jours restants
       let daysLeft = 0;
       
+      // Si nous ne sommes pas au dernier client, il y a au moins les jours des clients suivants
       if (currentIndex < visitedClients.length - 1) {
+        // Compter les jours uniques restants parmi les clients déjà visités
         const uniqueDatesAfterCurrent = new Set();
         for (let i = currentIndex + 1; i < visitedClients.length; i++) {
           uniqueDatesAfterCurrent.add(visitedClients[i].booking.bookingDate);
@@ -136,7 +126,9 @@ const OptimisationRdvClient = () => {
         daysLeft = uniqueDatesAfterCurrent.size;
       }
       
+      // Si nous sommes au dernier client et qu'il y a d'autres clients non encore chargés
       if (currentIndex === visitedClients.length - 1 && visitedClients[currentIndex].navigation.hasNext) {
+        // Ajouter 1 pour représenter les clients non encore chargés
         daysLeft += 1;
       }
       
@@ -149,25 +141,6 @@ const OptimisationRdvClient = () => {
     if (clientData?.navigation?.processedDates) {
       setAllProcessedDates(clientData.navigation.processedDates);
     }
-  }, [clientData]);
-
-  // Mise à jour du timestamp de synchronisation
-  useEffect(() => {
-    if (clientData?.freshTimestamp) {
-      setLastSyncTime(new Date(clientData.freshTimestamp));
-    }
-  }, [clientData]);
-
-  // Auto-synchronisation toutes les 30 secondes
-  useEffect(() => {
-    if (!clientData) return;
-    
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-synchronisation...');
-      forceRefresh();
-    }, 30000); // 30 secondes
-    
-    return () => clearInterval(interval);
   }, [clientData]);
 
   // Gestion des suggestions d'adresses
@@ -226,8 +199,7 @@ const OptimisationRdvClient = () => {
     setIsAddressSelected(true);
   };
 
-  // Fonction principale de récupération des clients avec synchronisation
-  const fetchClient = async (excludeDates: string[] = [], forceRefresh: boolean = false) => {
+  const fetchClient = async (excludeDates: string[] = []) => {
     if (!address) {
       setError('Veuillez entrer une adresse')
       return null;
@@ -242,20 +214,11 @@ const OptimisationRdvClient = () => {
     setError('')
     setFetchingNew(true);
 
-    if (forceRefresh) {
-      setIsSyncing(true);
-    }
-
     try {
-      console.log(`🔄 Récupération ${forceRefresh ? 'forcée' : 'normale'} des données...`);
-      
       const response = await fetch('https://api.piscineaquarius.com/api/client-rdv', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
         },
         body: JSON.stringify({ 
           address,
@@ -264,9 +227,7 @@ const OptimisationRdvClient = () => {
           dateRange: {
             startDate: dateRange.startDate,
             endDate: dateRange.endDate
-          },
-          forceRefresh: forceRefresh,
-          timestamp: Date.now()
+          }
         }),
       })
 
@@ -276,11 +237,6 @@ const OptimisationRdvClient = () => {
         throw new Error(data.error || 'Une erreur est survenue')
       }
 
-      console.log(`✅ Données reçues - Statut: ${data.data.cacheStatus}`);
-      if (data.data.syncInfo) {
-        console.log(`📊 Sync info: ${data.data.syncInfo.validBookingsFound}/${data.data.syncInfo.totalBookingsChecked} rendez-vous valides`);
-      }
-      
       return data.data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue')
@@ -288,35 +244,11 @@ const OptimisationRdvClient = () => {
     } finally {
       setLoading(false)
       setFetchingNew(false);
-      setIsSyncing(false);
     }
   }
 
-  // Fonction de synchronisation instantanée
-  const forceRefresh = async () => {
-    console.log('🚀 SYNCHRONISATION INSTANTANÉE AVEC SQUARE');
-    
-    // Vider complètement le cache local
-    setVisitedClients([]);
-    setCurrentIndex(0);
-    setClientData(null);
-    setAllProcessedDates([]);
-    setRemainingDays(0);
-    
-    // Récupérer des données fraîches avec forceRefresh = true
-    const freshData = await fetchClient([], true);
-    
-    if (freshData) {
-      setVisitedClients([freshData]);
-      setCurrentIndex(0);
-      setClientData(freshData);
-      setRemainingDays(freshData.navigation.hasNext ? 1 : 0);
-      console.log('✅ Données synchronisées instantanément avec Square');
-    }
-  };
-
   const findFirstClient = async () => {
-    const newClient = await fetchClient([], true); // Toujours forcer le refresh au premier appel
+    const newClient = await fetchClient([]);
     
     if (newClient) {
       setVisitedClients([newClient]);
@@ -327,27 +259,37 @@ const OptimisationRdvClient = () => {
   }
 
   const findNextClient = async () => {
+    // Si nous sommes déjà sur le dernier client connu et qu'il y a plus de clients disponibles
     if (currentIndex === visitedClients.length - 1 && clientData?.navigation.hasNext) {
+      // Récupérer toutes les dates déjà visitées
       const alreadyVisitedDates = visitedClients.map(client => client.booking.bookingDate);
       
-      // TOUJOURS forcer le refresh pour les nouveaux clients
-      const newClient = await fetchClient(alreadyVisitedDates, true);
+      // Chercher un nouveau client
+      const newClient = await fetchClient(alreadyVisitedDates);
       
       if (newClient) {
+        // Ajouter le nouveau client à notre liste
         const updatedClients = [...visitedClients, newClient];
         setVisitedClients(updatedClients);
+        
+        // Aller directement au nouveau client
         setCurrentIndex(updatedClients.length - 1);
+        
+        // Mettre à jour les jours restants
         setRemainingDays(newClient.navigation.hasNext ? 1 : 0);
       }
     } else if (currentIndex < visitedClients.length - 1) {
+      // Nous avons déjà ce client en mémoire, avancer simplement l'index
       const newIndex = currentIndex + 1;
       setCurrentIndex(newIndex);
       
+      // Recalculer les jours restants
       const uniqueDatesAfterCurrent = new Set();
       for (let i = newIndex + 1; i < visitedClients.length; i++) {
         uniqueDatesAfterCurrent.add(visitedClients[i].booking.bookingDate);
       }
       
+      // Si nous sommes sur le dernier client connu et qu'il y a d'autres clients non chargés
       let daysLeft = uniqueDatesAfterCurrent.size;
       if (newIndex === visitedClients.length - 1 && visitedClients[newIndex].navigation.hasNext) {
         daysLeft += 1;
@@ -362,11 +304,13 @@ const OptimisationRdvClient = () => {
       const newIndex = currentIndex - 1;
       setCurrentIndex(newIndex);
       
+      // Recalculer les jours restants
       const uniqueDatesAfterCurrent = new Set();
       for (let i = newIndex + 1; i < visitedClients.length; i++) {
         uniqueDatesAfterCurrent.add(visitedClients[i].booking.bookingDate);
       }
       
+      // Si le dernier client a hasNext, ajouter 1 pour les clients non chargés
       let daysLeft = uniqueDatesAfterCurrent.size;
       if (visitedClients[visitedClients.length - 1].navigation.hasNext) {
         daysLeft += 1;
@@ -377,60 +321,16 @@ const OptimisationRdvClient = () => {
   }
 
   const handleNextClient = () => {
-    if (fetchingNew) return;
+    if (fetchingNew) return; // Éviter les clics multiples pendant le chargement
     
     if (currentIndex < visitedClients.length - 1) {
+      // Nous avons déjà ce client en mémoire
       findNextClient();
     } else if (clientData?.navigation.hasNext) {
+      // Besoin de chercher un nouveau client
       findNextClient();
     }
   }
-
-  // Composant bouton de synchronisation instantanée
-  const InstantSyncButton = () => (
-    <button
-      onClick={forceRefresh}
-      disabled={loading || isSyncing}
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors ${
-        isSyncing 
-          ? 'bg-yellow-600/70 text-white animate-pulse' 
-          : 'bg-green-600/70 text-white hover:bg-green-700/90'
-      } disabled:opacity-50`}
-      title="Synchronisation instantanée avec Square"
-    >
-      <RefreshCw className={`h-4 w-4 ${(loading || isSyncing) ? 'animate-spin' : ''}`} />
-      <span className="hidden sm:inline">
-        {isSyncing ? 'Sync...' : 'Sync'}
-      </span>
-    </button>
-  );
-
-  // Composant indicateur de fraîcheur des données
-  const FreshnessIndicator = () => {
-    if (!lastSyncTime) return null;
-    
-    const secondsAgo = Math.floor((Date.now() - lastSyncTime.getTime()) / 1000);
-    
-    return (
-      <div className="text-xs text-center mt-2 flex items-center justify-center gap-2">
-        <div className="flex items-center gap-1">
-          <div className={`w-2 h-2 rounded-full ${
-            secondsAgo < 30 ? 'bg-green-400' : 
-            secondsAgo < 60 ? 'bg-yellow-400' : 
-            'bg-red-400'
-          }`}></div>
-          <span className="text-gray-400">
-            Sync: {secondsAgo < 60 ? `${secondsAgo}s` : `${Math.floor(secondsAgo/60)}m`}
-          </span>
-        </div>
-        {clientData?.syncInfo && (
-          <div className="text-gray-500 text-xs">
-            ({clientData.syncInfo.validBookingsFound}/{clientData.syncInfo.totalBookingsChecked} rendez-vous)
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const canGoLeft = currentIndex > 0;
   const canGoRight = currentIndex < visitedClients.length - 1 || (clientData?.navigation.hasNext || false);
@@ -442,25 +342,14 @@ const OptimisationRdvClient = () => {
           <div className="flex items-center gap-2">
             <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-400" />
             <h2 className="text-lg sm:text-xl font-semibold text-white">Client le plus proche.</h2>
-            {clientData?.cacheStatus && (
-              <div className="flex items-center gap-1">
-                <Zap className="h-3 w-3 text-green-400" />
-                <span className="text-xs text-green-400 bg-green-900/30 px-2 py-0.5 rounded-full">
-                  Temps réel
-                </span>
-              </div>
-            )}
           </div>
-          <div className="flex items-center gap-2">
-            <InstantSyncButton />
-            <button 
-              onClick={toggleDateFilter}
-              className="flex items-center gap-1 text-gray-300 px-3 py-1.5 rounded-full hover:bg-indigo-700/50 transition-colors"
-            >
-              <Filter className="h-4 w-4" />
-              <span>Dates</span>
-            </button>
-          </div>
+          <button 
+            onClick={toggleDateFilter}
+            className="flex items-center gap-1 text-gray-300 px-3 py-1.5 rounded-full hover:bg-indigo-700/50 transition-colors"
+          >
+            <Filter className="h-4 w-4" />
+            <span>Dates</span>
+          </button>
         </div>
 
         {/* Filtre par date - Visible uniquement lorsque activé */}
@@ -559,7 +448,7 @@ const OptimisationRdvClient = () => {
                   <ChevronLeft className="h-4 w-4" />
                 </button>
                 
-                {/* Indicateur de position */}
+                {/* Indicateur de position (optionnel) */}
                 <span className="text-xs text-gray-300 px-2 py-1 bg-gray-800/60 rounded-full">
                   {currentIndex + 1}/{visitedClients.length}
                   {clientData.navigation.hasNext && currentIndex === visitedClients.length - 1 ? "+" : ""}
@@ -605,13 +494,13 @@ const OptimisationRdvClient = () => {
                     {clientData.client.address}
                   </a>
                   
-                  {/* Date mise en évidence */}
+                  {/* Date mise en évidence, sans l'heure */}
                   <div className="flex items-center mb-3 bg-gray-700/70 backdrop-blur-sm p-3 rounded-lg border border-indigo-900/30 shadow-md">
                     <Calendar className="h-5 w-5 mr-2 text-indigo-400" />
                     <span className="text-gray-200 font-medium text-lg">{clientData.booking.date}</span>
                   </div>
                   
-                  {/* Statistiques condensées */}
+                  {/* Statistiques condensées avec compteur de jours correct */}
                   <div className="flex justify-between text-sm text-gray-300 mb-3 p-2 bg-gray-700/30 rounded-lg">
                     <div>{clientData.statistics.clientsOnSameDay} clients ce jour</div>
                     <div>
@@ -621,7 +510,7 @@ const OptimisationRdvClient = () => {
                     </div>
                   </div>
                   
-                  {/* Statistiques journalières avec itinéraire optimisé */}
+                  {/* Nouvelle section: Statistiques journalières avec itinéraire optimisé */}
                   <div className="mb-3 p-3 bg-gray-700/50 backdrop-blur-sm rounded-lg border border-indigo-900/30 shadow-md">
                     <h3 className="font-medium text-indigo-300 mb-2 text-sm flex justify-between items-center">
                       <span>Statistiques pour cette journée:</span>
@@ -678,7 +567,7 @@ const OptimisationRdvClient = () => {
                     <Navigation className="h-4 w-4 inline-block mr-1" /> Itinéraire
                   </a>
 
-                  {/* Bouton d'itinéraire optimisé */}
+                  {/* Bouton d'itinéraire optimisé (visible uniquement si disponible) */}
                   {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 0 && (
                     <a
                       href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(STARTING_POINT)}&destination=${encodeURIComponent(STARTING_POINT)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
@@ -689,9 +578,6 @@ const OptimisationRdvClient = () => {
                       <Navigation className="h-4 w-4 inline-block mr-1" /> Itinéraire optimisé (tous les clients)
                     </a>
                   )}
-
-                  {/* Indicateur de fraîcheur */}
-                  <FreshnessIndicator />
                 </div>
               </div>
             </div>
@@ -702,4 +588,3 @@ const OptimisationRdvClient = () => {
   )
 }
 
-export default OptimisationRdvClient
