@@ -588,3 +588,4 @@ const OptimisationRdvClient = () => {
   )
 }
 
+export default OptimisationRdvClient
