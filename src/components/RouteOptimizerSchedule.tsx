@@ -342,7 +342,7 @@ const RouteOptimizerSchedule = () => {
                 },
                 body: JSON.stringify({ 
                     date,
-                    forceRefresh: forceRefresh,
+                    forceRefresh: true, // TOUJOURS forcer le refresh
                     timestamp: Date.now()
                 }),
             });

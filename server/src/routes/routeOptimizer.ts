@@ -84,7 +84,12 @@ const getValidBookingsForDate = async (date: string, forceRefresh: boolean = fal
 
                 const bookingData = currentBooking.booking;
                 
-                // Vérifications strictes - seulement les rendez-vous acceptés et valides
+                console.log(`🔍 Vérification rendez-vous ${booking.id}:`);
+                console.log(`   - Statut: ${bookingData?.status || 'INCONNU'}`);
+                console.log(`   - Client ID: ${bookingData?.customerId || 'AUCUN'}`);
+                console.log(`   - Date: ${bookingData?.startAt || 'AUCUNE'}`);
+                
+                // Vérifications ULTRA STRICTES - exclure TOUT sauf ACCEPTED
                 if (bookingData && 
                     bookingData.status === 'ACCEPTED' && 
                     bookingData.customerId &&
@@ -94,13 +99,19 @@ const getValidBookingsForDate = async (date: string, forceRefresh: boolean = fal
                     const bookingDate = new Date(bookingData.startAt);
                     if (bookingDate >= startDate && bookingDate <= endDate) {
                         validBookings.push(bookingData);
-                        console.log(`✅ Rendez-vous ${booking.id} validé pour ${date}`);
+                        console.log(`✅ Rendez-vous ${booking.id} VALIDÉ - Statut: ${bookingData.status}`);
+                    } else {
+                        console.log(`❌ Rendez-vous ${booking.id} REJETÉ - Date hors plage`);
                     }
                 } else {
-                    console.log(`⚠️ Rendez-vous ${booking.id} ignoré - statut: ${bookingData?.status || 'unknown'}`);
+                    const reason = !bookingData ? 'pas de données' :
+                                  bookingData.status !== 'ACCEPTED' ? `statut: ${bookingData.status}` :
+                                  !bookingData.customerId ? 'pas de client ID' :
+                                  !bookingData.startAt ? 'pas de date' : 'raison inconnue';
+                    console.log(`❌ Rendez-vous ${booking.id} REJETÉ - ${reason}`);
                 }
             } catch (bookingError) {
-                console.log(`❌ Rendez-vous ${booking.id} ignoré - probablement supprimé/annulé`);
+                console.log(`❌ Rendez-vous ${booking.id} ERREUR - probablement supprimé/annulé:`, bookingError);
             }
         }
 
