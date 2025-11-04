@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
+import API_CONFIG from '../config/api';
 
 const baseClient = mbxClient({ accessToken: import.meta.env.VITE_MAPBOX_TOKEN || '' });
 const geocodingService = mbxGeocoding(baseClient);
@@ -115,7 +116,7 @@ const RouteOptimizer = () => {
             
             const validAddresses = addresses.filter(addr => addr.trim());
             
-            const response = await fetch('https://api.piscineaquarius.com/api/optimize', {
+            const response = await fetch(API_CONFIG.endpoints.optimize, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

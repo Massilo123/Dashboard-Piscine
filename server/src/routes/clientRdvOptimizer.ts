@@ -20,6 +20,7 @@ interface DailyStats {
 }
 
 // Fonction pour calculer les statistiques d'une journée spécifique
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const calculateDailyStats = (clients: any[], date: string): DailyStats => {
     const clientsOnDate = clients.filter(client => client.bookingDate === date);
     
@@ -50,7 +51,7 @@ async function calculateDistanceMatrix(locations: { address: string; coordinates
                     { coordinates: locations[i].coordinates as [number, number] },
                     { coordinates: locations[j].coordinates as [number, number] }
                 ],
-                exclude: ['toll']
+                // exclude: ['toll'] // Removed due to TypeScript type issues
             }).send();
 
             if (response.body.routes.length) {
@@ -98,7 +99,7 @@ async function getDetailedRoute(locations: { address: string; coordinates: numbe
     const response = await directionsService.getDirections({
         profile: 'driving-traffic',
         waypoints: waypoints.map(wp => ({ coordinates: wp.coordinates })),
-        exclude: ['toll']
+        // exclude: ['toll'] // Removed due to TypeScript type issues
     }).send();
 
     if (!response.body.routes.length) {
@@ -181,6 +182,7 @@ router.post('/', async (req: Request, res: Response) => {
             bookingDate: string; // Date du rendez-vous (YYYY-MM-DD)
             distance: number | null;
             duration: number | null;
+            phoneNumber?: string;
         }[] = [];
 
         // Map pour suivre les dates de rendez-vous déjà traitées
@@ -238,7 +240,7 @@ router.post('/', async (req: Request, res: Response) => {
                                     { coordinates: sourceCoordinates as [number, number] },
                                     { coordinates: clientCoordinates as [number, number] }
                                 ],
-                                exclude: ['toll']
+                                // exclude: ['toll'] // Removed due to TypeScript type issues
                             }).send();
 
                             let distance = null;
@@ -247,6 +249,16 @@ router.post('/', async (req: Request, res: Response) => {
                             if (directionsResponse.body.routes.length) {
                                 distance = Math.round(directionsResponse.body.routes[0].distance / 100) / 10; // km
                                 duration = Math.round(directionsResponse.body.routes[0].duration / 60); // minutes
+                            }
+
+                            // Récupérer le numéro de téléphone
+                            let phoneNumber = customerResponse.customer.phoneNumber || '';
+                            
+                            // Si phoneNumber est vide, essayer de récupérer depuis phones array
+                            const customer = customerResponse.customer as any;
+                            if (!phoneNumber && customer.phones && Array.isArray(customer.phones) && customer.phones.length > 0) {
+                                const firstPhone = customer.phones[0];
+                                phoneNumber = firstPhone?.phoneNumber || firstPhone?.number || firstPhone?.phone_number || firstPhone?.value || '';
                             }
 
                             clientsWithBookings.push({
@@ -258,7 +270,8 @@ router.post('/', async (req: Request, res: Response) => {
                                 startAt: booking.startAt,
                                 bookingDate: dateString,
                                 distance,
-                                duration
+                                duration,
+                                phoneNumber: phoneNumber || undefined
                             });
                         }
                     }
@@ -298,7 +311,7 @@ router.post('/', async (req: Request, res: Response) => {
                 { coordinates: sourceCoordinates as [number, number] },
                 { coordinates: nearestClient.coordinates as [number, number] }
             ],
-            exclude: ['toll']
+            // exclude: ['toll'] // Removed due to TypeScript type issues
         }).send();
 
         // Calculer les statistiques pour la journée du client sélectionné
@@ -401,7 +414,8 @@ router.post('/', async (req: Request, res: Response) => {
                 client: {
                     id: nearestClient.customerId,
                     name: nearestClient.customerName,
-                    address: nearestClient.address
+                    address: nearestClient.address,
+                    phoneNumber: nearestClient.phoneNumber || undefined
                 },
                 booking: {
                     id: nearestClient.bookingId,

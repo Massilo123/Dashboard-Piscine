@@ -2,6 +2,7 @@ import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, F
 import { useState, useEffect, useRef } from 'react'
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
+import API_CONFIG from '../config/api';
 
 const baseClient = mbxClient({ accessToken: import.meta.env.VITE_MAPBOX_TOKEN || '' });
 const geocodingService = mbxGeocoding(baseClient);
@@ -35,6 +36,7 @@ interface ClientData {
     id: string
     name: string
     address: string
+    phoneNumber?: string
   }
   booking: {
     id: string
@@ -215,7 +217,7 @@ const OptimisationRdvClient = () => {
     setFetchingNew(true);
 
     try {
-      const response = await fetch('https://api.piscineaquarius.com/api/client-rdv', {
+      const response = await fetch(API_CONFIG.endpoints.clientRdv, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -493,6 +495,19 @@ const OptimisationRdvClient = () => {
                   >
                     {clientData.client.address}
                   </a>
+                  
+                  {/* Numéro de téléphone */}
+                  {clientData.client.phoneNumber && (
+                    <a 
+                      href={`tel:${clientData.client.phoneNumber}`}
+                      className="text-indigo-400 hover:text-indigo-300 hover:underline block mb-3 flex items-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                      </svg>
+                      {clientData.client.phoneNumber}
+                    </a>
+                  )}
                   
                   {/* Date mise en évidence, sans l'heure */}
                   <div className="flex items-center mb-3 bg-gray-700/70 backdrop-blur-sm p-3 rounded-lg border border-indigo-900/30 shadow-md">

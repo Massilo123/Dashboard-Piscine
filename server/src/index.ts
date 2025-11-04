@@ -21,6 +21,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN || '';
 
 

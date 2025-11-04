@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Search, User, MapPin, CheckCircle, AlertCircle, Save } from 'lucide-react';
+import API_CONFIG from '../config/api';
 
 interface UnidentifiedClient {
   id: string;
@@ -177,7 +178,7 @@ const UnidentifiedClientsManager = () => {
   const fetchUnidentifiedClients = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('https://api.piscineaquarius.com/api/district-analysis');
+      const response = await axios.get(API_CONFIG.endpoints.districtAnalysis);
       setClients(response.data.unidentifiedClients);
     } catch (error) {
       console.error('Erreur:', error);

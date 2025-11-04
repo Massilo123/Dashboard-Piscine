@@ -12,6 +12,7 @@ interface BookingDetail {
    customerName: string;
    address: string;
    startAt: string;
+   phoneNumber: string;
 }
 
 const router = Router();
@@ -83,15 +84,19 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 router.post('/bookings', async (req: Request, res: Response) => {
+    console.log('\n========================================');
+    console.log('🚀 ROUTE /bookings APPELÉE');
+    console.log('========================================\n');
+    
     try {
         const { date } = req.body;
+        console.log(`📅 Date reçue: ${date}`);
 
         if (!date) {
             return res.status(400).json({
                 success: false,
                 error: 'Date non fournie'
             });
-            
         }
         
         const requestedDate = new Date(date);
@@ -112,35 +117,19 @@ router.post('/bookings', async (req: Request, res: Response) => {
             3, 59, 59, 999
         ));
 
-        console.log('Recherche des réservations entre:', startDate.toISOString(), 'et', endDate.toISOString());
-
         const bookingsResponse = await squareClient.bookings.list({
             startAtMin: startDate.toISOString(),
             startAtMax: endDate.toISOString(),
             locationId: "L24K8X13MB1A7",
-            
         });
-
-        console.log('Réservations reçues:', bookingsResponse);
 
         const bookingDetails: BookingDetail[] = [];
         
         for await (const booking of bookingsResponse) {
-            // FILTRE POUR LES STATUTS ACTIFS UNIQUEMENT
-            console.log('Statut de la réservation:', booking.id, '- Status:', booking.status);
-            
             // Ne traiter que les réservations avec un statut actif
             if (booking.status !== 'ACCEPTED' && booking.status !== 'PENDING') {
-                console.log(`Réservation ${booking.id} ignorée - statut: ${booking.status}`);
                 continue;
             }
-
-            const bookingDate = new Date(booking.startAt || '');
-            console.log('Réservation date (UTC):', booking.startAt);
-            console.log('En local:', bookingDate.toLocaleString());
-            console.log('Date demandée:', date);
-            console.log("StartAt reçu :", booking.startAt);
-            
 
             if (booking.customerId) {
                 try {
@@ -148,15 +137,60 @@ router.post('/bookings', async (req: Request, res: Response) => {
                         customerId: booking.customerId
                     });
 
-                    if (customerResponse.customer && customerResponse.customer.address?.addressLine1) {
-                        bookingDetails.push({
+                    const customer = customerResponse.customer as any;
+
+                    if (customer && customer.address?.addressLine1) {
+                        // Log de la structure complète pour voir où se trouve le numéro
+                        // Fonction pour convertir les BigInt en string pour JSON.stringify
+                        /* eslint-disable @typescript-eslint/no-explicit-any */
+                        const sanitizeForJSON = (obj: any): string => {
+                            if (obj === undefined || obj === null) {
+                                return 'null';
+                            }
+                            try {
+                                return JSON.stringify(obj, (_, value) =>
+                                    typeof value === 'bigint' ? value.toString() : value
+                                );
+                            } catch {
+                                return '{}';
+                            }
+                        };
+                        
+                        console.log('\n--- SQUARE DATA ---');
+                        console.log(`Client: ${customer.givenName || 'N/A'} ${customer.familyName || ''}`);
+                        console.log(`phoneNumber direct: ${customer.phoneNumber || 'UNDEFINED'}`);
+                        console.log(`phones array:`, sanitizeForJSON(customer.phones));
+                        console.log(`Tous les champs disponibles:`, Object.keys(customer));
+                        console.log(`Structure complète JSON:`, sanitizeForJSON(customer));
+                        console.log('--- FIN SQUARE DATA ---\n');
+
+                        // Essayer plusieurs façons de récupérer le numéro de téléphone
+                        let phoneNumber = customer.phoneNumber || '';
+                        
+                        // Si phoneNumber est vide, essayer de récupérer depuis phones array
+                        if (!phoneNumber && customer.phones && Array.isArray(customer.phones) && customer.phones.length > 0) {
+                            const firstPhone = customer.phones[0];
+                            phoneNumber = firstPhone?.phoneNumber || firstPhone?.number || firstPhone?.phone_number || firstPhone?.value || '';
+                        }
+                        
+                        // Si toujours vide, essayer d'autres champs possiblesx 
+                        if (!phoneNumber) {
+                            phoneNumber = customer.phone || customer.mobile || customer.telephone || customer.phone_number || '';
+                        }
+                        
+                        // Log pour chaque client avec son numéro
+                        console.log(`[TÉLÉPHONE] ${customer.givenName || 'Client'} - ${phoneNumber || 'NON DISPONIBLE'}`);
+
+                        const bookingDetail = {
                             bookingId: booking.id || '',
                             customerId: booking.customerId || '',
-                            customerName: `${customerResponse.customer.givenName || ''} ${customerResponse.customer.familyName || ''}`.trim(),
-                            address: customerResponse.customer.address.addressLine1,
-                            startAt: booking.startAt || ''
-                                    
-                        });
+                            customerName: `${customer.givenName || ''} ${customer.familyName || ''}`.trim(),
+                            address: customer.address.addressLine1,
+                            startAt: booking.startAt || '',
+                            phoneNumber: phoneNumber
+                        };
+                        
+                        bookingDetails.push(bookingDetail);
                     }
                 } catch (error) {
                     console.error(`Erreur récupération client ${booking.customerId}:`, error);
@@ -164,8 +198,15 @@ router.post('/bookings', async (req: Request, res: Response) => {
             }
         }
 
-        console.log('Nombre de réservations actives trouvées:', bookingDetails.length);
-        
+        // Log des numéros de téléphone pour tous les clients
+        if (bookingDetails.length > 0) {
+            console.log('========================================');
+            console.log(`[TÉLÉPHONES] ${bookingDetails.length} client(s) trouvé(s):`);
+            bookingDetails.forEach((booking, index) => {
+                console.log(`  ${index + 1}. ${booking.customerName} - ${booking.phoneNumber || 'NON DISPONIBLE'}`);
+            });
+            console.log('========================================');
+        }
 
         if (bookingDetails.length === 0) {
             res.status(404).json({
@@ -204,17 +245,45 @@ router.post('/bookings', async (req: Request, res: Response) => {
             waypoints: finalRoute.waypoints.map((wp, index) => {
                 if (index === 0) return { ...wp, type: 'starting_point' };
                 
-                const bookingDetail = bookingDetails.find(b => b.address === wp.address);
-                if (!bookingDetail) return wp;
+                // Normaliser les adresses pour le matching (enlever les espaces multiples, etc.)
+                const normalizeAddress = (addr: string) => addr.trim().toLowerCase().replace(/\s+/g, ' ');
+                const wpAddressNormalized = normalizeAddress(wp.address);
+                
+                const bookingDetail = bookingDetails.find(b => {
+                    const bAddressNormalized = normalizeAddress(b.address);
+                    return bAddressNormalized === wpAddressNormalized;
+                });
+                
+                if (!bookingDetail) {
+                    console.log(`[WARNING] Aucun bookingDetail trouvé pour: ${wp.address}`);
+                    return wp;
+                }
 
-                return {
+                const waypointResult = {
                     ...wp,
                     type: 'booking',
                     customerName: bookingDetail.customerName,
-                    startAt: bookingDetail.startAt
+                    startAt: bookingDetail.startAt,
+                    phoneNumber: bookingDetail.phoneNumber || undefined
                 };
+                
+                // Log pour vérifier que le phoneNumber est bien ajouté
+                console.log(`[WAYPOINT ${index}] ${waypointResult.customerName} - Téléphone: ${waypointResult.phoneNumber || 'NON DISPONIBLE'}`);
+
+                return waypointResult;
             })
         };
+        
+        // Log final de tous les waypoints avec leurs numéros
+        console.log('========================================');
+        console.log('[WAYPOINTS FINAUX] Liste complète:');
+        routeWithBookings.waypoints.forEach((wp: any, idx: number) => {
+            if (wp.customerName) {
+                console.log(`  ${idx}. ${wp.customerName} - ${wp.phoneNumber || 'NON DISPONIBLE'}`);
+            }
+        });
+        console.log('========================================');
+
 
         res.json({
             success: true,
@@ -241,7 +310,7 @@ async function calculateDistanceMatrix(locations: { address: string; coordinates
                    { coordinates: locations[i].coordinates as [number, number] },
                    { coordinates: locations[j].coordinates as [number, number] }
                ],
-               exclude: ['toll']
+                    // exclude: ['toll'] // Removed due to TypeScript type issues
            }).send();
 
            if (response.body.routes.length) {
@@ -287,7 +356,7 @@ async function getDetailedRoute(locations: { address: string; coordinates: numbe
    const response = await directionsService.getDirections({
        profile: 'driving-traffic',
        waypoints: waypoints.map(wp => ({ coordinates: wp.coordinates })),
-       exclude: ['toll']
+                    // exclude: ['toll'] // Removed due to TypeScript type issues
    }).send();
 
    if (!response.body.routes.length) {

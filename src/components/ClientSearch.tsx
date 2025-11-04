@@ -3,6 +3,7 @@ import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css';  // N'oubliez pas d'importer le CSS
+import API_CONFIG from '../config/api';
 
 const baseClient = mbxClient({ 
     accessToken: import.meta.env.VITE_MAPBOX_TOKEN || '' 
@@ -157,7 +158,7 @@ const ClientSearch = () => {
             setError('');
             setSuggestions([]);
             
-            const response = await fetch('https://api.piscineaquarius.com/api/mapbox/clients-nearby', {
+            const response = await fetch(API_CONFIG.endpoints.mapboxClientsNearby, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -185,7 +186,7 @@ const ClientSearch = () => {
             setLoading(true);
             setError('');
             
-            const response = await fetch('https://api.piscineaquarius.com/api/mapbox/clients-nearby-coordinates', {
+            const response = await fetch(API_CONFIG.endpoints.mapboxClientsNearbyCoordinates, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

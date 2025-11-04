@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_CONFIG from '../config/api';
 
 interface Client {
   id: string;
@@ -57,7 +58,7 @@ const DistrictTable = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('https://api.piscineaquarius.com/api/district-analysis');
+        const response = await axios.get(API_CONFIG.endpoints.districtAnalysis);
         
         if (!response.data) {
           throw new Error('Pas de données reçues de l\'API');

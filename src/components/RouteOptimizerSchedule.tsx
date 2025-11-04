@@ -3,6 +3,7 @@ import { Calendar, Clock, MapPin, Navigation, CheckCircle, Timer } from 'lucide-
 import { useState, useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import API_CONFIG from '../config/api'
 
 // Hack pour corriger l'icône de marqueur par défaut en CSS
 // Nécessaire car les images relatives ne fonctionnent pas correctement avec les importations webpack
@@ -24,6 +25,7 @@ interface Waypoint {
   type?: 'starting_point' | 'booking'
   customerName?: string
   startAt?: string
+  phoneNumber?: string
   coordinates: [number, number]
 }
 
@@ -141,6 +143,7 @@ const RouteOptimizerSchedule = () => {
         // Ajouter des marqueurs pour chaque waypoint
         routeData.waypoints.forEach((waypoint, index) => {
             try {
+                
                 // Inverser les coordonnées pour Leaflet [lat, lng]
                 const position: L.LatLngExpression = [waypoint.coordinates[1], waypoint.coordinates[0]];
                 routePoints.push(position);
@@ -176,11 +179,29 @@ const RouteOptimizerSchedule = () => {
                     });
                 }
 
+                // Créer l'URL Waze avec les coordonnées
+                const wazeUrl = `https://waze.com/ul?ll=${waypoint.coordinates[1]},${waypoint.coordinates[0]}&navigate=yes`;
+                
                 // Créer le contenu de la popup
+                const phoneDisplay = waypoint.phoneNumber && waypoint.phoneNumber.trim() 
+                    ? `<div style="font-size: 0.85rem; margin-bottom: 5px; color: #9ca3af; display: flex; align-items: center; gap: 4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                        <a href="tel:${waypoint.phoneNumber}" style="color: #818cf8; text-decoration: none;">
+                            ${waypoint.phoneNumber}
+                        </a>
+                    </div>` 
+                    : '';
+                
                 const popupContent = `
                     <div style="max-width: 200px; padding: 8px;">
                         <div style="font-weight: bold; margin-bottom: 5px;">${waypoint.customerName || 'Point de départ'}</div>
-                        <div style="font-size: 0.85rem; margin-bottom: 5px;">${waypoint.address}</div>
+                        <a href="${wazeUrl}" target="_blank" rel="noopener noreferrer" 
+                           style="font-size: 0.85rem; margin-bottom: 5px; color: #818cf8; text-decoration: underline; cursor: pointer; display: block;">
+                           ${waypoint.address}
+                        </a>
+                        ${phoneDisplay}
                         ${waypoint.startAt ? `
                             <div style="font-size: 0.85rem; color: #6b7280;">
                                 Heure: ${new Date(waypoint.startAt).getHours() === 0 
@@ -294,7 +315,7 @@ const RouteOptimizerSchedule = () => {
       setError('')
   
       try {
-        const response = await fetch('https://api.piscineaquarius.com/api/optimize/bookings', {
+        const response = await fetch(API_CONFIG.endpoints.optimizeBookings, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -303,11 +324,21 @@ const RouteOptimizerSchedule = () => {
         });
   
         const data = await response.json()
-  
+        
+        // Log des numéros de téléphone reçus
+        if (data.data?.waypoints) {
+            console.log('[TÉLÉPHONES] Numéros reçus du serveur:');
+            data.data.waypoints.forEach((wp: any, idx: number) => {
+                if (wp.customerName) {
+                    console.log(`  ${idx}. ${wp.customerName} - ${wp.phoneNumber || 'NON DISPONIBLE'}`);
+                }
+            });
+        }
+
         if (!response.ok) {
           throw new Error(data.error || 'Une erreur est survenue')
         }
-  
+
         setRouteData(data.data)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Une erreur est survenue')
@@ -462,6 +493,17 @@ const RouteOptimizerSchedule = () => {
                                     >
                                       {waypoint.address}
                                     </a>
+                                    {waypoint.phoneNumber && (
+                                      <a 
+                                        href={`tel:${waypoint.phoneNumber}`}
+                                        className="text-indigo-400 hover:text-indigo-300 hover:underline text-xs sm:text-sm block mt-1 flex items-center"
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                        </svg>
+                                        {waypoint.phoneNumber}
+                                      </a>
+                                    )}
                                     {waypoint.startAt && (
                                       <div className="text-gray-300 text-xs sm:text-sm mt-1 flex items-center">
                                         <Clock className="h-3.5 w-3.5 mr-1 text-indigo-400" />
