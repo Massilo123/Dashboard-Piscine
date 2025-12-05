@@ -9,12 +9,10 @@ export const API_CONFIG = {
   
   // Endpoints complets
   endpoints: {
-    optimize: `${API_BASE_URL}/api/optimize`,
     optimizeBookings: `${API_BASE_URL}/api/optimize/bookings`,
     clientRdv: `${API_BASE_URL}/api/client-rdv`,
     mapboxClientsNearby: `${API_BASE_URL}/api/mapbox/clients-nearby`,
     mapboxClientsNearbyCoordinates: `${API_BASE_URL}/api/mapbox/clients-nearby-coordinates`,
-    districtAnalysis: `${API_BASE_URL}/api/district-analysis`,
     clients: `${API_BASE_URL}/api/clienti`,
   }
 };

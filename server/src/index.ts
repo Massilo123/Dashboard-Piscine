@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -7,9 +7,8 @@ import clientRoutes from './routes/clientRoutes';
 import mapboxRoutes from './routes/mapboxRoutes';
 import routeOptimizer from './routes/routeOptimizer';
 import clientRdvOptimizer from './routes/clientRdvOptimizer';
-import clientDistrictsRoutes from './routes/clientDistrictsRoutes'
-import manualDistrictAssignment from './routes/manualDistrictAssignment';
 import webhookRoutes from './routes/webhookRoutes';
+import clientByCityRoutes from './routes/clientByCityRoutes';
 
 
 
@@ -35,9 +34,8 @@ app.use('/api/clients', clientRoutes);
 app.use('/api/mapbox', mapboxRoutes);
 app.use('/api/optimize', routeOptimizer);
 app.use('/api/client-rdv', clientRdvOptimizer);
-app.use('/', manualDistrictAssignment);
-app.use('/', clientDistrictsRoutes);
 app.use('/api', webhookRoutes);
+app.use('/api/clients', clientByCityRoutes);
 
 
 

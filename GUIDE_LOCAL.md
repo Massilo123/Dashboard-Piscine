@@ -35,8 +35,11 @@ Créer un fichier `.env` dans le dossier `server/` avec :
 PORT=3000
 MONGODB_URI=votre_uri_mongodb
 MAPBOX_TOKEN=votre_token_mapbox
+HERE_API_KEY=votre_clé_api_here
 SQUARE_ACCESS_TOKEN=votre_token_square
 ```
+
+**Note :** `HERE_API_KEY` est utilisé uniquement pour la fonctionnalité de classification des clients par ville/quartier. Vous pouvez obtenir une clé API gratuite sur [developer.here.com](https://developer.here.com/)
 
 **Frontend (.env.local) :**
 Créer un fichier `.env.local` à la racine avec :
@@ -49,15 +52,16 @@ VITE_API_URL=http://localhost:3000
 
 Tous les composants utilisent maintenant `src/config/api.ts` qui lit automatiquement `VITE_API_URL` depuis `.env.local`
 
-### 3. Modifier temporairement vite.config.ts (optionnel)
+### 3. Modifier vite.config.ts pour le mode local
 
-Si vous utilisez le proxy Vite, dans `vite.config.ts`, ligne 11, changer :
+**IMPORTANT** : Pour tester en local, modifiez `vite.config.ts`, ligne 11 :
 ```typescript
-target: 'http://server:3000',
+target: 'http://localhost:3000',  // Pour le mode local
 ```
-par :
+
+**Pour la production** (Docker), remettez :
 ```typescript
-target: 'http://localhost:3000',
+target: 'http://server:3000',  // Pour Docker
 ```
 
 ### 4. Lancer le serveur backend

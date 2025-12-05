@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import ClientSearch from './components/ClientSearch';
-import RouteOptimizer from './components/RouteOptimizer';
 import RouteOptimizerSchedule from './components/RouteOptimizerSchedule';
 import OptimisationRdvClient from './components/OptimisationRdvClient';
-import DistrictTable from './components/DistrictTable';
-import UnidentifiedClientsManager from './components/UnidentifiedClientsManager';
-import { Menu, X, PenTool, Search, Map, Calendar, MapPin, LayoutGrid, Users } from 'lucide-react';
+import ClientsByCity from './components/ClientsByCity';
+import { Menu, X, PenTool, Search, Calendar, MapPin, Building } from 'lucide-react';
 import logo_mauve from './assets/logo_mauve.png';
 import 'leaflet/dist/leaflet.css'
 
@@ -72,16 +70,6 @@ function App() {
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
                 <Link 
-                  to="/route-optimizer"
-                  className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Map className="h-4 w-4" />
-                    <span>Optimiseur Route</span>
-                  </div>
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
-                </Link>
-                <Link 
                   to="/schedule"
                   className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
                 >
@@ -102,22 +90,12 @@ function App() {
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
                 <Link 
-                  to="/district-table"
+                  to="/clients-by-city"
                   className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
                 >
                   <div className="flex items-center gap-1.5">
-                    <LayoutGrid className="h-4 w-4" />
-                    <span>Quartiers</span>
-                  </div>
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
-                </Link>
-                <Link 
-                  to="/UnidentifiedClientsManager"
-                  className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Users className="h-4 w-4" />
-                    <span>Villes</span>
+                    <Building className="h-4 w-4" />
+                    <span>Clients par Ville</span>
                   </div>
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
@@ -160,14 +138,6 @@ function App() {
                 <span>Recherche Client</span>
               </Link>
               <Link
-                to="/route-optimizer"
-                className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
-                onClick={toggleMobileMenu}
-              >
-                <Map className="h-5 w-5" />
-                <span>Optimiseur Route</span>
-              </Link>
-              <Link
                 to="/schedule"
                 className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
                 onClick={toggleMobileMenu}
@@ -184,20 +154,12 @@ function App() {
                 <span>RDV Proche</span>
               </Link>
               <Link
-                to="/district-table"
+                to="/clients-by-city"
                 className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
                 onClick={toggleMobileMenu}
               >
-                <LayoutGrid className="h-5 w-5" />
-                <span>Quartiers</span>
-              </Link>
-              <Link
-                to="/UnidentifiedClientsManager"
-                className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
-                onClick={toggleMobileMenu}
-              >
-                <Users className="h-5 w-5" />
-                <span>Villes</span>
+                <Building className="h-5 w-5" />
+                <span>Clients par Ville</span>
               </Link>
               <a
                 href="#"
@@ -215,17 +177,15 @@ function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/client-search" replace />} />
             <Route path="/client-search" element={<ClientSearch />} />
-            <Route path="/route-optimizer" element={<RouteOptimizer />} />
             <Route path="/schedule" element={<RouteOptimizerSchedule />} />
             <Route path="/optimisation-rdv" element={<OptimisationRdvClient />} />
-            <Route path="/district-table" element={<DistrictTable />} />
-            <Route path="/UnidentifiedClientsManager" element={<UnidentifiedClientsManager />} />
+            <Route path="/clients-by-city" element={<ClientsByCity />} />
           </Routes>
         </div>
       </div>
 
       {/* CSS pour les animations */}
-      <style jsx="true">{`
+      <style>{`
         @keyframes float {
           0% { transform: translateY(0) scale(1); }
           50% { transform: translateY(-20px) scale(1.05); }

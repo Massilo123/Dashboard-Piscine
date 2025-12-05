@@ -23,66 +23,6 @@ const directionsService = mbxDirections(baseClient);
 // Point de départ fixe
 const STARTING_POINT = "1829 rue capitol";
 
-router.post('/', async (req: Request, res: Response) => {
-   try {
-       const { addresses } = req.body;
-
-       if (!Array.isArray(addresses) || addresses.length === 0) {
-           res.status(400).json({
-               success: false,
-               error: 'Liste d\'adresses invalide'
-           });
-           return;
-       }
-
-       // 1. Convertir toutes les adresses en coordonnées (incluant le point de départ)
-       const allAddresses = [STARTING_POINT, ...addresses];
-       const coordinates = await Promise.all(
-           allAddresses.map(async (address) => {
-               const response = await geocodingService.forwardGeocode({
-                   query: address,
-                   countries: ['ca'],
-                   limit: 1
-               }).send();
-
-               if (!response.body.features.length) {
-                   throw new Error(`Adresse non trouvée : ${address}`);
-               }
-
-               return {
-                   address,
-                   coordinates: response.body.features[0].geometry.coordinates
-               };
-           })
-       );
-
-       // 2. Calculer la matrice des distances
-       const matrix = await calculateDistanceMatrix(coordinates);
-
-       // 3. Trouver le meilleur ordre
-       const optimalRoute = findOptimalRoute(matrix, coordinates.length);
-
-       // 4. Obtenir l'itinéraire détaillé
-       const finalRoute = await getDetailedRoute(coordinates, optimalRoute);
-
-       res.json({
-           success: true,
-           data: {
-               route: finalRoute,
-               totalDuration: finalRoute.totalDuration,
-               totalDistance: finalRoute.totalDistance,
-               waypoints: finalRoute.waypoints
-           }
-       });
-
-   } catch (error) {
-       res.status(500).json({
-           success: false,
-           error: error instanceof Error ? error.message : 'Erreur inconnue'
-       });
-   }
-});
-
 router.post('/bookings', async (req: Request, res: Response) => {
     console.log('\n========================================');
     console.log('🚀 ROUTE /bookings APPELÉE');
@@ -137,6 +77,7 @@ router.post('/bookings', async (req: Request, res: Response) => {
                         customerId: booking.customerId
                     });
 
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const customer = customerResponse.customer as any;
 
                     if (customer && customer.address?.addressLine1) {
@@ -277,9 +218,9 @@ router.post('/bookings', async (req: Request, res: Response) => {
         // Log final de tous les waypoints avec leurs numéros
         console.log('========================================');
         console.log('[WAYPOINTS FINAUX] Liste complète:');
-        routeWithBookings.waypoints.forEach((wp: any, idx: number) => {
-            if (wp.customerName) {
-                console.log(`  ${idx}. ${wp.customerName} - ${wp.phoneNumber || 'NON DISPONIBLE'}`);
+        routeWithBookings.waypoints.forEach((wp, idx: number) => {
+            if ('customerName' in wp && wp.customerName) {
+                console.log(`  ${idx}. ${wp.customerName} - ${('phoneNumber' in wp && wp.phoneNumber) || 'NON DISPONIBLE'}`);
             }
         });
         console.log('========================================');
