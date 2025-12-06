@@ -2038,15 +2038,150 @@ router.get('/by-city-changes', async (req: Request, res: Response): Promise<void
 
     console.log(`📊 ${changedClients.length} client(s) modifié(s) depuis ${sinceDate.toISOString()}`);
 
-    // Traiter seulement les clients modifiés (version simplifiée)
-    // Pour une vraie optimisation, on devrait traiter seulement ces clients
-    // Mais pour l'instant, on retourne un flag pour indiquer qu'un rechargement complet est nécessaire
+    if (changedClients.length === 0) {
+      res.json({
+        success: true,
+        hasChanges: false,
+        message: 'Aucun changement depuis cette date',
+        changedClients: [],
+        clientsForMap: [],
+        clientsForByCity: [],
+        lastUpdate: new Date().toISOString()
+      });
+      return;
+    }
+
+    // Traiter seulement les clients modifiés pour retourner leurs données formatées pour la carte
+    const clientsForMap: Array<{
+      _id: string;
+      name: string;
+      phoneNumber?: string;
+      address: string;
+      coordinates: { lng: number; lat: number } | null;
+      sector?: string;
+      city?: string;
+      district?: string;
+    }> = [];
+
+    for (const client of changedClients) {
+      // Vérifier si le client a des coordonnées
+      const hasCoordinates = client.coordinates && 
+        typeof client.coordinates === 'object' &&
+        client.coordinates !== null &&
+        'lng' in client.coordinates &&
+        'lat' in client.coordinates &&
+        client.coordinates.lng != null &&
+        client.coordinates.lat != null;
+
+      if (hasCoordinates) {
+        // Extraire la ville et le secteur pour ce client
+        let city = 'Inconnu';
+        let district: string | undefined;
+        let sector = 'Non assignés';
+
+        if (client.addressLine1) {
+          try {
+            const addressResult = await extractCityAndDistrict(client.addressLine1);
+            city = addressResult.city;
+            district = addressResult.district;
+            sector = getSector(city);
+          } catch (error) {
+            console.warn(`Erreur lors de l'extraction de la ville pour ${client.givenName}:`, error);
+            // Utiliser les coordonnées comme fallback
+            if (client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null) {
+              const coordsResult = await extractCityFromCoordinates(client.coordinates.lng, client.coordinates.lat);
+              if (coordsResult) {
+                city = coordsResult.city;
+                district = coordsResult.district;
+                sector = getSector(city);
+              }
+            }
+          }
+        }
+
+        const coords = client.coordinates as { lng: number; lat: number } | null;
+        if (coords && coords.lng != null && coords.lat != null) {
+          clientsForMap.push({
+            _id: client._id.toString(),
+            name: `${client.givenName || ''} ${client.familyName || ''}`.trim() || 'Sans nom',
+            phoneNumber: client.phoneNumber || undefined,
+            address: client.addressLine1 || '',
+            coordinates: {
+              lng: coords.lng,
+              lat: coords.lat
+            },
+            sector,
+            city,
+            district: district || undefined
+          });
+        }
+      }
+    }
+
+    console.log(`✅ ${clientsForMap.length} client(s) avec coordonnées formaté(s) pour la carte`);
+
+    // Formater aussi les clients pour ClientsByCity (tous les clients avec adresse, pas seulement ceux avec coordonnées)
+    const clientsForByCity: Array<{
+      _id: string;
+      givenName: string;
+      familyName: string;
+      phoneNumber?: string;
+      addressLine1: string;
+      coordinates?: { lng: number; lat: number };
+      city: string;
+      district?: string;
+      sector: string;
+    }> = [];
+
+    for (const client of changedClients) {
+      if (client.addressLine1 && client.addressLine1.trim() !== '') {
+        let city = 'Inconnu';
+        let district: string | undefined;
+        let sector = 'Non assignés';
+
+        try {
+          const addressResult = await extractCityAndDistrict(client.addressLine1);
+          city = addressResult.city;
+          district = addressResult.district;
+          sector = getSector(city);
+        } catch (error) {
+          console.warn(`Erreur lors de l'extraction pour ${client.givenName}:`, error);
+          // Utiliser les coordonnées comme fallback
+          if (client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null) {
+            const coordsResult = await extractCityFromCoordinates(client.coordinates.lng, client.coordinates.lat);
+            if (coordsResult) {
+              city = coordsResult.city;
+              district = coordsResult.district;
+              sector = getSector(city);
+            }
+          }
+        }
+
+        const coords = client.coordinates as { lng: number; lat: number } | null;
+        clientsForByCity.push({
+          _id: client._id.toString(),
+          givenName: client.givenName || '',
+          familyName: client.familyName || '',
+          phoneNumber: client.phoneNumber || undefined,
+          addressLine1: client.addressLine1 || '',
+          coordinates: (coords && coords.lng != null && coords.lat != null) ? coords : undefined,
+          city,
+          district: district || undefined,
+          sector
+        });
+      }
+    }
+
+    console.log(`✅ ${clientsForByCity.length} client(s) formaté(s) pour ClientsByCity`);
+
+    // Toujours retourner clientsForByCity, même s'il est vide (pour éviter les rechargements complets inutiles)
     res.json({
       success: true,
       hasChanges: true,
       changedClientsCount: changedClients.length,
-      clientIds: changedClients.map(c => c._id.toString()),
-      message: `${changedClients.length} client(s) modifié(s). Rechargement recommandé.`,
+      clientsForMap: clientsForMap,
+      clientsForByCity: clientsForByCity, // Peut être vide si aucun client n'a d'adresse
+      message: `${changedClients.length} client(s) modifié(s), ${clientsForMap.length} avec coordonnées, ${clientsForByCity.length} avec adresse.`,
       lastUpdate: new Date().toISOString()
     });
 

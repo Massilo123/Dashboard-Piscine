@@ -70,3 +70,4 @@ SQUARE_ACCESS_TOKEN=votre_token_square
 - Vérifiez les dépendances : `npm install`
 - Vérifiez la console pour les erreurs
 
+

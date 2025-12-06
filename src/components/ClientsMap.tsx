@@ -53,6 +53,7 @@ const ClientsMap: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const clientsHashRef = useRef<string>(''); // Hash des clients pour éviter la recréation inutile
+  const hasCheckedChangesRef = useRef<boolean>(false); // Pour éviter de vérifier plusieurs fois les changements
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [mapLoading, setMapLoading] = useState(false); // État séparé pour le chargement de la carte
@@ -111,13 +112,13 @@ const ClientsMap: React.FC = () => {
     }
   };
 
-  // Fonction pour vérifier les changements
-  const checkForChanges = async (): Promise<boolean> => {
+  // Fonction pour vérifier les changements et récupérer les clients modifiés
+  const checkForChanges = async (): Promise<{ hasChanges: boolean; changedClients?: Client[] }> => {
     try {
       const cachedTimestamp = localStorage.getItem('clientsMapLastUpdate');
       if (!cachedTimestamp) {
         console.log('⚠️ Pas de timestamp en cache, chargement complet nécessaire');
-        return true; // Pas de cache, charger tout
+        return { hasChanges: true }; // Pas de cache, charger tout
       }
 
       console.log(`🔍 Vérification des changements depuis: ${cachedTimestamp}`);
@@ -126,16 +127,131 @@ const ClientsMap: React.FC = () => {
       
       if (result.success) {
         console.log(`📊 Résultat de la vérification: hasChanges=${result.hasChanges}, message=${result.message || 'N/A'}`);
-        return result.hasChanges; // true si changements, false sinon
+        if (result.hasChanges && result.clientsForMap) {
+          // Convertir les clients formatés pour la carte
+          const changedClients: Client[] = result.clientsForMap.map((c: any) => ({
+            _id: c._id,
+            name: c.name,
+            phoneNumber: c.phoneNumber,
+            address: c.address,
+            coordinates: c.coordinates,
+            sector: c.sector,
+            city: c.city,
+            district: c.district
+          }));
+          return { hasChanges: true, changedClients };
+        }
+        return { hasChanges: result.hasChanges };
       }
       // En cas d'erreur de l'API, ne pas recharger (garder le cache)
       console.warn('⚠️ Erreur lors de la vérification des changements, conservation du cache');
-      return false; // Ne pas recharger en cas d'erreur
+      return { hasChanges: false }; // Ne pas recharger en cas d'erreur
     } catch (error) {
       console.error('Erreur lors de la vérification des changements:', error);
       // En cas d'erreur réseau, ne pas recharger (garder le cache)
-      return false; // Ne pas recharger en cas d'erreur
+      return { hasChanges: false }; // Ne pas recharger en cas d'erreur
     }
+  };
+
+  // Fonction pour mettre à jour seulement les clients modifiés sur la carte
+  const updateMapWithChangedClients = (changedClients: Client[]) => {
+    if (!mapRef.current || changedClients.length === 0) {
+      return;
+    }
+
+    console.log(`🔄 Mise à jour de ${changedClients.length} client(s) sur la carte`);
+
+    changedClients.forEach((changedClient) => {
+      if (!changedClient.coordinates?.lat || !changedClient.coordinates?.lng) {
+        return; // Ignorer les clients sans coordonnées
+      }
+
+      // Chercher si un marqueur existe déjà pour ce client
+      const existingMarkerIndex = markersRef.current.findIndex((marker) => {
+        return (marker as any).clientId === changedClient._id;
+      });
+
+      if (existingMarkerIndex >= 0) {
+        // Mettre à jour le marqueur existant
+        const existingMarker = markersRef.current[existingMarkerIndex];
+        const markerLat = (existingMarker as any).getLatLng().lat;
+        const markerLng = (existingMarker as any).getLatLng().lng;
+
+        // Vérifier si les coordonnées ont changé
+        if (markerLat !== changedClient.coordinates.lat || markerLng !== changedClient.coordinates.lng) {
+          // Déplacer le marqueur
+          existingMarker.setLatLng([changedClient.coordinates.lat, changedClient.coordinates.lng]);
+          console.log(`📍 Marqueur déplacé pour ${changedClient.name}`);
+        }
+
+        // Mettre à jour la popup
+        const color = getSectorColor(changedClient.sector);
+        const popupContent = `
+          <div style="min-width: 200px;">
+            <strong>${changedClient.name}</strong><br/>
+            ${changedClient.address ? `<small>${changedClient.address}</small><br/>` : ''}
+            ${changedClient.phoneNumber ? `<small>📞 ${changedClient.phoneNumber}</small><br/>` : ''}
+            ${changedClient.city ? `<small>🏙️ ${changedClient.city}</small><br/>` : ''}
+            ${changedClient.district ? `<small>🏘️ ${changedClient.district}</small><br/>` : ''}
+            ${changedClient.sector ? `<small style="color: ${color}; font-weight: bold;">📍 ${changedClient.sector}</small>` : ''}
+          </div>
+        `;
+        existingMarker.setPopupContent(popupContent);
+      } else {
+        // Nouveau client, créer un nouveau marqueur
+        const color = getSectorColor(changedClient.sector);
+        
+        const customIcon = L.divIcon({
+          className: 'custom-marker',
+          html: `<div style="
+            background-color: ${color};
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          "></div>`,
+          iconSize: [12, 12],
+          iconAnchor: [6, 6]
+        });
+
+        const marker = L.marker([changedClient.coordinates.lat, changedClient.coordinates.lng], {
+          icon: customIcon
+        }).addTo(mapRef.current);
+
+        (marker as any).clientId = changedClient._id;
+
+        const popupContent = `
+          <div style="min-width: 200px;">
+            <strong>${changedClient.name}</strong><br/>
+            ${changedClient.address ? `<small>${changedClient.address}</small><br/>` : ''}
+            ${changedClient.phoneNumber ? `<small>📞 ${changedClient.phoneNumber}</small><br/>` : ''}
+            ${changedClient.city ? `<small>🏙️ ${changedClient.city}</small><br/>` : ''}
+            ${changedClient.district ? `<small>🏘️ ${changedClient.district}</small><br/>` : ''}
+            ${changedClient.sector ? `<small style="color: ${color}; font-weight: bold;">📍 ${changedClient.sector}</small>` : ''}
+          </div>
+        `;
+        marker.bindPopup(popupContent);
+
+        markersRef.current.push(marker);
+        console.log(`➕ Nouveau marqueur ajouté pour ${changedClient.name}`);
+      }
+
+      // Mettre à jour le client dans la liste des clients
+      setClients(prevClients => {
+        const updated = [...prevClients];
+        const existingIndex = updated.findIndex(c => c._id === changedClient._id);
+        if (existingIndex >= 0) {
+          updated[existingIndex] = changedClient;
+        } else {
+          updated.push(changedClient);
+        }
+        // Mettre à jour le hash après la mise à jour
+        const newHash = updated.map(c => `${c._id}-${c.coordinates?.lat || ''}-${c.coordinates?.lng || ''}-${c.name || ''}-${c.address || ''}`).sort().join('|');
+        clientsHashRef.current = newHash;
+        return updated;
+      });
+    });
   };
 
   // Fonction fetchClients accessible depuis le bouton
@@ -238,7 +354,14 @@ const ClientsMap: React.FC = () => {
 
   useEffect(() => {
     // Charger immédiatement depuis le cache si disponible
+    // Ce useEffect ne doit s'exécuter qu'une seule fois au montage du composant
     const loadInitialData = async () => {
+      // Si on a déjà vérifié les changements, ne pas re-vérifier (évite les rechargements quand on revient sur la page)
+      if (hasCheckedChangesRef.current) {
+        console.log('✅ Déjà initialisé, pas de re-vérification');
+        return;
+      }
+      
       const cached = localStorage.getItem('clientsMapCache');
       const cachedTimestamp = localStorage.getItem('clientsMapLastUpdate');
       
@@ -251,20 +374,41 @@ const ClientsMap: React.FC = () => {
           // Charger les clients sans coordonnées
           fetchClientsWithoutCoordinates();
           
-          // Ne PAS vérifier les changements automatiquement pour la carte
-          // La vérification des changements sera faite uniquement quand l'utilisateur clique sur "Actualiser"
-          // Cela évite les rechargements inutiles quand on change de page
-          console.log('✅ Données chargées depuis le cache - pas de vérification automatique des changements');
+          // Vérifier les changements en arrière-plan UNE SEULE FOIS (sans bloquer l'UI)
+          // Mais ne recharger que si des changements sont détectés
+          hasCheckedChangesRef.current = true;
+          checkForChanges().then((result) => {
+            if (result.hasChanges) {
+              if (result.changedClients && result.changedClients.length > 0) {
+                console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
+                // Mettre à jour seulement les clients modifiés
+                updateMapWithChangedClients(result.changedClients);
+                // Mettre à jour le timestamp du cache
+                localStorage.setItem('clientsMapLastUpdate', new Date().toISOString());
+              } else {
+                console.log('🔄 Changements détectés mais pas de clients avec coordonnées, rechargement complet...');
+                fetchClients(true); // Forcer le rechargement complet
+              }
+            } else {
+              console.log('✅ Aucun changement détecté, conservation du cache');
+            }
+          }).catch((err) => {
+            console.error('Erreur lors de la vérification des changements:', err);
+            // En cas d'erreur, garder le cache (ne pas recharger)
+          });
+          
           return;
         }
       }
       
       // Si pas de cache, charger depuis l'API
+      hasCheckedChangesRef.current = true;
       fetchClients();
     };
     
     loadInitialData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Tableau de dépendances vide pour s'exécuter une seule fois
 
   // Fonction pour charger les clients sans coordonnées
   const fetchClientsWithoutCoordinates = async () => {
@@ -317,37 +461,158 @@ const ClientsMap: React.FC = () => {
 
   useEffect(() => {
     // Ne créer la carte que si on a des clients avec coordonnées et que le chargement des données est terminé
-    if (!mapContainerRef.current || clients.length === 0 || loading) {
+    if (!mapContainerRef.current || loading) {
+      return;
+    }
+
+    // Si on n'a pas de clients, ne pas créer la carte
+    if (clients.length === 0) {
+      // Si la carte existe déjà, la garder (ne pas la supprimer)
+      if (mapRef.current) {
+        setMapLoading(false);
+        return;
+      }
       return;
     }
     
     // Créer un hash des clients pour vérifier s'ils ont changé
-    const clientsHash = clients.map(c => `${c._id}-${c.coordinates.lat}-${c.coordinates.lng}`).sort().join('|');
+    // Inclure aussi les coordonnées et les informations importantes
+    const clientsHash = clients
+      .map(c => `${c._id}-${c.coordinates?.lat || ''}-${c.coordinates?.lng || ''}-${c.name || ''}-${c.address || ''}`)
+      .sort()
+      .join('|');
     
     // Si la carte existe déjà et que les clients n'ont pas changé, ne pas la recréer
+    // Cette vérification empêche la recréation de la carte quand on revient sur la page
     if (mapRef.current && clientsHashRef.current === clientsHash && markersRef.current.length === clients.length) {
-      console.log('✅ Carte déjà créée avec les mêmes clients, pas de recréation');
-      setMapLoading(false); // S'assurer que mapLoading est false
+      console.log('✅ Carte déjà créée avec les mêmes clients, pas de recréation (retour sur la page)');
+      setMapLoading(false);
       return;
     }
     
-    // Vérifier si les clients ont changé avant de mettre à jour le hash
+    // Si la carte existe mais que le hash est vide, c'est qu'on vient de charger depuis le cache
+    // Dans ce cas, ne pas recréer si la carte existe déjà
+    if (mapRef.current && !clientsHashRef.current && clientsHash) {
+      // Mettre à jour le hash sans recréer la carte
+      clientsHashRef.current = clientsHash;
+      console.log('✅ Carte existante, mise à jour du hash seulement');
+      setMapLoading(false);
+      return;
+    }
+    
+    // Vérifier si les clients ont changé
     const clientsChanged = clientsHashRef.current !== clientsHash;
     
-    // Ne pas afficher "Chargement de la carte..." si les données sont identiques
-    // (cela signifie qu'on revient sur la page avec les mêmes données)
-    if (!clientsChanged && clientsHashRef.current) {
-      setMapLoading(false); // Pas besoin de recharger, les données sont identiques
-    } else {
-      setMapLoading(true); // Afficher le chargement seulement si les données ont changé
-    }
+    // Si la carte existe déjà et que les clients ont changé, mettre à jour seulement les marqueurs
+    if (mapRef.current && clientsChanged) {
+      console.log('🔄 Mise à jour des marqueurs (clients ont changé)');
+      setMapLoading(true);
+      
+      // Créer un Map des clients existants par ID pour comparaison rapide
+      const existingClientIds = new Set(markersRef.current.map((marker, idx) => {
+        const clientId = (marker as any).clientId;
+        return clientId;
+      }));
+      
+      const newClientIds = new Set(clients.map(c => c._id));
+      
+      // Retirer les marqueurs des clients qui n'existent plus
+      markersRef.current = markersRef.current.filter((marker, idx) => {
+        const clientId = (marker as any).clientId;
+        if (!newClientIds.has(clientId)) {
+          if (mapRef.current) {
+            mapRef.current.removeLayer(marker);
+          }
+          marker.remove();
+          return false;
+        }
+        return true;
+      });
+      
+      // Ajouter ou mettre à jour les marqueurs pour les nouveaux clients ou ceux qui ont changé
+      clients.forEach((client) => {
+        if (!client.coordinates?.lat || !client.coordinates?.lng) {
+          return; // Ignorer les clients sans coordonnées
+        }
+        
+        // Chercher si un marqueur existe déjà pour ce client
+        let existingMarker = markersRef.current.find((marker) => {
+          return (marker as any).clientId === client._id;
+        });
+        
+        if (existingMarker) {
+          // Vérifier si les coordonnées ont changé
+          const markerLat = (existingMarker as any).getLatLng().lat;
+          const markerLng = (existingMarker as any).getLatLng().lng;
+          
+          if (markerLat !== client.coordinates.lat || markerLng !== client.coordinates.lng) {
+            // Les coordonnées ont changé, mettre à jour le marqueur
+            existingMarker.setLatLng([client.coordinates.lat, client.coordinates.lng]);
+            
+            // Mettre à jour la popup si nécessaire
+            const color = getSectorColor(client.sector);
+            const popupContent = `
+              <div style="min-width: 200px;">
+                <strong>${client.name}</strong><br/>
+                ${client.address ? `<small>${client.address}</small><br/>` : ''}
+                ${client.phoneNumber ? `<small>📞 ${client.phoneNumber}</small><br/>` : ''}
+                ${client.city ? `<small>🏙️ ${client.city}</small><br/>` : ''}
+                ${client.district ? `<small>🏘️ ${client.district}</small><br/>` : ''}
+                ${client.sector ? `<small style="color: ${color}; font-weight: bold;">📍 ${client.sector}</small>` : ''}
+              </div>
+            `;
+            existingMarker.setPopupContent(popupContent);
+          }
+        } else {
+          // Nouveau client, créer un nouveau marqueur
+          const color = getSectorColor(client.sector);
+          
+          const customIcon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="
+              background-color: ${color};
+              width: 12px;
+              height: 12px;
+              border-radius: 50%;
+              border: 2px solid white;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            "></div>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+          });
+
+          const marker = L.marker([client.coordinates.lat, client.coordinates.lng], {
+            icon: customIcon
+          }).addTo(mapRef.current);
+
+          // Stocker l'ID du client dans le marqueur pour référence future
+          (marker as any).clientId = client._id;
+
+          const popupContent = `
+            <div style="min-width: 200px;">
+              <strong>${client.name}</strong><br/>
+              ${client.address ? `<small>${client.address}</small><br/>` : ''}
+              ${client.phoneNumber ? `<small>📞 ${client.phoneNumber}</small><br/>` : ''}
+              ${client.city ? `<small>🏙️ ${client.city}</small><br/>` : ''}
+              ${client.district ? `<small>🏘️ ${client.district}</small><br/>` : ''}
+              ${client.sector ? `<small style="color: ${color}; font-weight: bold;">📍 ${client.sector}</small>` : ''}
+            </div>
+          `;
+          marker.bindPopup(popupContent);
+
+          markersRef.current.push(marker);
+        }
+      });
     
     // Mettre à jour le hash
     clientsHashRef.current = clientsHash;
+      setMapLoading(false);
+      return;
+    }
 
-    // Nettoyer la carte précédente complètement si elle existe
+    // Si on arrive ici, c'est qu'on doit créer la carte pour la première fois
     if (mapRef.current) {
-      // Retirer tous les marqueurs
+      // La carte existe déjà mais on doit la recréer (cas rare)
       markersRef.current.forEach(marker => {
         if (mapRef.current) {
           mapRef.current.removeLayer(marker);
@@ -355,20 +620,26 @@ const ClientsMap: React.FC = () => {
         marker.remove();
       });
       markersRef.current = [];
-      
-      // Retirer la carte
       mapRef.current.remove();
       mapRef.current = null;
     }
 
-    // Vérifier que le conteneur est vide (pas de carte Leaflet déjà attachée)
+    // Vérifier que le conteneur est vide
     if (mapContainerRef.current && (mapContainerRef.current as any)._leaflet_id) {
       delete (mapContainerRef.current as any)._leaflet_id;
     }
 
+    setMapLoading(true);
+
     // Calculer le centre de la carte (moyenne des coordonnées)
-    const lats = clients.map(c => c.coordinates.lat);
-    const lngs = clients.map(c => c.coordinates.lng);
+    const lats = clients.map(c => c.coordinates?.lat).filter(Boolean) as number[];
+    const lngs = clients.map(c => c.coordinates?.lng).filter(Boolean) as number[];
+    
+    if (lats.length === 0 || lngs.length === 0) {
+      setMapLoading(false);
+      return;
+    }
+    
     const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
     const centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
 
@@ -386,6 +657,10 @@ const ClientsMap: React.FC = () => {
 
     // Créer des marqueurs colorés par secteur
     clients.forEach((client) => {
+      if (!client.coordinates?.lat || !client.coordinates?.lng) {
+        return; // Ignorer les clients sans coordonnées
+      }
+      
       const color = getSectorColor(client.sector);
       
       // Créer une icône personnalisée avec la couleur du secteur
@@ -407,6 +682,9 @@ const ClientsMap: React.FC = () => {
         icon: customIcon
       }).addTo(map);
 
+      // Stocker l'ID du client dans le marqueur
+      (marker as any).clientId = client._id;
+
       // Popup avec informations du client
       const popupContent = `
         <div style="min-width: 200px;">
@@ -423,7 +701,8 @@ const ClientsMap: React.FC = () => {
       markersRef.current.push(marker);
     });
     
-    // Une fois la carte créée, mettre mapLoading à false
+    // Mettre à jour le hash
+    clientsHashRef.current = clientsHash;
     setMapLoading(false);
 
     return () => {
@@ -479,11 +758,27 @@ const ClientsMap: React.FC = () => {
             </div>
           </div>
           <button
-            onClick={() => {
-              // Forcer le rechargement en supprimant le cache
-              localStorage.removeItem('clientsMapCache');
-              localStorage.removeItem('clientsMapLastUpdate');
-              fetchClients(true);
+            onClick={async () => {
+              // Vérifier d'abord s'il y a des changements avant de recharger
+              const result = await checkForChanges();
+              if (result.hasChanges) {
+                if (result.changedClients && result.changedClients.length > 0) {
+                  console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
+                  // Mettre à jour seulement les clients modifiés
+                  updateMapWithChangedClients(result.changedClients);
+                  // Mettre à jour le timestamp du cache
+                  localStorage.setItem('clientsMapLastUpdate', new Date().toISOString());
+                } else {
+                  console.log('🔄 Changements détectés mais pas de clients avec coordonnées, rechargement complet...');
+                  localStorage.removeItem('clientsMapCache');
+                  localStorage.removeItem('clientsMapLastUpdate');
+                  hasCheckedChangesRef.current = false;
+                  fetchClients(true);
+                }
+              } else {
+                console.log('✅ Aucun changement détecté, pas de rechargement nécessaire');
+                alert('Aucun changement détecté dans la base de données. La carte est déjà à jour.');
+              }
             }}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
           >

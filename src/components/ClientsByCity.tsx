@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MapPin, Users, ChevronDown, ChevronRight, Phone, Home, Search, X, Building, Edit2, Check } from 'lucide-react';
 import API_CONFIG from '../config/api';
 
@@ -84,43 +84,286 @@ const ClientsByCity: React.FC = () => {
     }
   };
 
-  // Fonction pour vérifier les changements
-  const checkForChanges = async (): Promise<boolean> => {
+  // Fonction helper pour déterminer le secteur (doit correspondre à celle du serveur)
+  const getSector = (city: string): string => {
+    const cityLower = city.toLowerCase().trim();
+    if (cityLower === 'montréal' || cityLower === 'montreal') {
+      return 'Montréal';
+    }
+    if (cityLower === 'laval') {
+      return 'Laval';
+    }
+    // Rive Nord
+    const riveNordCities = ['blainville', 'boisbriand', 'rosemère', 'sainte-thérèse', 'terrebonne', 'mascouche', 'lachenaie', 'lorraine', 'sainte-anne-des-plaines', 'saint-jérôme', 'saint-eustache', 'deux-montagnes', 'saint-joseph-du-lac', 'pointe-calumet', 'oka', 'mirabel'];
+    if (riveNordCities.some(c => cityLower.includes(c))) {
+      return 'Rive Nord';
+    }
+    // Rive Sud
+    const riveSudCities = ['brossard', 'longueuil', 'saint-lambert', 'boucherville', 'saint-bruno', 'sainte-julie', 'saint-hubert', 'la prairie', 'candiac', 'delson', 'saint-constant', 'sainte-catherine', 'châteauguay', 'mercier', 'beauharnois', 'saint-jean-sur-richelieu'];
+    if (riveSudCities.some(c => cityLower.includes(c))) {
+      return 'Rive Sud';
+    }
+    return 'Autres';
+  };
+
+  // Fonction pour vérifier les changements et récupérer les clients modifiés
+  const checkForChanges = async (): Promise<{ hasChanges: boolean; changedClients?: Client[] }> => {
     try {
       const cachedTimestamp = localStorage.getItem('clientsByCityLastUpdate');
       if (!cachedTimestamp) {
-        return true; // Pas de cache, charger tout
+        return { hasChanges: true }; // Pas de cache, charger tout
       }
 
       const response = await fetch(`${API_CONFIG.baseUrl}/api/clients/by-city-changes?since=${encodeURIComponent(cachedTimestamp)}`);
       const result = await response.json();
       
       if (result.success) {
-        return result.hasChanges; // true si changements, false sinon
+        console.log('📊 Résultat de la vérification:', {
+          hasChanges: result.hasChanges,
+          changedClientsCount: result.changedClientsCount,
+          clientsForByCityLength: result.clientsForByCity?.length || 0,
+          message: result.message
+        });
+        
+        if (result.hasChanges && result.clientsForByCity && result.clientsForByCity.length > 0) {
+          // Convertir les clients formatés
+          const changedClients: Client[] = result.clientsForByCity.map((c: {
+            _id: string;
+            givenName: string;
+            familyName: string;
+            phoneNumber?: string;
+            addressLine1: string;
+            coordinates?: { lng: number; lat: number };
+            city: string;
+            district?: string;
+            sector: string;
+          }) => ({
+            _id: c._id,
+            givenName: c.givenName,
+            familyName: c.familyName,
+            phoneNumber: c.phoneNumber,
+            addressLine1: c.addressLine1,
+            coordinates: c.coordinates,
+            city: c.city,
+            district: c.district
+          }));
+          console.log(`✅ ${changedClients.length} client(s) formaté(s) pour la mise à jour incrémentale`);
+          return { hasChanges: true, changedClients };
+        }
+        
+        // Si hasChanges mais pas de clients formatés, c'est qu'il y a des changements mais pas de clients avec adresse
+        if (result.hasChanges) {
+          console.warn('⚠️ Changements détectés mais aucun client avec adresse à mettre à jour');
+        }
+        
+        return { hasChanges: result.hasChanges };
       }
-      return true; // En cas d'erreur, recharger tout
+      return { hasChanges: true }; // En cas d'erreur, recharger tout
     } catch (error) {
       console.error('Erreur lors de la vérification des changements:', error);
-      return true; // En cas d'erreur, recharger tout
+      return { hasChanges: true }; // En cas d'erreur, recharger tout
     }
   };
+
+  // Fonction pour mettre à jour seulement les clients modifiés
+  const updateClientsIncremental = useCallback((changedClients: Client[]) => {
+    if (changedClients.length === 0) return;
+
+    console.log(`🔄 Mise à jour incrémentale de ${changedClients.length} client(s)`);
+
+    setClientsBySector(prevSector => {
+      const updated = JSON.parse(JSON.stringify(prevSector)); // Deep copy
+      
+      // Retirer les clients modifiés de leur ancien emplacement
+      changedClients.forEach(changedClient => {
+        // Parcourir tous les secteurs
+        Object.keys(updated).forEach(sectorKey => {
+          const sector = updated[sectorKey];
+          
+          if (sectorKey === 'Montréal' || sectorKey === 'Laval') {
+            // Pour Montréal/Laval avec districts
+            const sectorData = sector as { districts?: Record<string, Client[]>; clients: Client[] };
+            if (sectorData.districts) {
+              Object.keys(sectorData.districts).forEach(district => {
+                sectorData.districts![district] = sectorData.districts![district].filter(
+                  c => c._id !== changedClient._id
+                );
+              });
+            }
+            if (sectorData.clients) {
+              sectorData.clients = sectorData.clients.filter(c => c._id !== changedClient._id);
+            }
+          } else {
+            // Pour les autres secteurs (organisés par ville)
+            const sectorData = sector as ClientsByCityData;
+            Object.keys(sectorData).forEach(city => {
+              const cityData = sectorData[city];
+              if (cityData.clients) {
+                cityData.clients = cityData.clients.filter(c => c._id !== changedClient._id);
+              }
+              if (cityData.districts) {
+                Object.keys(cityData.districts).forEach(district => {
+                  cityData.districts![district] = cityData.districts![district].filter(
+                    c => c._id !== changedClient._id
+                  );
+                });
+              }
+            });
+          }
+        });
+      });
+
+      // Ajouter les clients modifiés à leur nouvel emplacement
+      changedClients.forEach(changedClient => {
+        const sector = getSector(changedClient.city);
+        
+        // Initialiser le secteur s'il n'existe pas
+        if (!updated[sector]) {
+          if (sector === 'Montréal' || sector === 'Laval') {
+            updated[sector] = { districts: {}, clients: [] };
+          } else {
+            updated[sector] = {};
+          }
+        }
+
+        if (sector === 'Montréal' || sector === 'Laval') {
+          const sectorData = updated[sector] as { districts?: Record<string, Client[]>; clients: Client[] };
+          if (changedClient.district) {
+            if (!sectorData.districts) {
+              sectorData.districts = {};
+            }
+            if (!sectorData.districts[changedClient.district]) {
+              sectorData.districts[changedClient.district] = [];
+            }
+            sectorData.districts[changedClient.district].push(changedClient);
+          } else {
+            if (!sectorData.clients) {
+              sectorData.clients = [];
+            }
+            sectorData.clients.push(changedClient);
+          }
+        } else {
+          const sectorData = updated[sector] as ClientsByCityData;
+          if (!sectorData[changedClient.city]) {
+            sectorData[changedClient.city] = { clients: [] };
+          }
+          sectorData[changedClient.city].clients.push(changedClient);
+        }
+      });
+
+      // Mettre à jour aussi clientsData (version aplatie)
+      const flattened: ClientsByCityData = {};
+      Object.values(updated).forEach(sect => {
+        if (typeof sect === 'object' && sect !== null && !Array.isArray(sect)) {
+          if ('districts' in sect || 'clients' in sect) {
+            // C'est Montréal ou Laval
+            const sectorData = sect as { districts?: Record<string, Client[]>; clients: Client[] };
+            if (sectorData.districts) {
+              Object.values(sectorData.districts).forEach(districtClients => {
+                districtClients.forEach(client => {
+                  if (!flattened[client.city]) {
+                    flattened[client.city] = { clients: [] };
+                  }
+                  flattened[client.city].clients.push(client);
+                });
+              });
+            }
+            if (sectorData.clients) {
+              sectorData.clients.forEach(client => {
+                if (!flattened[client.city]) {
+                  flattened[client.city] = { clients: [] };
+                }
+                flattened[client.city].clients.push(client);
+              });
+            }
+          } else {
+            // C'est un autre secteur
+            Object.assign(flattened, sect);
+          }
+        }
+      });
+
+      setClientsData(flattened);
+      
+      // Recalculer le total des clients
+      let total = 0;
+      Object.values(updated).forEach(sect => {
+        if (typeof sect === 'object' && sect !== null && !Array.isArray(sect)) {
+          if ('districts' in sect || 'clients' in sect) {
+            // Montréal ou Laval
+            const sectorData = sect as { districts?: Record<string, Client[]>; clients: Client[] };
+            if (sectorData.districts) {
+              Object.values(sectorData.districts).forEach(districtClients => {
+                total += districtClients.length;
+              });
+            }
+            if (sectorData.clients) {
+              total += sectorData.clients.length;
+            }
+          } else {
+            // Autres secteurs
+            Object.values(sect as ClientsByCityData).forEach(cityData => {
+              if (cityData.clients) {
+                total += cityData.clients.length;
+              }
+              if (cityData.districts) {
+                Object.values(cityData.districts).forEach(districtClients => {
+                  total += districtClients.length;
+                });
+              }
+            });
+          }
+        }
+      });
+      setTotalClients(total);
+      
+      return updated;
+    });
+
+    // Mettre à jour le timestamp du cache
+    localStorage.setItem('clientsByCityLastUpdate', new Date().toISOString());
+    
+    console.log('✅ Mise à jour incrémentale terminée');
+  }, []);
 
   useEffect(() => {
     let eventSource: EventSource | null = null;
 
     const startStream = async (forceReload: boolean = false) => {
       try {
-        // Si pas de rechargement forcé, vérifier le cache
-        if (!forceReload) {
-          const hasChanges = await checkForChanges();
-          if (!hasChanges) {
+        // Vérifier si le cache existe
+        const cachedTimestamp = localStorage.getItem('clientsByCityLastUpdate');
+        const hasCache = cachedTimestamp && localStorage.getItem('clientsByCityCache');
+        
+        // Si pas de rechargement forcé et que le cache existe, vérifier les changements
+        if (!forceReload && hasCache) {
+          const result = await checkForChanges();
+          if (!result.hasChanges) {
             // Pas de changements, charger depuis le cache
             if (loadFromCache()) {
               setLoading(false);
               console.log('✅ Données chargées depuis le cache (aucun changement détecté)');
               return;
             }
+          } else if (result.changedClients && result.changedClients.length > 0) {
+            // Il y a des changements, mettre à jour incrémentalement
+            console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
+            updateClientsIncremental(result.changedClients);
+            setLoading(false);
+            return;
+          } else if (result.hasChanges) {
+            // Si hasChanges mais pas de changedClients, c'est qu'il y a des changements mais aucun client avec adresse
+            // Dans ce cas, on ne fait rien (pas de rechargement complet) car les clients sans adresse ne sont pas affichés
+            console.log('ℹ️ Changements détectés mais aucun client avec adresse à mettre à jour (ignoré)');
+            setLoading(false);
+            return;
           }
+          // Si pas de hasChanges, continuer pour charger depuis l'API (cas normal)
+        }
+        
+        // Si pas de cache ou rechargement forcé, charger depuis l'API
+        if (!hasCache || forceReload) {
+          console.log(forceReload ? '🔄 Rechargement forcé depuis l\'API...' : '📦 Pas de cache, chargement depuis l\'API...');
         }
 
         setLoading(true);
@@ -245,15 +488,40 @@ const ClientsByCity: React.FC = () => {
     // Charger depuis le cache au démarrage, puis vérifier les changements
     const initialize = async () => {
       // D'abord charger depuis le cache pour un affichage immédiat
-      if (loadFromCache()) {
+      const hasCache = loadFromCache();
+      if (hasCache) {
         setLoading(false);
+        console.log('✅ Données chargées depuis le cache');
       }
       
-      // Ensuite vérifier les changements en arrière-plan
-      const hasChanges = await checkForChanges();
-      if (hasChanges) {
-        // Il y a des changements, recharger
-        startStream(true);
+      // Vérifier si on a un timestamp de cache
+      const cachedTimestamp = localStorage.getItem('clientsByCityLastUpdate');
+      
+      // Si pas de cache ou pas de timestamp, charger depuis l'API
+      if (!hasCache || !cachedTimestamp) {
+        console.log('📦 Pas de cache ou cache invalide, chargement depuis l\'API...');
+        startStream(false);
+        return;
+      }
+      
+      // Si cache existe, vérifier les changements en arrière-plan
+      const result = await checkForChanges();
+      if (result.hasChanges) {
+        if (result.changedClients && result.changedClients.length > 0) {
+          console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
+          // Mettre à jour seulement les clients modifiés
+          updateClientsIncremental(result.changedClients);
+        } else {
+          // Si hasChanges mais pas de changedClients, c'est qu'il y a des changements mais aucun client avec adresse
+          // Dans ce cas, on ne fait rien (pas de rechargement complet) car les clients sans adresse ne sont pas affichés dans ClientsByCity
+          console.log('ℹ️ Changements détectés mais aucun client avec adresse à mettre à jour (clients sans adresse ignorés)');
+          // S'assurer que loading est false
+          setLoading(false);
+        }
+      } else {
+        console.log('✅ Aucun changement détecté, conservation du cache');
+        // S'assurer que loading est false
+        setLoading(false);
       }
     };
 
@@ -265,7 +533,7 @@ const ClientsByCity: React.FC = () => {
         eventSource.close();
       }
     };
-  }, [refreshKey]);
+  }, [refreshKey, updateClientsIncremental]);
 
   const fetchClientsByCityStream = () => {
     // Réinitialiser tous les états pour fermer les menus
