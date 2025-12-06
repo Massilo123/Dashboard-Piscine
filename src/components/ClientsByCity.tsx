@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { MapPin, Users, ChevronDown, ChevronRight, Phone, Home, Search, X, Building, Edit2, Check } from 'lucide-react';
 import API_CONFIG from '../config/api';
 
@@ -48,6 +48,7 @@ const ClientsByCity: React.FC = () => {
   const [correctedAddress, setCorrectedAddress] = useState('');
   const [isFixing, setIsFixing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const hasInitializedRef = useRef<boolean>(false); // Pour éviter les initialisations multiples
 
   // Fonction pour charger depuis le cache
   const loadFromCache = (): boolean => {
@@ -55,16 +56,37 @@ const ClientsByCity: React.FC = () => {
       const cached = localStorage.getItem('clientsByCityCache');
       const cachedTimestamp = localStorage.getItem('clientsByCityLastUpdate');
       
+      console.log('🔍 Vérification du cache:', {
+        hasCache: !!cached,
+        hasTimestamp: !!cachedTimestamp,
+        cacheLength: cached?.length || 0
+      });
+      
       if (cached && cachedTimestamp) {
         const cacheData = JSON.parse(cached);
-        setClientsBySector(cacheData.clientsBySector || {});
-        setClientsData(cacheData.clientsData || {});
-        setTotalClients(cacheData.totalClients || 0);
-        setLastUpdate(cachedTimestamp);
-        return true;
+        
+        // Vérifier que les données sont valides
+        if (cacheData && (cacheData.clientsBySector || cacheData.clientsData)) {
+          setClientsBySector(cacheData.clientsBySector || {});
+          setClientsData(cacheData.clientsData || {});
+          setTotalClients(cacheData.totalClients || 0);
+          setLastUpdate(cachedTimestamp);
+          console.log('✅ Cache chargé avec succès:', {
+            totalClients: cacheData.totalClients || 0,
+            timestamp: cachedTimestamp
+          });
+          return true;
+        } else {
+          console.warn('⚠️ Cache invalide: données manquantes');
+        }
+      } else {
+        console.log('ℹ️ Pas de cache disponible:', {
+          hasCache: !!cached,
+          hasTimestamp: !!cachedTimestamp
+        });
       }
     } catch (error) {
-      console.error('Erreur lors du chargement du cache:', error);
+      console.error('❌ Erreur lors du chargement du cache:', error);
     }
     return false;
   };
@@ -72,13 +94,27 @@ const ClientsByCity: React.FC = () => {
   // Fonction pour sauvegarder dans le cache
   const saveToCache = (clientsBySectorData: ClientsBySectorData, clientsData: ClientsByCityData, total: number, timestamp: string) => {
     try {
-      localStorage.setItem('clientsByCityCache', JSON.stringify({
+      const cacheData = {
         clientsBySector: clientsBySectorData,
         clientsData: clientsData,
         totalClients: total
-      }));
+      };
+      localStorage.setItem('clientsByCityCache', JSON.stringify(cacheData));
       localStorage.setItem('clientsByCityLastUpdate', timestamp);
       setLastUpdate(timestamp);
+      
+      // Vérifier que le cache a bien été sauvegardé
+      const verifyCache = localStorage.getItem('clientsByCityCache');
+      const verifyTimestamp = localStorage.getItem('clientsByCityLastUpdate');
+      if (verifyCache && verifyTimestamp) {
+        console.log('✅ Cache sauvegardé avec succès:', {
+          totalClients: total,
+          timestamp: verifyTimestamp,
+          cacheSize: verifyCache.length
+        });
+      } else {
+        console.error('❌ Erreur: Le cache n\'a pas été sauvegardé correctement');
+      }
     } catch (error) {
       console.error('Erreur lors de la sauvegarde du cache:', error);
     }
@@ -457,6 +493,16 @@ const ClientsByCity: React.FC = () => {
                 
                 setLoading(false);
                 console.log('✅ Traitement terminé et sauvegardé dans le cache');
+                
+                // Vérifier immédiatement que le cache est accessible
+                const verifyCache = localStorage.getItem('clientsByCityCache');
+                const verifyTimestamp = localStorage.getItem('clientsByCityLastUpdate');
+                if (verifyCache && verifyTimestamp) {
+                  console.log('✅ Vérification: Cache accessible immédiatement après sauvegarde');
+                } else {
+                  console.error('❌ Vérification: Cache non accessible après sauvegarde !');
+                }
+                
                 eventSource?.close();
                 break;
 
@@ -487,6 +533,14 @@ const ClientsByCity: React.FC = () => {
 
     // Charger depuis le cache au démarrage, puis vérifier les changements
     const initialize = async () => {
+      // Éviter les initialisations multiples
+      if (hasInitializedRef.current) {
+        console.log('⚠️ Initialisation déjà effectuée, ignorée');
+        return;
+      }
+      
+      hasInitializedRef.current = true;
+      
       // D'abord charger depuis le cache pour un affichage immédiat
       const hasCache = loadFromCache();
       if (hasCache) {
@@ -496,10 +550,15 @@ const ClientsByCity: React.FC = () => {
       
       // Vérifier si on a un timestamp de cache
       const cachedTimestamp = localStorage.getItem('clientsByCityLastUpdate');
+      const cachedData = localStorage.getItem('clientsByCityCache');
       
       // Si pas de cache ou pas de timestamp, charger depuis l'API
-      if (!hasCache || !cachedTimestamp) {
-        console.log('📦 Pas de cache ou cache invalide, chargement depuis l\'API...');
+      if (!hasCache || !cachedTimestamp || !cachedData) {
+        console.log('📦 Pas de cache ou cache invalide, chargement depuis l\'API...', {
+          hasCache,
+          hasTimestamp: !!cachedTimestamp,
+          hasCachedData: !!cachedData
+        });
         startStream(false);
         return;
       }
@@ -532,6 +591,8 @@ const ClientsByCity: React.FC = () => {
       if (eventSource) {
         eventSource.close();
       }
+      // Réinitialiser le flag si le composant est démonté
+      hasInitializedRef.current = false;
     };
   }, [refreshKey, updateClientsIncremental]);
 
@@ -546,6 +607,9 @@ const ClientsByCity: React.FC = () => {
     localStorage.removeItem('clientsByCityLastUpdate');
     localStorage.removeItem('clientsBySectorData');
     localStorage.removeItem('lastUpdate');
+    
+    // Réinitialiser le flag d'initialisation pour permettre un nouveau chargement
+    hasInitializedRef.current = false;
     
     // Forcer le re-render en changeant la clé
     setRefreshKey(prev => prev + 1);
