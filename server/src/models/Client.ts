@@ -10,6 +10,8 @@ const clientSchema = new mongoose.Schema({
         lng: { type: Number },
         lat: { type: Number }
     }
+}, {
+    timestamps: true // Ajoute automatiquement createdAt et updatedAt
 });
 
 export default mongoose.model('Client', clientSchema);

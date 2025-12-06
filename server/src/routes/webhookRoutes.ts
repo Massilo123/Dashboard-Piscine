@@ -1,6 +1,5 @@
 // webhookRoutes.ts
 import { Router, Request, Response } from 'express';
-import { exec } from 'child_process';
 import squareClient from '../config/square';
 import Client from '../models/Client';
 
@@ -21,7 +20,7 @@ async function upsertClientInMongo(squareCustomerId: string) {
         const customer = customerResponse.customer;
 
         // Mettre à jour ou créer le client dans MongoDB
-        await Client.findOneAndUpdate(
+        const updatedClient = await Client.findOneAndUpdate(
             { squareId: customer.id },
             {
                 givenName: customer.givenName || '',
@@ -33,15 +32,13 @@ async function upsertClientInMongo(squareCustomerId: string) {
             { upsert: true, new: true }
         );
 
-        // Lancer la mise à jour des coordonnées uniquement pour ce client
-        exec(`npm run update-coords ${customer.id}`, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Erreur lors de la mise à jour des coordonnées: ${error}`);
-                return;
-            }
-            console.log(`Mise à jour des coordonnées pour le client ${customer.givenName}:`);
-            console.log(stdout);
-        });
+        // Géocoder automatiquement le client s'il a une adresse
+        if (updatedClient && updatedClient.addressLine1 && updatedClient.addressLine1.trim() !== '') {
+            const { geocodeClient } = await import('../utils/geocodeClient');
+            geocodeClient(updatedClient._id.toString()).catch(err => {
+                console.error(`Erreur lors du géocodage automatique pour ${customer.givenName}:`, err);
+            });
+        }
 
     } catch (error) {
         console.error('Erreur lors de la mise à jour du client:', error);

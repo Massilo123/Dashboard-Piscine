@@ -4,7 +4,8 @@ import ClientSearch from './components/ClientSearch';
 import RouteOptimizerSchedule from './components/RouteOptimizerSchedule';
 import OptimisationRdvClient from './components/OptimisationRdvClient';
 import ClientsByCity from './components/ClientsByCity';
-import { Menu, X, PenTool, Search, Calendar, MapPin, Building } from 'lucide-react';
+import ClientsMap from './components/ClientsMap';
+import { Menu, X, PenTool, Search, Calendar, MapPin, Building, Map } from 'lucide-react';
 import logo_mauve from './assets/logo_mauve.png';
 import 'leaflet/dist/leaflet.css'
 
@@ -99,6 +100,16 @@ function App() {
                   </div>
                   <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
                 </Link>
+                <Link 
+                  to="/clients-map"
+                  className="text-gray-300 hover:text-indigo-400 px-3 py-2 rounded-md text-sm font-medium transition-colors relative group"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Map className="h-4 w-4" />
+                    <span>Carte des Clients</span>
+                  </div>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 group-hover:w-full transition-all duration-300"></span>
+                </Link>
               </nav>
               
               {/* Bouton RDV et menu mobile */}
@@ -161,6 +172,14 @@ function App() {
                 <Building className="h-5 w-5" />
                 <span>Clients par Ville</span>
               </Link>
+              <Link
+                to="/clients-map"
+                className="text-gray-300 hover:text-white hover:bg-gray-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2"
+                onClick={toggleMobileMenu}
+              >
+                <Map className="h-5 w-5" />
+                <span>Carte des Clients</span>
+              </Link>
               <a
                 href="#"
                 className="text-white bg-indigo-600 hover:bg-indigo-700 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2 mt-4"
@@ -180,6 +199,7 @@ function App() {
             <Route path="/schedule" element={<RouteOptimizerSchedule />} />
             <Route path="/optimisation-rdv" element={<OptimisationRdvClient />} />
             <Route path="/clients-by-city" element={<ClientsByCity />} />
+            <Route path="/clients-map" element={<ClientsMap />} />
           </Routes>
         </div>
       </div>

@@ -41,7 +41,7 @@ router.get('/bookings', async (req: Request, res: Response) => {
                             
                             // Sauvegarder dans MongoDB
                             try {
-                                await Client.findOneAndUpdate(
+                                const updatedClient = await Client.findOneAndUpdate(
                                     { squareId: customer.id },
                                     {
                                         givenName: customer.givenName || '',
@@ -52,6 +52,24 @@ router.get('/bookings', async (req: Request, res: Response) => {
                                     },
                                     { upsert: true, new: true }
                                 );
+
+                                // Géocoder automatiquement le client s'il a une adresse et pas de coordonnées
+                                if (updatedClient && updatedClient.addressLine1 && updatedClient.addressLine1.trim() !== '') {
+                                    const hasCoordinates = updatedClient.coordinates && 
+                                        typeof updatedClient.coordinates === 'object' &&
+                                        updatedClient.coordinates !== null &&
+                                        'lng' in updatedClient.coordinates &&
+                                        'lat' in updatedClient.coordinates &&
+                                        updatedClient.coordinates.lng != null &&
+                                        updatedClient.coordinates.lat != null;
+
+                                    if (!hasCoordinates) {
+                                        const { geocodeClient } = await import('../utils/geocodeClient');
+                                        geocodeClient(updatedClient._id.toString()).catch(err => {
+                                            console.error(`Erreur lors du géocodage pour ${customer.givenName}:`, err);
+                                        });
+                                    }
+                                }
                             } catch (dbError) {
                                 console.error(`Erreur MongoDB pour le client ${customer.id}:`, dbError);
                             }

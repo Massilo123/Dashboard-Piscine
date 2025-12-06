@@ -21,6 +21,7 @@ services:
       - MAPBOX_TOKEN=${MAPBOX_TOKEN}
       - SQUARE_ACCESS_TOKEN=${SQUARE_ACCESS_TOKEN}
       - MONGODB_URI=${MONGODB_URI}
+      - HERE_API_KEY=${HERE_API_KEY}
     networks:
       - cloudflared
     depends_on:

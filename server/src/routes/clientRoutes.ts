@@ -8,6 +8,15 @@ router.post('/', async (req, res) => {
   try {
     const client = new Client(req.body);
     await client.save();
+    
+    // Géocoder automatiquement le client s'il a une adresse
+    if (client.addressLine1 && client.addressLine1.trim() !== '') {
+      const { geocodeClient } = await import('../utils/geocodeClient');
+      geocodeClient(client._id.toString()).catch(err => {
+        console.error('Erreur lors du géocodage automatique après création:', err);
+      });
+    }
+    
     res.status(201).json(client);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue';
