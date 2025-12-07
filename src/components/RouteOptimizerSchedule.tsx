@@ -154,28 +154,30 @@ const RouteOptimizerSchedule = () => {
                     // Point de départ
                     customIcon = L.divIcon({
                         className: 'custom-icon',
-                        html: `<div style="background-color: #3730a3; width: 32px; height: 32px; border-radius: 16px; 
-                                display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" 
-                                stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        html: `<div style="background: linear-gradient(135deg, #8b5cf6, #6366f1); width: 22px; height: 22px; border-radius: 11px; 
+                                display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, 0.8); 
+                                box-shadow: 0 0 4px rgba(139, 92, 246, 0.5), 0 0 8px rgba(139, 92, 246, 0.3);">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" 
+                                stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 1px rgba(255,255,255,0.8));">
                                 <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
                                 <circle cx="12" cy="10" r="3"/>
                                 </svg>
                                 </div>`,
-                        iconSize: [32, 32],
-                        iconAnchor: [16, 16],
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11],
                     });
                 } else {
                     // Autres points
                     customIcon = L.divIcon({
                         className: 'custom-icon',
-                        html: `<div style="background-color: #4f46e5; width: 28px; height: 28px; border-radius: 14px; 
-                                display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; 
-                                border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                        html: `<div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 20px; height: 20px; border-radius: 10px; 
+                                display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 11px;
+                                border: 1px solid rgba(255, 255, 255, 0.8); 
+                                box-shadow: 0 0 4px rgba(99, 102, 241, 0.5), 0 0 8px rgba(99, 102, 241, 0.3);">
                                 ${index}
                                 </div>`,
-                        iconSize: [28, 28],
-                        iconAnchor: [14, 14],
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10],
                     });
                 }
 
@@ -195,15 +197,17 @@ const RouteOptimizerSchedule = () => {
                     : '';
                 
                 const popupContent = `
-                    <div style="max-width: 200px; padding: 8px;">
-                        <div style="font-weight: bold; margin-bottom: 5px;">${waypoint.customerName || 'Point de départ'}</div>
+                    <div style="max-width: 200px; padding: 12px 16px;">
+                        <div style="font-weight: 600; margin-bottom: 8px; font-size: 16px; background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">
+                            ${waypoint.customerName || 'Point de départ'}
+                        </div>
                         <a href="${wazeUrl}" target="_blank" rel="noopener noreferrer" 
-                           style="font-size: 0.85rem; margin-bottom: 5px; color: #818cf8; text-decoration: underline; cursor: pointer; display: block;">
+                           style="font-size: 0.85rem; margin-bottom: 6px; color: #60a5fa; text-decoration: underline; cursor: pointer; display: block; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6);">
                            ${waypoint.address}
                         </a>
                         ${phoneDisplay}
                         ${waypoint.startAt ? `
-                            <div style="font-size: 0.85rem; color: #6b7280;">
+                            <div style="font-size: 0.85rem; color: #9ca3af; margin-top: 6px;">
                                 Heure: ${new Date(waypoint.startAt).getHours() === 0 
                                     ? "Toute la journée" 
                                     : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', {
@@ -227,12 +231,22 @@ const RouteOptimizerSchedule = () => {
 
         // Ajouter des polylines pour représenter l'itinéraire avec les temps de trajet entre chaque point
         if (routePoints.length > 1) {
-            // Créer une polyline pour l'itinéraire complet (en arrière-plan)
-            const mainRoute = L.polyline(routePoints, {
-                color: '#4f46e5',
+            // Ajouter un effet de glow à la ligne en créant une ligne plus large en arrière-plan
+            L.polyline(routePoints, {
+                color: '#a78bfa',
                 weight: 4,
-                opacity: 0.7,
-                lineJoin: 'round'
+                opacity: 0.25,
+                lineJoin: 'round',
+                lineCap: 'round'
+            }).addTo(newMap);
+            
+            // Créer une polyline pour l'itinéraire complet (en avant-plan)
+            const mainRoute = L.polyline(routePoints, {
+                color: '#8b5cf6',
+                weight: 2.5,
+                opacity: 0.85,
+                lineJoin: 'round',
+                lineCap: 'round'
             }).addTo(newMap);
 
             // Ajouter des indicateurs de temps entre chaque segment
@@ -256,13 +270,16 @@ const RouteOptimizerSchedule = () => {
                     // Créer une icône personnalisée pour l'étiquette de temps
                     const timeIcon = L.divIcon({
                         className: 'time-label',
-                        html: `<div style="background-color: rgba(79, 70, 229, 0.9); color: white; 
-                                font-size: 10px; font-weight: 500; padding: 2px 5px; border-radius: 4px; 
-                                box-shadow: 0 1px 2px rgba(0,0,0,0.2); white-space: nowrap; width: fit-content;
-                                max-width: 60px; overflow: hidden; text-overflow: ellipsis; text-align: center;">
+                        html: `<div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(99, 102, 241, 0.9)); color: white; 
+                                font-size: 9px; font-weight: 600; padding: 2px 5px; border-radius: 4px; 
+                                border: 1px solid rgba(255, 255, 255, 0.25);
+                                box-shadow: 0 0 4px rgba(139, 92, 246, 0.4), 0 0 8px rgba(139, 92, 246, 0.2); 
+                                white-space: nowrap; width: fit-content;
+                                max-width: 50px; overflow: hidden; text-overflow: ellipsis; text-align: center;
+                                text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);">
                                 ${estimatedDuration} min</div>`,
                         iconSize: [0, 0], // Taille nulle pour que le contenu HTML définisse la taille
-                        iconAnchor: [15, 8]
+                        iconAnchor: [12, 6]
                     });
                     
                     // Ajouter l'étiquette à la carte
@@ -349,10 +366,12 @@ const RouteOptimizerSchedule = () => {
   
     return (
       <div className="w-full max-w-4xl mx-auto p-2 sm:p-4 space-y-4">
-        <div className="bg-gray-800/60 backdrop-blur-sm rounded-xl shadow-xl p-4 sm:p-6 border border-indigo-900/30">
+        <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 p-4 sm:p-6 border border-indigo-500/20">
           <div className="mb-4 flex items-center gap-2">
-            <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-400" />
-            <h2 className="text-lg sm:text-xl font-semibold text-white">Optimisation des rendez-vous</h2>
+            <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+            <h2 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
+              Optimisation des rendez-vous
+            </h2>
           </div>
           
           <div className="flex flex-col gap-4">
@@ -362,7 +381,7 @@ const RouteOptimizerSchedule = () => {
                 type="date"
                 value={date}
                 onChange={handleDateChange}
-                className="border border-indigo-900/30 rounded-lg p-2.5 bg-gray-800/60 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full sm:w-auto backdrop-blur-sm shadow-md"
+                className="border border-cyan-500/30 rounded-lg p-2.5 bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 w-full sm:w-auto backdrop-blur-sm shadow-md transition-all duration-200"
               />
               <div className="flex gap-2 sm:gap-4">
                 <button
@@ -372,20 +391,20 @@ const RouteOptimizerSchedule = () => {
                     setDate(formattedDate);
                     setShouldFetch(true);
                   }}
-                  className="flex-1 sm:flex-none bg-gray-700/70 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg hover:bg-gray-600/90 transition-colors text-sm sm:text-base shadow-md flex items-center justify-center"
+                  className="flex-1 sm:flex-none bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 backdrop-blur-sm text-cyan-200 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 flex items-center justify-center"
                 >
-                  <Calendar className="h-4 w-4 mr-1.5" />
+                  <Calendar className="h-4 w-4 mr-1.5 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
                   Aujourd'hui
                 </button>
                
                 <button
                   onClick={fetchOptimizedRoute}
                   disabled={loading}
-                  className="flex-1 sm:flex-none bg-indigo-600/80 backdrop-blur-sm text-white px-4 py-2.5 rounded-lg hover:bg-indigo-700/90 disabled:bg-gray-600/70 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors text-sm sm:text-base shadow-md flex items-center justify-center"
+                  className="flex-1 sm:flex-none bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 disabled:from-gray-600/20 disabled:to-gray-600/20 backdrop-blur-sm text-indigo-200 px-4 py-2.5 rounded-lg disabled:text-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-sm sm:text-base border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 disabled:opacity-50 flex items-center justify-center"
                 >
                   {loading ? (
                     <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
@@ -393,7 +412,7 @@ const RouteOptimizerSchedule = () => {
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="h-4 w-4 mr-1.5" />
+                      <CheckCircle className="h-4 w-4 mr-1.5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
                       Optimiser
                     </>
                   )}
@@ -402,8 +421,8 @@ const RouteOptimizerSchedule = () => {
             </div>
 
             {error && (
-              <div className="text-red-300 p-3 bg-red-900/40 backdrop-blur-sm rounded-lg text-sm border border-red-800/50 shadow-md flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-red-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div className="text-rose-300 p-3 bg-gradient-to-br from-rose-900/40 to-pink-900/40 backdrop-blur-sm rounded-lg text-sm border border-rose-500/50 shadow-lg shadow-rose-500/20 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-rose-300 drop-shadow-[0_0_3px_rgba(239,68,68,0.8)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"></circle>
                   <line x1="12" y1="8" x2="12" y2="12"></line>
                   <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -415,16 +434,16 @@ const RouteOptimizerSchedule = () => {
             {routeData && (
               <>
                 {/* Sélecteur de mode d'affichage */}
-                <div className="flex border border-indigo-900/30 rounded-lg overflow-hidden">
+                <div className="flex border border-indigo-500/30 rounded-lg overflow-hidden bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm shadow-lg shadow-indigo-500/5">
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`flex-1 py-2.5 px-4 flex items-center justify-center ${
+                    className={`flex-1 py-2.5 px-4 flex items-center justify-center transition-all duration-200 ${
                       viewMode === 'list'
-                        ? 'bg-indigo-600/80 text-white'
-                        : 'bg-gray-800/60 text-gray-300 hover:bg-gray-700/60'
+                        ? 'bg-gradient-to-r from-indigo-500/30 to-purple-500/30 text-indigo-200 border-r border-indigo-400/40 shadow-lg shadow-indigo-500/20'
+                        : 'bg-transparent text-gray-300 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10'
                     }`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-1.5 ${viewMode === 'list' ? 'drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="8" y1="6" x2="21" y2="6"></line>
                       <line x1="8" y1="12" x2="21" y2="12"></line>
                       <line x1="8" y1="18" x2="21" y2="18"></line>
@@ -436,13 +455,13 @@ const RouteOptimizerSchedule = () => {
                   </button>
                   <button
                     onClick={() => setViewMode('map')}
-                    className={`flex-1 py-2.5 px-4 flex items-center justify-center ${
+                    className={`flex-1 py-2.5 px-4 flex items-center justify-center transition-all duration-200 ${
                       viewMode === 'map'
-                        ? 'bg-indigo-600/80 text-white'
-                        : 'bg-gray-800/60 text-gray-300 hover:bg-gray-700/60'
+                        ? 'bg-gradient-to-r from-indigo-500/30 to-purple-500/30 text-indigo-200 shadow-lg shadow-indigo-500/20'
+                        : 'bg-transparent text-gray-300 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10'
                     }`}
                   >
-                    <MapPin className="h-4 w-4 mr-1.5" />
+                    <MapPin className={`h-4 w-4 mr-1.5 ${viewMode === 'map' ? 'drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]' : ''}`} />
                     Carte
                   </button>
                 </div>
@@ -450,27 +469,27 @@ const RouteOptimizerSchedule = () => {
                 {/* Affichage de la liste */}
                 {viewMode === 'list' && (
                   <div className="mt-4">
-                    <h3 className="text-base sm:text-lg font-semibold mb-3 text-white flex items-center">
-                      <Navigation className="h-5 w-5 mr-2 text-indigo-400" />
+                    <h3 className="text-base sm:text-lg font-semibold mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] flex items-center">
+                      <Navigation className="h-5 w-5 mr-2 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                       Itinéraire optimisé
                     </h3>
                     <div className="space-y-1">
                       {routeData.waypoints.map((waypoint, index) => (
                         <React.Fragment key={index}>
-                          <div className="p-3 sm:p-4 border border-indigo-900/30 rounded-lg bg-gray-800/60 backdrop-blur-sm hover:bg-gray-700/70 transition-colors shadow-md">
+                          <div className="p-3 sm:p-4 border border-indigo-500/20 rounded-lg bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5 transition-all duration-200 shadow-md">
                             <div>
                               {waypoint.type === 'starting_point' ? (
                                 <div className="break-words flex items-start">
-                                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-indigo-900/70 rounded-full text-white text-sm font-bold mr-3">
-                                    <MapPin className="h-4 w-4" />
+                                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-sm font-bold mr-3 border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
+                                    <MapPin className="h-4 w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
                                   </div>
                                   <div className="flex-grow">
-                                    <span className="font-medium text-gray-200 text-sm sm:text-base">Point de départ:</span>
+                                    <span className="font-medium text-cyan-300 text-sm sm:text-base drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Point de départ:</span>
                                     <a 
                                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-indigo-400 hover:text-indigo-300 hover:underline ml-1 text-sm sm:text-base block"
+                                      className="text-cyan-400 hover:text-cyan-300 hover:underline ml-1 text-sm sm:text-base block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
                                     >
                                       {waypoint.address}
                                     </a>
@@ -478,27 +497,27 @@ const RouteOptimizerSchedule = () => {
                                 </div>
                               ) : (
                                 <div className="flex items-start">
-                                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-indigo-600/70 rounded-full text-white text-sm font-bold mr-3">
+                                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-sm font-bold mr-3 border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
                                     {index}
                                   </div>
                                   <div className="flex-grow">
-                                    <div className="font-medium text-sm sm:text-base text-white mb-1">
+                                    <div className="font-medium text-sm sm:text-base text-white mb-1 drop-shadow-[0_0_3px_rgba(139,92,246,0.6)]">
                                       {waypoint.customerName}
                                     </div>
                                     <a 
                                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-indigo-400 hover:text-indigo-300 hover:underline text-xs sm:text-sm break-words block"
+                                      className="text-cyan-400 hover:text-cyan-300 hover:underline text-xs sm:text-sm break-words block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
                                     >
                                       {waypoint.address}
                                     </a>
                                     {waypoint.phoneNumber && (
                                       <a 
                                         href={`tel:${waypoint.phoneNumber}`}
-                                        className="text-indigo-400 hover:text-indigo-300 hover:underline text-xs sm:text-sm block mt-1 flex items-center"
+                                        className="text-cyan-400 hover:text-cyan-300 hover:underline text-xs sm:text-sm block mt-1 flex items-center transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
                                       >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                           <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
                                         </svg>
                                         {waypoint.phoneNumber}
@@ -506,7 +525,7 @@ const RouteOptimizerSchedule = () => {
                                     )}
                                     {waypoint.startAt && (
                                       <div className="text-gray-300 text-xs sm:text-sm mt-1 flex items-center">
-                                        <Clock className="h-3.5 w-3.5 mr-1 text-indigo-400" />
+                                        <Clock className="h-3.5 w-3.5 mr-1 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
                                         Heure: {
                                           new Date(waypoint.startAt).getHours() === 0 
                                           ? "Toute la journée" 
@@ -526,8 +545,8 @@ const RouteOptimizerSchedule = () => {
                           {/* Afficher le temps de trajet entre les waypoints - version discrète */}
                           {index < routeData.waypoints.length - 1 && travelTimes[index] !== undefined && (
                             <div className="flex justify-center items-center py-1">
-                              <div className="flex items-center text-indigo-300 px-2 py-0.5 text-xs opacity-70">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 opacity-60">
+                              <div className="flex items-center text-cyan-300 px-2 py-0.5 text-xs bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded border border-cyan-500/20 shadow-lg shadow-cyan-500/10 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 drop-shadow-[0_0_2px_rgba(34,211,238,0.8)]">
                                   <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
                                 <span>{travelTimes[index]} min</span>
@@ -543,29 +562,29 @@ const RouteOptimizerSchedule = () => {
                 {/* Affichage de la carte */}
                 {viewMode === 'map' && (
                   <div className="mt-4">
-                    <h3 className="text-base sm:text-lg font-semibold mb-3 text-white flex items-center">
-                      <MapPin className="h-5 w-5 mr-2 text-indigo-400" />
+                    <h3 className="text-base sm:text-lg font-semibold mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] flex items-center">
+                      <MapPin className="h-5 w-5 mr-2 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                       Visualisation de l'itinéraire
                     </h3>
                     <div 
                       ref={mapContainer} 
-                      className="w-full h-96 rounded-lg overflow-hidden shadow-lg border border-indigo-900/30"
+                      className="w-full h-96 rounded-lg overflow-hidden shadow-lg border border-indigo-500/20"
                     />
                   </div>
                 )}
 
                 {/* Résumé de l'itinéraire (toujours visible) */}
-                <div className="mt-4 p-4 bg-indigo-900/30 backdrop-blur-sm rounded-lg border border-indigo-900/30 shadow-lg">
+                <div className="mt-4 p-4 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-gray-800/60 backdrop-blur-sm rounded-lg border border-indigo-900/20 shadow-md">
-                      <div className="font-medium text-indigo-300 text-sm sm:text-base flex items-center">
-                        <Clock className="h-4 w-4 mr-1.5 text-indigo-400" />
+                    <div className="p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-cyan-500/20 shadow-md">
+                      <div className="font-medium text-cyan-300 text-sm sm:text-base flex items-center drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
+                        <Clock className="h-4 w-4 mr-1.5 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
                         Durée totale: <span className="text-white ml-1">{routeData.totalDuration} minutes</span>
                       </div>
                     </div>
-                    <div className="p-3 bg-gray-800/60 backdrop-blur-sm rounded-lg border border-indigo-900/20 shadow-md">
-                      <div className="font-medium text-indigo-300 text-sm sm:text-base flex items-center">
-                        <Navigation className="h-4 w-4 mr-1.5 text-indigo-400" />
+                    <div className="p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-cyan-500/20 shadow-md">
+                      <div className="font-medium text-cyan-300 text-sm sm:text-base flex items-center drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
+                        <Navigation className="h-4 w-4 mr-1.5 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
                         Distance totale: <span className="text-white ml-1">{routeData.totalDistance} km</span>
                       </div>
                     </div>

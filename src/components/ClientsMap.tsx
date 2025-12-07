@@ -47,6 +47,53 @@ function getSectorColor(sector: string | undefined): string {
   return SECTOR_COLORS[sector] || SECTOR_COLORS['Autres'];
 }
 
+// Helper functions pour générer des icônes SVG stylisées
+function getLocationIcon(color: string = '#60a5fa'): string {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px; filter: drop-shadow(0 0 3px ${color}80);">
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+    <circle cx="12" cy="10" r="3"></circle>
+  </svg>`;
+}
+
+function getPhoneIcon(color: string = '#60a5fa'): string {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px; filter: drop-shadow(0 0 3px ${color}80);">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+  </svg>`;
+}
+
+function getCityIcon(color: string = '#9ca3af'): string {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px; filter: drop-shadow(0 0 2px ${color}60);">
+    <path d="M3 21h18"></path>
+    <path d="M5 21V7l8-4v18"></path>
+    <path d="M19 21V11l-6-4"></path>
+    <path d="M9 9v0"></path>
+    <path d="M9 12v0"></path>
+    <path d="M9 15v0"></path>
+    <path d="M9 18v0"></path>
+  </svg>`;
+}
+
+function getDistrictIcon(color: string = '#9ca3af'): string {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px; filter: drop-shadow(0 0 2px ${color}60);">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+  </svg>`;
+}
+
+function getSearchIcon(color: string = '#fbbf24'): string {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px; filter: drop-shadow(0 0 3px ${color}80);">
+    <circle cx="11" cy="11" r="8"></circle>
+    <path d="m21 21-4.35-4.35"></path>
+  </svg>`;
+}
+
+function getPositionIcon(color: string = '#22d3ee'): string {
+  return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 6px; filter: drop-shadow(0 0 3px ${color}80);">
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+    <circle cx="12" cy="10" r="3"></circle>
+  </svg>`;
+}
+
 
 const ClientsMap: React.FC = () => {
   const mapRef = useRef<L.Map | null>(null);
@@ -203,12 +250,12 @@ const ClientsMap: React.FC = () => {
           const color = getSectorColor(changedClient.sector);
           const popupContent = `
             <div style="min-width: 200px;">
-              <strong>${changedClient.name}</strong><br/>
-              ${changedClient.address ? `<small>${changedClient.address}</small><br/>` : ''}
-              ${changedClient.phoneNumber ? `<small>📞 ${changedClient.phoneNumber}</small><br/>` : ''}
-              ${changedClient.city ? `<small>🏙️ ${changedClient.city}</small><br/>` : ''}
-              ${changedClient.district ? `<small>🏘️ ${changedClient.district}</small><br/>` : ''}
-              ${changedClient.sector ? `<small style="color: ${color}; font-weight: bold;">📍 ${changedClient.sector}</small>` : ''}
+              <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${changedClient.name}</strong>
+              ${changedClient.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${changedClient.address}</span></div>` : ''}
+              ${changedClient.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${changedClient.phoneNumber}</span></div>` : ''}
+              ${changedClient.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${changedClient.city}</span></div>` : ''}
+              ${changedClient.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${changedClient.district}</span></div>` : ''}
+              ${changedClient.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${changedClient.sector}</span></div>` : ''}
             </div>
           `;
           existingMarker.setPopupContent(popupContent);
@@ -220,14 +267,14 @@ const ClientsMap: React.FC = () => {
             className: 'custom-marker',
             html: `<div style="
               background-color: ${color};
-              width: 12px;
-              height: 12px;
+              width: 9px;
+              height: 9px;
               border-radius: 50%;
-              border: 2px solid white;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+              border: 1.5px solid rgba(255, 255, 255, 0.9);
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
             "></div>`,
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
+            iconSize: [9, 9],
+            iconAnchor: [4.5, 4.5]
           });
 
           const marker = L.marker([changedClient.coordinates.lat, changedClient.coordinates.lng], {
@@ -238,12 +285,12 @@ const ClientsMap: React.FC = () => {
 
           const popupContent = `
             <div style="min-width: 200px;">
-              <strong>${changedClient.name}</strong><br/>
-              ${changedClient.address ? `<small>${changedClient.address}</small><br/>` : ''}
-              ${changedClient.phoneNumber ? `<small>📞 ${changedClient.phoneNumber}</small><br/>` : ''}
-              ${changedClient.city ? `<small>🏙️ ${changedClient.city}</small><br/>` : ''}
-              ${changedClient.district ? `<small>🏘️ ${changedClient.district}</small><br/>` : ''}
-              ${changedClient.sector ? `<small style="color: ${color}; font-weight: bold;">📍 ${changedClient.sector}</small>` : ''}
+              <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${changedClient.name}</strong>
+              ${changedClient.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${changedClient.address}</span></div>` : ''}
+              ${changedClient.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${changedClient.phoneNumber}</span></div>` : ''}
+              ${changedClient.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${changedClient.city}</span></div>` : ''}
+              ${changedClient.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${changedClient.district}</span></div>` : ''}
+              ${changedClient.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${changedClient.sector}</span></div>` : ''}
             </div>
           `;
           marker.bindPopup(popupContent);
@@ -530,7 +577,7 @@ const ClientsMap: React.FC = () => {
               zIndexOffset: 1000 // S'assurer que le marqueur est au-dessus des autres
             }).addTo(mapRef.current);
 
-            marker.bindPopup('<strong>📍 Votre position</strong>').openPopup();
+            marker.bindPopup(`<div style="min-width: 200px;"><strong style="background: linear-gradient(135deg, #22d3ee, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); display: flex; align-items: center;">${getPositionIcon('#22d3ee')}<span>Votre position</span></strong></div>`).openPopup();
             userLocationMarkerRef.current = marker;
           }
         }
@@ -621,7 +668,7 @@ const ClientsMap: React.FC = () => {
               zIndexOffset: 1000
             }).addTo(mapRef.current);
 
-            marker.bindPopup('<strong>📍 Votre position (suivi actif)</strong>');
+            marker.bindPopup(`<div style="min-width: 200px;"><strong style="background: linear-gradient(135deg, #22d3ee, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); display: flex; align-items: center;">${getPositionIcon('#22d3ee')}<span>Votre position (suivi actif)</span></strong></div>`);
             userLocationMarkerRef.current = marker;
           }
           
@@ -738,13 +785,13 @@ const ClientsMap: React.FC = () => {
       
       highlightMarker.bindPopup(`
         <div style="min-width: 200px;">
-          <strong style="color: #F59E0B;">🔍 Client sélectionné</strong><br/>
-          <strong>${client.name}</strong><br/>
-          ${client.address ? `<small>${client.address}</small><br/>` : ''}
-          ${client.phoneNumber ? `<small>📞 ${client.phoneNumber}</small><br/>` : ''}
-          ${client.city ? `<small>🏙️ ${client.city}</small><br/>` : ''}
-          ${client.district ? `<small>🏘️ ${client.district}</small><br/>` : ''}
-          ${client.sector ? `<small style="color: ${getSectorColor(client.sector)}; font-weight: bold;">📍 ${client.sector}</small>` : ''}
+          <div style="margin-bottom: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.2)); border: 1px solid rgba(245, 158, 11, 0.5); color: #fbbf24; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px rgba(245, 158, 11, 0.8); box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);">${getSearchIcon('#fbbf24')}<span>Client sélectionné</span></div>
+          <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6); display: block; margin-top: 8px;">${client.name}</strong>
+          ${client.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${client.address}</span></div>` : ''}
+          ${client.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
+          ${client.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${client.city}</span></div>` : ''}
+          ${client.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${client.district}</span></div>` : ''}
+          ${client.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${getSectorColor(client.sector)}20; border: 1px solid ${getSectorColor(client.sector)}50; color: ${getSectorColor(client.sector)}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${getSectorColor(client.sector)}80; box-shadow: 0 0 8px ${getSectorColor(client.sector)}40;">${getLocationIcon(getSectorColor(client.sector))}<span>${client.sector}</span></div>` : ''}
         </div>
       `).openPopup();
       
@@ -829,7 +876,7 @@ const ClientsMap: React.FC = () => {
               zIndexOffset: 1000
             }).addTo(mapRef.current);
 
-            marker.bindPopup('<strong>📍 Votre position (suivi actif)</strong>');
+            marker.bindPopup(`<div style="min-width: 200px;"><strong style="background: linear-gradient(135deg, #22d3ee, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); display: flex; align-items: center;">${getPositionIcon('#22d3ee')}<span>Votre position (suivi actif)</span></strong></div>`);
             userLocationMarkerRef.current = marker;
           }
           
@@ -1002,12 +1049,12 @@ const ClientsMap: React.FC = () => {
             const color = getSectorColor(client.sector);
             const popupContent = `
               <div style="min-width: 200px;">
-                <strong>${client.name}</strong><br/>
-                ${client.address ? `<small>${client.address}</small><br/>` : ''}
-                ${client.phoneNumber ? `<small>📞 ${client.phoneNumber}</small><br/>` : ''}
-                ${client.city ? `<small>🏙️ ${client.city}</small><br/>` : ''}
-                ${client.district ? `<small>🏘️ ${client.district}</small><br/>` : ''}
-                ${client.sector ? `<small style="color: ${color}; font-weight: bold;">📍 ${client.sector}</small>` : ''}
+                <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${client.name}</strong>
+                ${client.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${client.address}</span></div>` : ''}
+                ${client.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
+                ${client.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${client.city}</span></div>` : ''}
+                ${client.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${client.district}</span></div>` : ''}
+                ${client.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${client.sector}</span></div>` : ''}
               </div>
             `;
             existingMarker.setPopupContent(popupContent);
@@ -1020,14 +1067,14 @@ const ClientsMap: React.FC = () => {
             className: 'custom-marker',
             html: `<div style="
               background-color: ${color};
-              width: 12px;
-              height: 12px;
+              width: 9px;
+              height: 9px;
               border-radius: 50%;
-              border: 2px solid white;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+              border: 1.5px solid rgba(255, 255, 255, 0.9);
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
             "></div>`,
-            iconSize: [12, 12],
-            iconAnchor: [6, 6]
+            iconSize: [9, 9],
+            iconAnchor: [4.5, 4.5]
           });
 
           const marker = L.marker([client.coordinates.lat, client.coordinates.lng], {
@@ -1039,12 +1086,12 @@ const ClientsMap: React.FC = () => {
 
           const popupContent = `
             <div style="min-width: 200px;">
-              <strong>${client.name}</strong><br/>
-              ${client.address ? `<small>${client.address}</small><br/>` : ''}
-              ${client.phoneNumber ? `<small>📞 ${client.phoneNumber}</small><br/>` : ''}
-              ${client.city ? `<small>🏙️ ${client.city}</small><br/>` : ''}
-              ${client.district ? `<small>🏘️ ${client.district}</small><br/>` : ''}
-              ${client.sector ? `<small style="color: ${color}; font-weight: bold;">📍 ${client.sector}</small>` : ''}
+              <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${client.name}</strong>
+              ${client.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${client.address}</span></div>` : ''}
+              ${client.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
+              ${client.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${client.city}</span></div>` : ''}
+              ${client.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${client.district}</span></div>` : ''}
+              ${client.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${client.sector}</span></div>` : ''}
             </div>
           `;
           marker.bindPopup(popupContent);
@@ -1117,14 +1164,14 @@ const ClientsMap: React.FC = () => {
         className: 'custom-marker',
         html: `<div style="
           background-color: ${color};
-          width: 12px;
-          height: 12px;
+          width: 9px;
+          height: 9px;
           border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          border: 1.5px solid rgba(255, 255, 255, 0.9);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
         "></div>`,
-        iconSize: [12, 12],
-        iconAnchor: [6, 6]
+        iconSize: [9, 9],
+        iconAnchor: [4.5, 4.5]
       });
 
       const marker = L.marker([client.coordinates.lat, client.coordinates.lng], {
@@ -1137,12 +1184,12 @@ const ClientsMap: React.FC = () => {
       // Popup avec informations du client
       const popupContent = `
         <div style="min-width: 200px;">
-          <strong>${client.name}</strong><br/>
-          ${client.address ? `<small>${client.address}</small><br/>` : ''}
-          ${client.phoneNumber ? `<small>📞 ${client.phoneNumber}</small><br/>` : ''}
-          ${client.city ? `<small>🏙️ ${client.city}</small><br/>` : ''}
-          ${client.district ? `<small>🏘️ ${client.district}</small><br/>` : ''}
-          ${client.sector ? `<small style="color: ${color}; font-weight: bold;">📍 ${client.sector}</small>` : ''}
+          <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${client.name}</strong>
+          ${client.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${client.address}</span></div>` : ''}
+          ${client.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
+          ${client.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${client.city}</span></div>` : ''}
+          ${client.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${client.district}</span></div>` : ''}
+          ${client.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${client.sector}</span></div>` : ''}
         </div>
       `;
       marker.bindPopup(popupContent);
@@ -1206,68 +1253,42 @@ const ClientsMap: React.FC = () => {
     .sort((a, b) => b[1] - a[1]);
 
   return (
-    <div className="min-h-screen bg-transparent p-2 md:p-4">
+    <div className="min-h-screen bg-transparent p-1 sm:p-2 md:p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/30 backdrop-blur-sm">
-                <MapPin className="h-4 w-4 text-indigo-300 drop-shadow-[0_0_6px_rgba(139,92,246,1)]" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
-                  Carte des Clients
-                </h1>
-                <p className="text-gray-300 text-xs mt-0.5">
-                  {loading ? (
-                    <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Chargement...</span>
-                  ) : (
-                    <>
-                      <span className="text-gray-300">{totalClients} clients affichés</span>
-                      {totalWithCoordinates > 0 && totalWithCoordinates !== totalClients && (
-                        <span className="text-cyan-400 ml-1 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]">
-                          ({totalWithCoordinates - totalClients} manquants)
-                        </span>
-                      )}
-                    </>
-                  )}
-                </p>
-              </div>
+        {/* Header - Compact sur mobile */}
+        <div className="mb-1 sm:mb-2 md:mb-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="p-1 sm:p-1.5 md:p-2 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
+              <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-indigo-300 drop-shadow-[0_0_6px_rgba(139,92,246,1)]" />
             </div>
-            
-            {/* Groupe de boutons d'action */}
-            <div className="flex gap-1.5 flex-wrap">
-              <button
-                onClick={getUserLocation}
-                className="px-2.5 py-1.5 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 rounded-lg transition-all duration-200 flex items-center gap-1.5 text-xs font-medium border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
-                title="Afficher ma position"
-              >
-                <Navigation className="h-3.5 w-3.5 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-                Ma position
-              </button>
-              <button
-                onClick={toggleLocationTracking}
-                className={`px-2.5 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1.5 text-xs font-medium border shadow-lg hover:-translate-y-0.5 backdrop-blur-sm ${
-                  isTrackingLocation
-                    ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 hover:from-emerald-500/30 hover:to-cyan-500/30 text-emerald-200 border-emerald-400/40 shadow-emerald-500/20 hover:shadow-emerald-500/40'
-                    : 'bg-gradient-to-r from-gray-700/20 to-gray-600/20 hover:from-gray-700/30 hover:to-gray-600/30 text-gray-300 border-gray-500/40 shadow-gray-500/10 hover:shadow-gray-500/20'
-                }`}
-                title={isTrackingLocation ? 'Arrêter le suivi' : 'Suivre ma position en temps réel'}
-              >
-                <Navigation2 className={`h-3.5 w-3.5 ${isTrackingLocation ? 'drop-shadow-[0_0_4px_rgba(16,185,129,0.8)]' : ''}`} />
-                {isTrackingLocation ? 'Suivi actif' : 'Suivre'}
-              </button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-base sm:text-lg md:text-xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] truncate">
+                Carte des Clients
+              </h1>
+              <p className="text-gray-300 text-[10px] sm:text-xs mt-0.5">
+                {loading ? (
+                  <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Chargement...</span>
+                ) : (
+                  <>
+                    <span className="text-gray-300">{totalClients} clients affichés</span>
+                    {totalWithCoordinates > 0 && totalWithCoordinates !== totalClients && (
+                      <span className="text-cyan-400 ml-1 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]">
+                        ({totalWithCoordinates - totalClients} manquants)
+                      </span>
+                    )}
+                  </>
+                )}
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Section de contrôle - Recherche et Actions */}
-        <div className="mb-3 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-2.5 border border-indigo-500/20 shadow-lg shadow-indigo-500/5 relative z-10">
-          {/* Barre de recherche avec suggestions */}
-          <div className="mb-2 relative z-[10000]">
+        {/* Section de contrôle - Recherche et Actions - Compact sur mobile */}
+        <div className="mb-1 sm:mb-2 md:mb-3 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 md:p-2.5 border border-indigo-500/20 shadow-lg shadow-indigo-500/5 relative z-10">
+          {/* Barre de recherche */}
+          <div className="mb-1 sm:mb-2 relative z-[10000]">
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+              <Search className="absolute left-1.5 sm:left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -1285,8 +1306,8 @@ const ClientsMap: React.FC = () => {
                     setShowSuggestions(false);
                   }
                 }}
-                placeholder="Rechercher un client..."
-                className="w-full pl-8 pr-8 py-1.5 text-sm bg-gray-900/60 border border-indigo-500/30 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 transition-all duration-200"
+                placeholder="Rechercher..."
+                className="w-full pl-6 sm:pl-7 md:pl-8 pr-6 sm:pr-7 md:pr-8 py-1 sm:py-1.5 text-xs sm:text-sm bg-gray-900/60 border border-indigo-500/30 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 transition-all duration-200"
               />
               {searchTerm && (
                 <button
@@ -1300,9 +1321,9 @@ const ClientsMap: React.FC = () => {
                       highlightedMarkerRef.current = null;
                     }
                   }}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]"
+                  className="absolute right-1.5 sm:right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] p-0.5"
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5" />
                 </button>
               )}
             </div>
@@ -1318,24 +1339,24 @@ const ClientsMap: React.FC = () => {
                   <button
                     key={client._id}
                     onClick={() => handleSelectClient(client)}
-                    className="w-full text-left px-4 py-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 border-b border-indigo-500/20 last:border-b-0 transition-all duration-200"
+                    className="w-full text-left px-3 sm:px-4 py-2 sm:py-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 border-b border-indigo-500/20 last:border-b-0 transition-all duration-200"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.4)]">{client.name}</div>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm sm:text-base font-semibold text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.4)] truncate">{client.name}</div>
                         {client.phoneNumber && (
-                          <div className="text-sm text-gray-400 flex items-center gap-1 mb-1">
-                            <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.6)]" />
-                            {client.phoneNumber}
+                          <div className="text-xs sm:text-sm text-gray-400 flex items-center gap-1 mb-1">
+                            <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.6)] flex-shrink-0" />
+                            <span className="truncate">{client.phoneNumber}</span>
                           </div>
                         )}
                         {client.address && (
-                          <div className="text-sm text-gray-400 truncate">{client.address}</div>
+                          <div className="text-xs sm:text-sm text-gray-400 truncate">{client.address}</div>
                         )}
                       </div>
                       {client.sector && (
                         <div
-                          className="ml-2 px-2 py-1 rounded text-xs font-medium border backdrop-blur-sm"
+                          className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-xs font-medium border backdrop-blur-sm flex-shrink-0 self-start sm:ml-2"
                           style={{
                             backgroundColor: getSectorColor(client.sector) + '20',
                             color: getSectorColor(client.sector),
@@ -1361,89 +1382,121 @@ const ClientsMap: React.FC = () => {
             )}
           </div>
           
-          {/* Groupe de boutons de rafraîchissement */}
-          <div className="flex gap-1.5 justify-end">
-            <button
-              onClick={async () => {
-                // Vérifier d'abord s'il y a des changements avant de recharger
-                const result = await checkForChanges();
-                if (result.hasChanges) {
-                  if (result.changedClients && result.changedClients.length > 0) {
-                    console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
-                    // Mettre à jour seulement les clients modifiés
-                    updateMapWithChangedClients(result.changedClients);
-                    // Mettre à jour le timestamp du cache
-                    localStorage.setItem('clientsMapLastUpdate', new Date().toISOString());
-                  } else {
-                    console.log('🔄 Changements détectés mais pas de clients avec coordonnées, rechargement complet...');
-                    localStorage.removeItem('clientsMapCache');
-                    localStorage.removeItem('clientsMapLastUpdate');
-                    hasCheckedChangesRef.current = false;
-                    fetchClients(true);
-                  }
-                } else {
-                  console.log('✅ Aucun changement détecté, pas de rechargement nécessaire');
-                  alert('Aucun changement détecté dans la base de données. La carte est déjà à jour.');
-                }
-              }}
-              className="px-2.5 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-lg text-xs font-medium transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
-            >
-              Actualiser
-            </button>
-            <button
-              onClick={() => {
-                // Forcer un rechargement complet depuis l'API
-                console.log('🔄 Rechargement complet depuis l\'API...');
-                
-                // Supprimer tout le cache
-                localStorage.removeItem('clientsMapCache');
-                localStorage.removeItem('clientsMapLastUpdate');
-                localStorage.removeItem('clientsMapMissing');
-                
-                // Réinitialiser les flags
-                hasCheckedChangesRef.current = false;
-                clientsHashRef.current = '';
-                
-                // Réinitialiser les états
-                setClients([]);
-                setSectorStats({});
-                setMissingClients([]);
-                setTotalWithCoordinates(0);
-                setError(null);
-                
-                // Retirer tous les marqueurs de la carte
-                if (mapRef.current) {
-                  markersRef.current.forEach(marker => {
-                    if (mapRef.current) {
-                      mapRef.current.removeLayer(marker);
+          {/* Barre d'actions - Boutons groupés logiquement */}
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+            {/* Groupe: Actions de localisation */}
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <button
+                onClick={getUserLocation}
+                className="px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
+                title="Afficher ma position"
+              >
+                <Navigation className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                <span className="hidden sm:inline text-[10px] sm:text-xs">Position</span>
+                <span className="hidden md:inline text-xs">Ma position</span>
+              </button>
+              <button
+                onClick={toggleLocationTracking}
+                className={`px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 border shadow-lg hover:-translate-y-0.5 backdrop-blur-sm ${
+                  isTrackingLocation
+                    ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 hover:from-emerald-500/30 hover:to-cyan-500/30 text-emerald-200 border-emerald-400/40 shadow-emerald-500/20 hover:shadow-emerald-500/40'
+                    : 'bg-gradient-to-r from-gray-700/20 to-gray-600/20 hover:from-gray-700/30 hover:to-gray-600/30 text-gray-300 border-gray-500/40 shadow-gray-500/10 hover:shadow-gray-500/20'
+                }`}
+                title={isTrackingLocation ? 'Arrêter le suivi' : 'Suivre ma position en temps réel'}
+              >
+                <Navigation2 className={`h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 ${isTrackingLocation ? 'drop-shadow-[0_0_4px_rgba(16,185,129,0.8)]' : ''}`} />
+                <span className="hidden sm:inline text-[10px] sm:text-xs">Suivi actif</span>
+                <span className="hidden md:inline text-xs">Actif</span>
+              </button>
+            </div>
+            
+            {/* Groupe: Actions de rafraîchissement */}
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <button
+                onClick={async () => {
+                  // Vérifier d'abord s'il y a des changements avant de recharger
+                  const result = await checkForChanges();
+                  if (result.hasChanges) {
+                    if (result.changedClients && result.changedClients.length > 0) {
+                      console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
+                      // Mettre à jour seulement les clients modifiés
+                      updateMapWithChangedClients(result.changedClients);
+                      // Mettre à jour le timestamp du cache
+                      localStorage.setItem('clientsMapLastUpdate', new Date().toISOString());
+                    } else {
+                      console.log('🔄 Changements détectés mais pas de clients avec coordonnées, rechargement complet...');
+                      localStorage.removeItem('clientsMapCache');
+                      localStorage.removeItem('clientsMapLastUpdate');
+                      hasCheckedChangesRef.current = false;
+                      fetchClients(true);
                     }
-                    marker.remove();
-                  });
-                  markersRef.current = [];
-                }
-                
-                // Recharger depuis l'API
-                fetchClients(true);
-              }}
-              className="p-1.5 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 text-rose-200 rounded-lg transition-all duration-200 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
-              title="Recharger complètement depuis l'API (supprime le cache)"
-            >
-              <Loader2 className="h-4 w-4 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]" />
-            </button>
+                  } else {
+                    console.log('✅ Aucun changement détecté, pas de rechargement nécessaire');
+                    alert('Aucun changement détecté dans la base de données. La carte est déjà à jour.');
+                  }
+                }}
+                className="px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
+                title="Actualiser"
+              >
+                <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
+                <span className="hidden sm:inline text-[10px] sm:text-xs md:text-sm">Actualiser</span>
+              </button>
+              <button
+                onClick={() => {
+                  // Forcer un rechargement complet depuis l'API
+                  console.log('🔄 Rechargement complet depuis l\'API...');
+                  
+                  // Supprimer tout le cache
+                  localStorage.removeItem('clientsMapCache');
+                  localStorage.removeItem('clientsMapLastUpdate');
+                  localStorage.removeItem('clientsMapMissing');
+                  
+                  // Réinitialiser les flags
+                  hasCheckedChangesRef.current = false;
+                  clientsHashRef.current = '';
+                  
+                  // Réinitialiser les états
+                  setClients([]);
+                  setSectorStats({});
+                  setMissingClients([]);
+                  setTotalWithCoordinates(0);
+                  setError(null);
+                  
+                  // Retirer tous les marqueurs de la carte
+                  if (mapRef.current) {
+                    markersRef.current.forEach(marker => {
+                      if (mapRef.current) {
+                        mapRef.current.removeLayer(marker);
+                      }
+                      marker.remove();
+                    });
+                    markersRef.current = [];
+                  }
+                  
+                  // Recharger depuis l'API
+                  fetchClients(true);
+                }}
+                className="px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 text-rose-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
+                title="Recharger complètement depuis l'API (supprime le cache)"
+              >
+                <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]" />
+                <span className="hidden sm:inline text-[10px] sm:text-xs md:text-sm">Recharger</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Statistiques par secteur */}
-        <div className="mb-3 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-3 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-1.5 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-sm shadow-indigo-500/30 backdrop-blur-sm">
-              <Users className="h-4 w-4 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+        {/* Statistiques par secteur - Compact sur mobile */}
+        <div className="mb-1 sm:mb-2 md:mb-3 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 md:p-3 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 md:mb-3">
+            <div className="p-0.5 sm:p-1 md:p-1.5 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-sm shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
+              <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
             </div>
-            <h2 className="text-sm font-semibold bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)]">
+            <h2 className="text-[10px] sm:text-xs md:text-sm font-semibold bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)]">
               Répartition par Secteur
             </h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-2.5">
             {sortedSectors.map(([sector, count]) => {
               const color = getSectorColor(sector);
               return (
@@ -1456,17 +1509,17 @@ const ClientsMap: React.FC = () => {
                     boxShadow: `0 0 10px ${color}15`
                   }}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1 sm:gap-1.5 md:gap-2">
+                    <div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 flex-1 min-w-0">
                       <div
-                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        className="w-1 h-1 sm:w-1.5 sm:h-1.5 md:w-2 md:h-2 rounded-full flex-shrink-0"
                         style={{ 
                           backgroundColor: color,
                           boxShadow: `0 0 8px ${color}, 0 0 16px ${color}60`
                         }}
                       ></div>
                       <div 
-                        className="text-xs font-medium truncate"
+                        className="text-[9px] sm:text-[10px] md:text-xs font-medium truncate"
                         style={{ 
                           color: color + 'FF',
                           textShadow: `0 0 4px ${color}80`
@@ -1476,8 +1529,8 @@ const ClientsMap: React.FC = () => {
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <div className="text-gray-100 font-bold text-base leading-none drop-shadow-[0_0_4px_rgba(139,92,246,0.3)]">{count}</div>
-                      <div className="text-gray-400 text-[9px] mt-0.5 leading-none">clients</div>
+                      <div className="text-gray-100 font-bold text-xs sm:text-sm md:text-base leading-none drop-shadow-[0_0_4px_rgba(139,92,246,0.3)]">{count}</div>
+                      <div className="text-gray-400 text-[7px] sm:text-[8px] md:text-[9px] mt-0.5 leading-none">clients</div>
                     </div>
                   </div>
                   {/* Effet de brillance au survol */}
@@ -1535,16 +1588,16 @@ const ClientsMap: React.FC = () => {
         {/* Carte */}
         <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg border border-indigo-500/20 overflow-hidden shadow-lg shadow-indigo-500/5">
           {loading || mapLoading ? (
-            <div className="h-[500px] flex items-center justify-center">
+            <div className="h-[500px] sm:h-[550px] md:h-[600px] lg:h-[700px] flex items-center justify-center">
               <div className="text-center">
-                <Loader2 className="h-6 w-6 text-cyan-400 animate-spin mx-auto mb-2 drop-shadow-[0_0_8px_rgba(34,211,238,1)]" />
-                <p className="text-cyan-300 text-sm drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]">
+                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 animate-spin mx-auto mb-2 drop-shadow-[0_0_8px_rgba(34,211,238,1)]" />
+                <p className="text-cyan-300 text-xs sm:text-sm drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]">
                   {loading ? 'Chargement des données...' : 'Chargement de la carte...'}
                 </p>
               </div>
             </div>
           ) : error ? (
-            <div className="h-[500px] flex items-center justify-center">
+            <div className="h-[500px] sm:h-[550px] md:h-[600px] lg:h-[700px] flex items-center justify-center">
               <div className="text-center">
                 <p className="text-rose-400 mb-2 font-semibold text-sm drop-shadow-[0_0_6px_rgba(244,63,94,0.8)]">Erreur</p>
                 <p className="text-rose-300 text-sm drop-shadow-[0_0_3px_rgba(244,63,94,0.5)]">{error}</p>
@@ -1553,22 +1606,22 @@ const ClientsMap: React.FC = () => {
           ) : (
             <div
               ref={mapContainerRef}
-              className="h-[500px] w-full rounded-lg"
+              className="h-[500px] sm:h-[550px] md:h-[600px] lg:h-[700px] w-full rounded-lg"
               style={{ zIndex: 1 }}
             />
           )}
         </div>
 
-        {/* Section des clients sans coordonnées */}
+        {/* Section des clients sans coordonnées - Compact sur mobile */}
         {clientsWithoutCoordinates.length > 0 && (
-          <div className="mt-3 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg border border-cyan-500/20 overflow-hidden shadow-lg shadow-cyan-500/5">
-            <div className="p-2.5">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-cyan-400 font-semibold text-xs drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]">
+          <div className="mt-1 sm:mt-2 md:mt-3 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg border border-cyan-500/20 overflow-hidden shadow-lg shadow-cyan-500/5">
+            <div className="p-1.5 sm:p-2 md:p-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 mb-1 sm:mb-1.5">
+                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                  <span className="text-cyan-400 font-semibold text-[10px] sm:text-xs drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]">
                     ⚠️ {clientsWithoutCoordinates.length} client(s) sans coordonnées GPS
                   </span>
-                  <span className="text-gray-400 text-xs">
+                  <span className="text-gray-400 text-[9px] sm:text-xs">
                     (ne peuvent pas être affichés)
                   </span>
                 </div>

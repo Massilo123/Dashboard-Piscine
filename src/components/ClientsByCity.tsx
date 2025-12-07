@@ -975,39 +975,41 @@ const ClientsByCity: React.FC = () => {
     return (
       <div className="space-y-6">
         {/* Barre de progression */}
-        <div className="bg-gradient-to-r from-indigo-900/30 to-purple-900/30 rounded-lg p-6 border border-indigo-500/20">
+        <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg p-6 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white">Traitement en cours...</h2>
+            <h2 className="text-xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
+              Traitement en cours...
+            </h2>
             <div className="text-right">
-              <p className="text-indigo-300 font-semibold">{progress.percentage}%</p>
-              <p className="text-gray-400 text-sm">{progress.processed} / {progress.total} clients</p>
+              <p className="text-cyan-300 font-semibold drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]">{progress.percentage}%</p>
+              <p className="text-gray-300 text-sm">{progress.processed} / {progress.total} clients</p>
             </div>
           </div>
           
           {/* Barre de progression */}
-          <div className="w-full bg-gray-700 rounded-full h-3 mb-4 overflow-hidden">
+          <div className="w-full bg-gray-900/60 rounded-full h-3 mb-4 overflow-hidden border border-indigo-500/20">
             <div 
-              className="bg-gradient-to-r from-indigo-500 to-purple-500 h-3 rounded-full transition-all duration-300 ease-out"
+              className="bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 h-3 rounded-full transition-all duration-300 ease-out shadow-lg shadow-indigo-500/50"
               style={{ width: `${progress.percentage}%` }}
             ></div>
           </div>
 
           {/* Informations détaillées */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-gray-400">Client actuel</p>
-              <p className="text-white font-medium">{progress.currentClient || 'En attente...'}</p>
+            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg p-3 border border-cyan-500/20 shadow-lg shadow-cyan-500/5">
+              <p className="text-cyan-300 mb-1 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Client actuel</p>
+              <p className="text-white font-medium drop-shadow-[0_0_3px_rgba(139,92,246,0.6)]">{progress.currentClient || 'En attente...'}</p>
             </div>
-            <div>
-              <p className="text-gray-400">Ville / Quartier</p>
-              <p className="text-white font-medium">
+            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg p-3 border border-purple-500/20 shadow-lg shadow-purple-500/5">
+              <p className="text-purple-300 mb-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]">Ville / Quartier</p>
+              <p className="text-white font-medium drop-shadow-[0_0_3px_rgba(139,92,246,0.6)]">
                 {progress.city || 'En attente...'}
-                {progress.district && <span className="text-purple-300"> - {progress.district}</span>}
+                {progress.district && <span className="text-purple-300 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]"> - {progress.district}</span>}
               </p>
             </div>
-            <div>
-              <p className="text-gray-400">Temps</p>
-              <p className="text-white font-medium">
+            <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg p-3 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
+              <p className="text-indigo-300 mb-1 drop-shadow-[0_0_3px_rgba(139,92,246,0.6)]">Temps</p>
+              <p className="text-white font-medium drop-shadow-[0_0_3px_rgba(139,92,246,0.6)]">
                 Écoulé: {progress.elapsed} | Restant: ~{progress.estimated}
               </p>
             </div>
@@ -1017,9 +1019,10 @@ const ClientsByCity: React.FC = () => {
         {/* Affichage des données déjà reçues */}
         {Object.keys(clientsData).length > 0 && (
           <div className="space-y-4">
-            <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-lg p-4">
-              <p className="text-yellow-300 text-sm">
-                ⚡ {Object.keys(clientsData).length} ville{Object.keys(clientsData).length > 1 ? 's' : ''} déjà chargée{Object.keys(clientsData).length > 1 ? 's' : ''} - Les données s'affichent au fur et à mesure
+            <div className="bg-gradient-to-br from-amber-900/40 to-orange-900/40 backdrop-blur-sm border border-amber-500/50 rounded-lg p-4 shadow-lg shadow-amber-500/20">
+              <p className="text-amber-300 text-sm flex items-center gap-2 drop-shadow-[0_0_3px_rgba(245,158,11,0.6)]">
+                <span className="text-amber-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]">⚡</span>
+                {Object.keys(clientsData).length} ville{Object.keys(clientsData).length > 1 ? 's' : ''} déjà chargée{Object.keys(clientsData).length > 1 ? 's' : ''} - Les données s'affichent au fur et à mesure
               </p>
             </div>
             
@@ -1095,27 +1098,27 @@ const ClientsByCity: React.FC = () => {
                     return (
                       <div
                         key={sector}
-                        className="bg-gray-800/50 rounded-lg border border-gray-700/50 overflow-hidden hover:border-indigo-500/50 transition-colors"
+                        className="bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-indigo-500/20 overflow-hidden hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5 transition-all duration-200 shadow-md"
                       >
                         <button
                           onClick={() => toggleSector(sector)}
-                          className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-700/30 transition-colors"
+                          className="w-full px-6 py-4 flex items-center gap-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 transition-all duration-200"
                         >
-                          <div className="flex items-center gap-3">
-                            {isSectorExpanded ? (
-                              <ChevronDown className="h-6 w-6 text-indigo-400" />
-                            ) : (
-                              <ChevronRight className="h-6 w-6 text-indigo-400" />
-                            )}
-                            <Building className="h-6 w-6 text-indigo-400" />
-                            <span className="text-2xl font-bold text-white">{sector}</span>
-                            <span className="px-3 py-1 bg-indigo-600/20 text-indigo-300 rounded text-sm font-semibold">
-                              {sectorClientCount} client{sectorClientCount > 1 ? 's' : ''}
-                            </span>
-                            <span className="px-2 py-1 bg-purple-600/20 text-purple-300 rounded text-xs">
-                              {sectorCityCount} ville{sectorCityCount > 1 ? 's' : ''}
-                            </span>
-                          </div>
+                          {isSectorExpanded ? (
+                            <ChevronDown className="h-6 w-6 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                          ) : (
+                            <ChevronRight className="h-6 w-6 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                          )}
+                          <Building className="h-6 w-6 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                          <span className="text-2xl font-bold bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_6px_rgba(139,92,246,0.6)] flex-shrink-0">
+                            {sector}
+                          </span>
+                          <span className="px-3 py-1.5 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 backdrop-blur-sm text-indigo-200 rounded-lg text-sm font-semibold border border-indigo-400/40 shadow-lg shadow-indigo-500/20 drop-shadow-[0_0_3px_rgba(139,92,246,0.6)] flex-shrink-0">
+                            {sectorClientCount} client{sectorClientCount > 1 ? 's' : ''}
+                          </span>
+                          <span className="px-2.5 py-1.5 bg-gradient-to-br from-purple-500/30 to-pink-500/30 backdrop-blur-sm text-purple-200 rounded-lg text-xs border border-purple-400/40 shadow-lg shadow-purple-500/20 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0">
+                            {sectorCityCount} ville{sectorCityCount > 1 ? 's' : ''}
+                          </span>
                         </button>
 
                         {isSectorExpanded && (
@@ -1166,11 +1169,11 @@ const ClientsByCity: React.FC = () => {
                                             {clients.map((client) => (
                                               <div
                                                 key={client._id}
-                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                               >
-                                                <div className="flex items-start justify-between">
-                                                  <div className="flex-1">
-                                                    <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                                                  <div className="flex-1 min-w-0">
+                                                    <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                                       {client.givenName} {client.familyName}
                                                     </h4>
                                                     <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
@@ -1189,7 +1192,7 @@ const ClientsByCity: React.FC = () => {
                                                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                       target="_blank"
                                                       rel="noopener noreferrer"
-                                                      className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
+                                                      className="sm:ml-4 px-2 sm:px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20 w-full sm:w-auto text-center"
                                                     >
                                                       Voir carte
                                                     </a>
@@ -1221,11 +1224,11 @@ const ClientsByCity: React.FC = () => {
                                       {cities.clients.map((client) => (
                                         <div
                                           key={client._id}
-                                          className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                          className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                         >
-                                          <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                              <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                              <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                                 {client.givenName} {client.familyName}
                                               </h4>
                                               <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
@@ -1295,17 +1298,17 @@ const ClientsByCity: React.FC = () => {
                                       >
                                         <button
                                           onClick={() => toggleCity(cityKey)}
-                                          className="w-full px-4 py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
+                                          className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
                                         >
-                                          <div className="flex items-center gap-3">
+                                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                                             {isExpanded ? (
-                                              <ChevronDown className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                                              <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
                                             ) : (
-                                              <ChevronRight className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                                              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
                                             )}
-                                            <MapPin className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-                                            <span className="text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(139,92,246,0.3)]">{city}</span>
-                                            <span className="px-2 py-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-400/40 text-indigo-300 rounded text-sm backdrop-blur-sm shadow-sm shadow-indigo-500/10">
+                                            <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                                            <span className="text-base sm:text-lg md:text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(139,92,246,0.3)] truncate">{city}</span>
+                                            <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-400/40 text-indigo-300 rounded text-xs sm:text-sm backdrop-blur-sm shadow-sm shadow-indigo-500/10 flex-shrink-0 ml-auto">
                                               {clientCount} client{clientCount > 1 ? 's' : ''}
                                             </span>
                                           </div>
@@ -1333,17 +1336,17 @@ const ClientsByCity: React.FC = () => {
                                                       >
                                                         <button
                                                           onClick={() => toggleDistrict(sector, city, district)}
-                                                          className="w-full px-4 py-2 flex items-center justify-between hover:bg-gradient-to-r hover:from-purple-500/5 hover:to-pink-500/5 transition-all duration-200 rounded"
+                                                          className="w-full px-3 sm:px-4 py-2 flex items-center justify-between hover:bg-gradient-to-r hover:from-purple-500/5 hover:to-pink-500/5 transition-all duration-200 rounded"
                                                         >
-                                                          <div className="flex items-center gap-2">
+                                                          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
                                                             {isDistrictExpanded ? (
-                                                              <ChevronDown className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
+                                                              <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0" />
                                                             ) : (
-                                                              <ChevronRight className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
+                                                              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0" />
                                                             )}
-                                                            <Home className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
-                                                            <span className="font-medium text-gray-200 drop-shadow-[0_0_2px_rgba(168,85,247,0.2)]">{district}</span>
-                                                            <span className="px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
+                                                            <Home className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0" />
+                                                            <span className="text-sm sm:text-base font-medium text-gray-200 drop-shadow-[0_0_2px_rgba(168,85,247,0.2)] truncate">{district}</span>
+                                                            <span className="px-1.5 sm:px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10 flex-shrink-0 ml-auto">
                                                               {clients.length} client{clients.length > 1 ? 's' : ''}
                                                             </span>
                                                           </div>
@@ -1354,11 +1357,11 @@ const ClientsByCity: React.FC = () => {
                                                             {clients.map((client) => (
                                                               <div
                                                                 key={client._id}
-                                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                                               >
-                                                                <div className="flex items-start justify-between">
-                                                                  <div className="flex-1">
-                                                                    <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                                                                  <div className="flex-1 min-w-0">
+                                                                    <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                                                       {client.givenName} {client.familyName}
                                                                     </h4>
                                                                     <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
@@ -1397,11 +1400,11 @@ const ClientsByCity: React.FC = () => {
                                                   cityData.clients.map((client) => (
                                                   <div
                                                     key={client._id}
-                                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                                   >
-                                                    <div className="flex items-start justify-between">
-                                                      <div className="flex-1">
-                                                        <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                                                      <div className="flex-1 min-w-0">
+                                                        <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                                           {client.givenName} {client.familyName}
                                                         </h4>
                                                         <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
@@ -1658,18 +1661,18 @@ const ClientsByCity: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       {/* En-tête avec statistiques */}
-      <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-6 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] mb-2 flex items-center gap-2">
-              <div className="p-2 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/30 backdrop-blur-sm">
-                <Users className="h-6 w-6 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+      <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-3 sm:p-6 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-3 sm:mb-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] mb-1 sm:mb-2 flex items-center gap-2">
+              <div className="p-1.5 sm:p-2 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
+                <Users className="h-4 w-4 sm:h-6 sm:w-6 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
               </div>
-              Clients par Ville
+              <span className="truncate">Clients par Ville</span>
             </h1>
-            <p className="text-gray-300">
+            <p className="text-sm sm:text-base text-gray-300">
               {searchTerm ? (
                 <>
                   <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">{filteredClientCount}</span> client{filteredClientCount > 1 ? 's' : ''} trouvé{filteredClientCount > 1 ? 's' : ''} sur <span className="text-gray-300">{totalClients}</span> total
@@ -1683,36 +1686,36 @@ const ClientsByCity: React.FC = () => {
           </div>
           <button
             onClick={fetchClientsByCityStream}
-            className="px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-md transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex items-center gap-2"
+            className="px-3 py-2 sm:px-4 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-md transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex items-center justify-center gap-2 text-sm sm:text-base flex-shrink-0"
           >
-            <MapPin className="h-4 w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
+            <MapPin className="h-3 w-3 sm:h-4 sm:w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
             Actualiser
           </button>
         </div>
 
         {/* Barre de recherche */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+          <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Rechercher par nom, téléphone ou adresse..."
-            className="w-full pl-10 pr-10 py-3 bg-gray-900/60 border border-indigo-500/30 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/20 transition-all duration-200"
+            placeholder="Rechercher..."
+            className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2 sm:py-3 bg-gray-900/60 border border-indigo-500/30 rounded-lg text-sm sm:text-base text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/20 transition-all duration-200"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]"
+              className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] p-1"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
           )}
         </div>
       </div>
 
       {/* Liste des secteurs */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {filteredClientsBySector && typeof filteredClientsBySector === 'object' && Object.keys(filteredClientsBySector).length > 0 ? (
           Object.entries(filteredClientsBySector)
             .sort(([sectorA, citiesA], [sectorB, citiesB]) => {
@@ -1804,36 +1807,34 @@ const ClientsByCity: React.FC = () => {
                 {/* En-tête du secteur */}
                 <button
                   onClick={() => toggleSector(sector)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
+                  className="w-full px-3 sm:px-6 py-3 sm:py-4 flex items-center gap-2 sm:gap-3 hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
                 >
-                  <div className="flex items-center gap-3">
-                    {isSectorExpanded ? (
-                      <ChevronDown className={`h-6 w-6 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
-                    ) : (
-                      <ChevronRight className={`h-6 w-6 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
-                    )}
-                    <Building className={`h-6 w-6 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
-                    <span className="text-2xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)]">
-                      {sector}
+                  {isSectorExpanded ? (
+                    <ChevronDown className={`h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
+                  ) : (
+                    <ChevronRight className={`h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
+                  )}
+                  <Building className={`h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
+                  <span className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)] flex-shrink-0">
+                    {sector}
+                  </span>
+                  <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded text-xs sm:text-sm font-semibold border backdrop-blur-sm flex-shrink-0 ${
+                    sector === 'Non assignés' 
+                      ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-400/40 text-yellow-300 shadow-lg shadow-yellow-500/20' 
+                      : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-indigo-400/40 text-indigo-300 shadow-lg shadow-indigo-500/20'
+                  }`}>
+                    {sectorClientCount} client{sectorClientCount > 1 ? 's' : ''}
+                  </span>
+                  {sector !== 'Non assignés' && (
+                  <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10 hidden sm:inline flex-shrink-0">
+                    {sectorCityCount} ville{sectorCityCount > 1 ? 's' : ''}
+                  </span>
+                  )}
+                  {sector === 'Non assignés' && (
+                    <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/40 text-yellow-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-yellow-500/10 hidden sm:inline flex-shrink-0">
+                      {sectorCityCount} catégorie{sectorCityCount > 1 ? 's' : ''}
                     </span>
-                    <span className={`px-3 py-1 rounded text-sm font-semibold border backdrop-blur-sm ${
-                      sector === 'Non assignés' 
-                        ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-400/40 text-yellow-300 shadow-lg shadow-yellow-500/20' 
-                        : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-indigo-400/40 text-indigo-300 shadow-lg shadow-indigo-500/20'
-                    }`}>
-                      {sectorClientCount} client{sectorClientCount > 1 ? 's' : ''}
-                    </span>
-                    {sector !== 'Non assignés' && (
-                    <span className="px-2 py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
-                      {sectorCityCount} ville{sectorCityCount > 1 ? 's' : ''}
-                    </span>
-                    )}
-                    {sector === 'Non assignés' && (
-                      <span className="px-2 py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/40 text-yellow-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-yellow-500/10">
-                        {sectorCityCount} catégorie{sectorCityCount > 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </button>
 
                 {/* Contenu du secteur */}
@@ -1860,33 +1861,33 @@ const ClientsByCity: React.FC = () => {
                               >
                                 <button
                                   onClick={() => toggleCity(categoryKey)}
-                                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-yellow-500/5 hover:to-orange-500/5 transition-all duration-200"
+                                  className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-yellow-500/5 hover:to-orange-500/5 transition-all duration-200"
                                 >
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                                     {isExpanded ? (
-                                      <ChevronDown className="h-5 w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]" />
+                                      <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)] flex-shrink-0" />
                                     ) : (
-                                      <ChevronRight className="h-5 w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]" />
+                                      <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)] flex-shrink-0" />
                                     )}
-                                    <MapPin className="h-5 w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]" />
-                                    <span className="text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(245,158,11,0.3)]">{category}</span>
-                                    <span className="px-2 py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/40 text-yellow-300 rounded text-sm backdrop-blur-sm shadow-sm shadow-yellow-500/10">
+                                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)] flex-shrink-0" />
+                                    <span className="text-base sm:text-lg md:text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(245,158,11,0.3)] truncate">{category}</span>
+                                    <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/40 text-yellow-300 rounded text-xs sm:text-sm backdrop-blur-sm shadow-sm shadow-yellow-500/10 flex-shrink-0 ml-auto">
                                       {clientCount} client{clientCount > 1 ? 's' : ''}
                                     </span>
                                   </div>
                                 </button>
 
                                 {isExpanded && (
-                                  <div className="px-4 pb-3 space-y-2">
+                                  <div className="px-3 sm:px-4 pb-3 space-y-2">
                                     {cityData.clients && Array.isArray(cityData.clients) ? (
                                       cityData.clients.map((client) => (
                                       <div
                                         key={client._id}
-                                        className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-yellow-500/15 hover:border-yellow-500/30 transition-all duration-200 shadow-sm"
+                                        className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-yellow-500/15 hover:border-yellow-500/30 transition-all duration-200 shadow-sm"
                                       >
-                                        <div className="flex items-start justify-between">
-                                          <div className="flex-1">
-                                            <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                                          <div className="flex-1 min-w-0">
+                                            <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                               {client.givenName} {client.familyName}
                                             </h4>
                                             {client.addressLine1 && (
@@ -1907,14 +1908,14 @@ const ClientsByCity: React.FC = () => {
                                               </p>
                                             )}
                                           </div>
-                                          <div className="flex gap-2 ml-4">
+                                          <div className="flex flex-col sm:flex-row gap-2 sm:ml-4 w-full sm:w-auto">
                                             {category === 'Adresse ambiguë' && (
                                               <button
                                                 onClick={() => {
                                                   setEditingClient(client);
                                                   setCorrectedAddress(client.addressLine1 || '');
                                                 }}
-                                                className="px-3 py-1.5 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 border border-yellow-400/40 text-yellow-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-yellow-500/10 hover:shadow-yellow-500/20 flex items-center gap-1"
+                                                className="px-2 sm:px-3 py-1.5 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 border border-yellow-400/40 text-yellow-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-yellow-500/10 hover:shadow-yellow-500/20 flex items-center justify-center gap-1 w-full sm:w-auto"
                                               >
                                                 <Edit2 className="h-3 w-3 drop-shadow-[0_0_2px_rgba(245,158,11,0.6)]" />
                                                 Corriger
@@ -1925,7 +1926,7 @@ const ClientsByCity: React.FC = () => {
                                                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="px-3 py-1.5 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 border border-yellow-400/40 text-yellow-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-yellow-500/10 hover:shadow-yellow-500/20"
+                                                className="px-2 sm:px-3 py-1.5 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 border border-yellow-400/40 text-yellow-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-yellow-500/10 hover:shadow-yellow-500/20 w-full sm:w-auto text-center"
                                               >
                                                 Voir carte
                                               </a>
@@ -2011,7 +2012,7 @@ const ClientsByCity: React.FC = () => {
                                                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                   target="_blank"
                                                   rel="noopener noreferrer"
-                                                  className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
+                                                  className="sm:ml-4 px-2 sm:px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20 w-full sm:w-auto text-center"
                                                 >
                                                   Voir carte
                                                 </a>
