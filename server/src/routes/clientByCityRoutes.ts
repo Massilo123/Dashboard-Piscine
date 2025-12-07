@@ -286,13 +286,13 @@ const RIVE_NORD_CITIES = [
   'ste-thérèse', 'sainte-thérèse', 'oka', 'prévost', 'prevost',
   'ste-marthe-sur-le-lac', 'sainte-marthe-sur-le-lac', 'lanoraie',
   'saint-sauveur', 'st-sauveur', 'boisbriand', 'bois-briand',
-  'brownsburg-chatham', 'brownsburg chatham', 'brownsburg'
+  'brownsburg-chatham', 'brownsburg chatham', 'brownsburg', 'charlemagne', 'lavaltrie'
 ];
 
 const RIVE_SUD_CITIES = [
   'longueuil', 'brossard', 'candiac', 'st-constant', 'saint-constant',
   'châteauguay', 'chateauguay', 'mercier', 'vaudreuil-dorion', 'vaudreuil dorion',
-  'sorel-tracy', 'sorel tracy', 'charlemagne',
+  'sorel-tracy', 'sorel tracy',
   'saint-rémi', 'st-rémi', 'saint remi', 'st remi'
 ];
 

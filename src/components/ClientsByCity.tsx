@@ -130,7 +130,7 @@ const ClientsByCity: React.FC = () => {
       return 'Laval';
     }
     // Rive Nord
-    const riveNordCities = ['blainville', 'boisbriand', 'rosemère', 'sainte-thérèse', 'terrebonne', 'mascouche', 'lachenaie', 'lorraine', 'sainte-anne-des-plaines', 'saint-jérôme', 'saint-eustache', 'deux-montagnes', 'saint-joseph-du-lac', 'pointe-calumet', 'oka', 'mirabel'];
+    const riveNordCities = ['blainville', 'boisbriand', 'rosemère', 'sainte-thérèse', 'terrebonne', 'mascouche', 'lachenaie', 'lorraine', 'sainte-anne-des-plaines', 'saint-jérôme', 'saint-eustache', 'deux-montagnes', 'saint-joseph-du-lac', 'pointe-calumet', 'oka', 'mirabel', 'charlemagne', 'lavaltrie'];
     if (riveNordCities.some(c => cityLower.includes(c))) {
       return 'Rive Nord';
     }
@@ -162,8 +162,8 @@ const ClientsByCity: React.FC = () => {
         });
         
         if (result.hasChanges && result.clientsForByCity && result.clientsForByCity.length > 0) {
-          // Convertir les clients formatés
-          const changedClients: Client[] = result.clientsForByCity.map((c: {
+          // Convertir les clients formatés en gardant le secteur retourné par le serveur
+          const changedClients = result.clientsForByCity.map((c: {
             _id: string;
             givenName: string;
             familyName: string;
@@ -181,7 +181,8 @@ const ClientsByCity: React.FC = () => {
             addressLine1: c.addressLine1,
             coordinates: c.coordinates,
             city: c.city,
-            district: c.district
+            district: c.district,
+            sector: c.sector // Garder le secteur retourné par le serveur
           }));
           console.log(`✅ ${changedClients.length} client(s) formaté(s) pour la mise à jour incrémentale`);
           return { hasChanges: true, changedClients };
@@ -202,7 +203,7 @@ const ClientsByCity: React.FC = () => {
   };
 
   // Fonction pour mettre à jour seulement les clients modifiés
-  const updateClientsIncremental = useCallback((changedClients: Client[]) => {
+  const updateClientsIncremental = useCallback((changedClients: Array<Client & { sector?: string }>) => {
     if (changedClients.length === 0) return;
 
     console.log(`🔄 Mise à jour incrémentale de ${changedClients.length} client(s)`);
@@ -251,7 +252,10 @@ const ClientsByCity: React.FC = () => {
 
       // Ajouter les clients modifiés à leur nouvel emplacement
       changedClients.forEach(changedClient => {
-        const sector = getSector(changedClient.city);
+        // Utiliser le secteur retourné par le serveur, sinon le calculer
+        const sector = changedClient.sector || getSector(changedClient.city);
+        
+        console.log(`📍 Client ${changedClient.givenName} ${changedClient.familyName} → Secteur: ${sector} (ville: ${changedClient.city})`);
         
         // Initialiser le secteur s'il n'existe pas
         if (!updated[sector]) {
@@ -353,13 +357,14 @@ const ClientsByCity: React.FC = () => {
       });
       setTotalClients(total);
       
+      // Sauvegarder les données mises à jour dans le cache
+      const updateTimestamp = new Date().toISOString();
+      saveToCache(updated, flattened, total, updateTimestamp);
+      
+      console.log('✅ Mise à jour incrémentale terminée et sauvegardée dans le cache');
+      
       return updated;
     });
-
-    // Mettre à jour le timestamp du cache
-    localStorage.setItem('clientsByCityLastUpdate', new Date().toISOString());
-    
-    console.log('✅ Mise à jour incrémentale terminée');
   }, []);
 
   useEffect(() => {
@@ -817,6 +822,45 @@ const ClientsByCity: React.FC = () => {
            address.includes(searchLower);
   };
 
+  // Fonction pour filtrer les clients selon le terme de recherche (par ville)
+  const filterClientsData = (data: ClientsByCityData, search: string): ClientsByCityData => {
+    if (!search.trim()) return data;
+    
+    const filtered: ClientsByCityData = {};
+    
+    Object.entries(data).forEach(([city, cityData]) => {
+      const filteredCityData: CityData = {
+        clients: [],
+        districts: {}
+      };
+      
+      // Filtrer les districts
+      if (cityData.districts && Object.keys(cityData.districts).length > 0) {
+        Object.entries(cityData.districts).forEach(([district, clients]) => {
+          const filteredClients = clients.filter(client => clientMatchesSearch(client, search));
+          if (filteredClients.length > 0) {
+            filteredCityData.districts![district] = filteredClients;
+          }
+        });
+      }
+      
+      // Filtrer les clients directs
+      if (cityData.clients && cityData.clients.length > 0) {
+        filteredCityData.clients = cityData.clients.filter(client => clientMatchesSearch(client, search));
+      }
+      
+      // Ne garder la ville que si elle a des clients après filtrage
+      const hasClients = (filteredCityData.districts && Object.keys(filteredCityData.districts).length > 0) ||
+                        (filteredCityData.clients && filteredCityData.clients.length > 0);
+      
+      if (hasClients) {
+        filtered[city] = filteredCityData;
+      }
+    });
+    
+    return filtered;
+  };
+
   // Fonction pour filtrer les clients selon le terme de recherche (par secteur)
   const filterClientsBySector = (data: ClientsBySectorData, search: string): ClientsBySectorData => {
     if (!search.trim()) return data;
@@ -1122,20 +1166,20 @@ const ClientsByCity: React.FC = () => {
                                             {clients.map((client) => (
                                               <div
                                                 key={client._id}
-                                                className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                               >
                                                 <div className="flex items-start justify-between">
                                                   <div className="flex-1">
-                                                    <h4 className="font-medium text-white mb-1">
+                                                    <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                                       {client.givenName} {client.familyName}
                                                     </h4>
                                                     <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                      <MapPin className="h-3 w-3" />
+                                                      <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                       {client.addressLine1}
                                                     </p>
                                                     {client.phoneNumber && (
                                                       <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                        <Phone className="h-3 w-3" />
+                                                        <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                         {client.phoneNumber}
                                                       </p>
                                                     )}
@@ -1145,7 +1189,7 @@ const ClientsByCity: React.FC = () => {
                                                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                       target="_blank"
                                                       rel="noopener noreferrer"
-                                                      className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                                      className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
                                                     >
                                                       Voir carte
                                                     </a>
@@ -1177,15 +1221,15 @@ const ClientsByCity: React.FC = () => {
                                       {cities.clients.map((client) => (
                                         <div
                                           key={client._id}
-                                          className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                                          className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                         >
                                           <div className="flex items-start justify-between">
                                             <div className="flex-1">
-                                              <h4 className="font-medium text-white mb-1">
+                                              <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                                 {client.givenName} {client.familyName}
                                               </h4>
                                               <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                <MapPin className="h-3 w-3" />
+                                                <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                 {client.addressLine1}
                                               </p>
                                               {client.phoneNumber && (
@@ -1247,21 +1291,21 @@ const ClientsByCity: React.FC = () => {
                                     return (
                                       <div
                                         key={city}
-                                        className="bg-gray-800/30 rounded-lg border border-gray-700/30 overflow-hidden hover:border-indigo-500/30 transition-colors"
+                                        className="bg-gradient-to-br from-gray-900/80 to-gray-800/70 backdrop-blur-sm rounded-lg border border-indigo-500/20 overflow-hidden hover:border-indigo-500/40 transition-all duration-200 shadow-sm shadow-indigo-500/5"
                                       >
                                         <button
                                           onClick={() => toggleCity(cityKey)}
-                                          className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-700/20 transition-colors"
+                                          className="w-full px-4 py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
                                         >
                                           <div className="flex items-center gap-3">
                                             {isExpanded ? (
-                                              <ChevronDown className="h-5 w-5 text-indigo-400" />
+                                              <ChevronDown className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                                             ) : (
-                                              <ChevronRight className="h-5 w-5 text-indigo-400" />
+                                              <ChevronRight className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                                             )}
-                                            <MapPin className="h-5 w-5 text-indigo-400" />
-                                            <span className="text-xl font-semibold text-white">{city}</span>
-                                            <span className="px-2 py-1 bg-indigo-600/20 text-indigo-300 rounded text-sm">
+                                            <MapPin className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                                            <span className="text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(139,92,246,0.3)]">{city}</span>
+                                            <span className="px-2 py-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-400/40 text-indigo-300 rounded text-sm backdrop-blur-sm shadow-sm shadow-indigo-500/10">
                                               {clientCount} client{clientCount > 1 ? 's' : ''}
                                             </span>
                                           </div>
@@ -1285,21 +1329,21 @@ const ClientsByCity: React.FC = () => {
                                                     return (
                                                       <div
                                                         key={district}
-                                                        className="bg-gray-800/20 rounded border border-gray-700/20"
+                                                        className="bg-gradient-to-br from-gray-900/70 to-gray-800/60 backdrop-blur-sm rounded border border-purple-500/20 hover:border-purple-500/40 transition-all duration-200 shadow-sm"
                                                       >
                                                         <button
                                                           onClick={() => toggleDistrict(sector, city, district)}
-                                                          className="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-700/20 transition-colors rounded"
+                                                          className="w-full px-4 py-2 flex items-center justify-between hover:bg-gradient-to-r hover:from-purple-500/5 hover:to-pink-500/5 transition-all duration-200 rounded"
                                                         >
                                                           <div className="flex items-center gap-2">
                                                             {isDistrictExpanded ? (
-                                                              <ChevronDown className="h-4 w-4 text-indigo-400" />
+                                                              <ChevronDown className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
                                                             ) : (
-                                                              <ChevronRight className="h-4 w-4 text-indigo-400" />
+                                                              <ChevronRight className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
                                                             )}
-                                                            <Home className="h-4 w-4 text-indigo-400" />
-                                                            <span className="font-medium text-gray-300">{district}</span>
-                                                            <span className="px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded text-xs">
+                                                            <Home className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
+                                                            <span className="font-medium text-gray-200 drop-shadow-[0_0_2px_rgba(168,85,247,0.2)]">{district}</span>
+                                                            <span className="px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
                                                               {clients.length} client{clients.length > 1 ? 's' : ''}
                                                             </span>
                                                           </div>
@@ -1310,20 +1354,20 @@ const ClientsByCity: React.FC = () => {
                                                             {clients.map((client) => (
                                                               <div
                                                                 key={client._id}
-                                                                className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                                               >
                                                                 <div className="flex items-start justify-between">
                                                                   <div className="flex-1">
-                                                                    <h4 className="font-medium text-white mb-1">
+                                                                    <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                                                       {client.givenName} {client.familyName}
                                                                     </h4>
                                                                     <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                                      <MapPin className="h-3 w-3" />
+                                                                      <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                                       {client.addressLine1}
                                                                     </p>
                                                                     {client.phoneNumber && (
                                                                       <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                                        <Phone className="h-3 w-3" />
+                                                                        <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                                         {client.phoneNumber}
                                                                       </p>
                                                                     )}
@@ -1333,7 +1377,7 @@ const ClientsByCity: React.FC = () => {
                                                                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                                       target="_blank"
                                                                       rel="noopener noreferrer"
-                                                                      className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                                                      className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
                                                                     >
                                                                       Voir carte
                                                                     </a>
@@ -1353,20 +1397,20 @@ const ClientsByCity: React.FC = () => {
                                                   cityData.clients.map((client) => (
                                                   <div
                                                     key={client._id}
-                                                    className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                                   >
                                                     <div className="flex items-start justify-between">
                                                       <div className="flex-1">
-                                                        <h4 className="font-medium text-white mb-1">
+                                                        <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                                           {client.givenName} {client.familyName}
                                                         </h4>
                                                         <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                          <MapPin className="h-3 w-3" />
+                                                          <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                           {client.addressLine1}
                                                         </p>
                                                         {client.phoneNumber && (
                                                           <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                            <Phone className="h-3 w-3" />
+                                                            <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                             {client.phoneNumber}
                                                           </p>
                                                         )}
@@ -1376,7 +1420,7 @@ const ClientsByCity: React.FC = () => {
                                                           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                           target="_blank"
                                                           rel="noopener noreferrer"
-                                                          className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                                          className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
                                                         >
                                                           Voir carte
                                                         </a>
@@ -1415,45 +1459,46 @@ const ClientsByCity: React.FC = () => {
                 if (isAMontrealOrLaval && isBMontrealOrLaval) {
                   if (aLower === 'montréal') return -1;
                   if (bLower === 'montréal') return 1;
-                  const countA = getClientCount(cityDataA);
-                  const countB = getClientCount(cityDataB);
+                  const countA = getClientCount(cityDataA as CityData);
+                  const countB = getClientCount(cityDataB as CityData);
                   return countB - countA;
                 }
                 if (isAMontrealOrLaval) return -1;
                 if (isBMontrealOrLaval) return 1;
-                const countA = getClientCount(cityDataA);
-                const countB = getClientCount(cityDataB);
+                const countA = getClientCount(cityDataA as CityData);
+                const countB = getClientCount(cityDataB as CityData);
                 return countB - countA;
               })
               .map(([city, cityData]) => {
+              const typedCityData = cityData as CityData;
               const isExpanded = expandedCities.has(city);
-              const clientCount = getClientCount(cityData);
-              const hasDistricts = cityData.districts && Object.keys(cityData.districts).length > 0;
+              const clientCount = getClientCount(typedCityData);
+              const hasDistricts = typedCityData.districts && Object.keys(typedCityData.districts).length > 0;
               const isMontrealOrLaval = city.toLowerCase() === 'montréal' || city.toLowerCase() === 'laval';
 
               return (
                 <div
                   key={city}
-                  className="bg-gray-800/50 rounded-lg border border-gray-700/50 overflow-hidden hover:border-indigo-500/50 transition-colors"
+                  className="bg-gradient-to-br from-gray-900/80 to-gray-800/70 backdrop-blur-sm rounded-lg border border-indigo-500/20 overflow-hidden hover:border-indigo-500/40 transition-all duration-200 shadow-sm shadow-indigo-500/5"
                 >
                   <button
                     onClick={() => toggleCity(city)}
-                    className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-700/30 transition-colors"
+                    className="w-full px-6 py-4 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
                   >
                     <div className="flex items-center gap-3">
                       {isExpanded ? (
-                        <ChevronDown className="h-5 w-5 text-indigo-400" />
+                        <ChevronDown className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                       ) : (
-                        <ChevronRight className="h-5 w-5 text-indigo-400" />
+                        <ChevronRight className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                       )}
-                      <MapPin className="h-5 w-5 text-indigo-400" />
-                      <span className="text-xl font-semibold text-white">{city}</span>
-                      <span className="px-2 py-1 bg-indigo-600/20 text-indigo-300 rounded text-sm">
+                      <MapPin className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                      <span className="text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(139,92,246,0.3)]">{city}</span>
+                      <span className="px-2 py-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-400/40 text-indigo-300 rounded text-sm backdrop-blur-sm shadow-sm shadow-indigo-500/10">
                         {clientCount} client{clientCount > 1 ? 's' : ''}
                       </span>
                       {isMontrealOrLaval && hasDistricts && (
-                        <span className="px-2 py-1 bg-purple-600/20 text-purple-300 rounded text-xs">
-                          {Object.keys(cityData.districts!).length} quartier{Object.keys(cityData.districts!).length > 1 ? 's' : ''}
+                        <span className="px-2 py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
+                          {Object.keys(typedCityData.districts!).length} quartier{Object.keys(typedCityData.districts!).length > 1 ? 's' : ''}
                         </span>
                       )}
                     </div>
@@ -1463,54 +1508,55 @@ const ClientsByCity: React.FC = () => {
                     <div className="px-6 pb-4 space-y-4">
                       {hasDistricts && isMontrealOrLaval ? (
                         <div className="space-y-3">
-                          {Object.entries(cityData.districts!)
-                            .sort(([, clientsA], [, clientsB]) => clientsB.length - clientsA.length)
+                          {Object.entries(typedCityData.districts!)
+                            .sort(([, clientsA], [, clientsB]) => (clientsB as Client[]).length - (clientsA as Client[]).length)
                             .map(([district, clients]) => {
-                            const districtKey = `${sector}-${city}-${district}`;
+                            const districtKey = `${city}-${district}`;
                             const isDistrictExpanded = expandedDistricts.has(districtKey);
+                            const typedClients = clients as Client[];
 
                             return (
                               <div
                                 key={district}
-                                className="bg-gray-900/50 rounded-lg border border-gray-700/30 overflow-hidden"
+                                className="bg-gradient-to-br from-gray-900/70 to-gray-800/60 backdrop-blur-sm rounded-lg border border-purple-500/20 overflow-hidden hover:border-purple-500/40 transition-all duration-200 shadow-sm"
                               >
                                 <button
-                                  onClick={() => toggleDistrict(sector, city, district)}
-                                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-800/50 transition-colors"
+                                  onClick={() => toggleDistrict('', city, district)}
+                                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-purple-500/5 hover:to-pink-500/5 transition-all duration-200"
                                 >
                                   <div className="flex items-center gap-2">
                                     {isDistrictExpanded ? (
-                                      <ChevronDown className="h-4 w-4 text-purple-400" />
+                                      <ChevronDown className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
                                     ) : (
-                                      <ChevronRight className="h-4 w-4 text-purple-400" />
+                                      <ChevronRight className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
                                     )}
-                                    <Home className="h-4 w-4 text-purple-400" />
-                                    <span className="font-medium text-gray-200 capitalize">{district}</span>
-                                    <span className="px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded text-xs">
-                                      {clients.length} client{clients.length > 1 ? 's' : ''}
+                                    <Home className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
+                                    <span className="font-medium text-gray-200 capitalize drop-shadow-[0_0_2px_rgba(168,85,247,0.2)]">{district}</span>
+                                    <span className="px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
+                                      {typedClients.length} client{typedClients.length > 1 ? 's' : ''}
                                     </span>
                                   </div>
                                 </button>
 
                                 {isDistrictExpanded && (
                                   <div className="px-4 pb-3 space-y-2">
-                                    {clients.map((client) => (
+                                    {typedClients.map((client) => (
                                       <div
                                         key={client._id}
-                                        className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                                        className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                       >
                                         <div className="flex items-start justify-between">
                                           <div className="flex-1">
-                                            <h4 className="font-medium text-white mb-1">
+                                            <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                               {client.givenName} {client.familyName}
                                             </h4>
                                             <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                              <MapPin className="h-3 w-3" />
+                                              <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                               {client.addressLine1}
                                             </p>
                                             {client.phoneNumber && (
                                               <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                <Phone className="h-3 w-3" />
+                                                <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                 {client.phoneNumber}
                                               </p>
                                             )}
@@ -1520,7 +1566,7 @@ const ClientsByCity: React.FC = () => {
                                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                               target="_blank"
                                               rel="noopener noreferrer"
-                                              className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                              className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
                                             >
                                               Voir carte
                                             </a>
@@ -1536,24 +1582,24 @@ const ClientsByCity: React.FC = () => {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          {cityData.clients && Array.isArray(cityData.clients) ? (
-                            cityData.clients.map((client) => (
+                          {typedCityData.clients && Array.isArray(typedCityData.clients) ? (
+                            typedCityData.clients.map((client) => (
                             <div
                               key={client._id}
-                              className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                              className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-white mb-1">
+                                  <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                     {client.givenName} {client.familyName}
                                   </h4>
                                   <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                    <MapPin className="h-3 w-3" />
+                                    <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                     {client.addressLine1}
                                   </p>
                                   {client.phoneNumber && (
                                     <p className="text-sm text-gray-400 flex items-center gap-1">
-                                      <Phone className="h-3 w-3" />
+                                      <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                       {client.phoneNumber}
                                     </p>
                                   )}
@@ -1563,7 +1609,7 @@ const ClientsByCity: React.FC = () => {
                                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                    className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
                                   >
                                     Voir carte
                                   </a>
@@ -1588,8 +1634,8 @@ const ClientsByCity: React.FC = () => {
         {Object.keys(clientsData).length === 0 && (
           <div className="flex items-center justify-center min-h-[200px]">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mb-4"></div>
-              <p className="text-gray-400">Chargement des clients...</p>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mb-4 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
+              <p className="text-cyan-300 drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]">Chargement des clients...</p>
             </div>
           </div>
         )}
@@ -1599,11 +1645,11 @@ const ClientsByCity: React.FC = () => {
 
   if (error) {
     return (
-      <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 text-center">
-        <p className="text-red-400 mb-4">{error}</p>
+      <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm border border-rose-500/30 rounded-lg p-6 text-center shadow-lg shadow-rose-500/10">
+        <p className="text-rose-400 mb-4 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] font-semibold">{error}</p>
         <button
           onClick={fetchClientsByCityStream}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
+          className="px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-md transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
         >
           Réessayer
         </button>
@@ -1614,48 +1660,50 @@ const ClientsByCity: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* En-tête avec statistiques */}
-      <div className="bg-gradient-to-r from-indigo-900/30 to-purple-900/30 rounded-lg p-6 border border-indigo-500/20">
+      <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-6 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-2">
-              <Users className="h-8 w-8 text-indigo-400" />
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] mb-2 flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/30 backdrop-blur-sm">
+                <Users className="h-6 w-6 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+              </div>
               Clients par Ville
             </h1>
-            <p className="text-gray-400">
+            <p className="text-gray-300">
               {searchTerm ? (
                 <>
-                  {filteredClientCount} client{filteredClientCount > 1 ? 's' : ''} trouvé{filteredClientCount > 1 ? 's' : ''} sur {totalClients} total
+                  <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">{filteredClientCount}</span> client{filteredClientCount > 1 ? 's' : ''} trouvé{filteredClientCount > 1 ? 's' : ''} sur <span className="text-gray-300">{totalClients}</span> total
                 </>
               ) : (
                 <>
-                  {totalClients} client{totalClients > 1 ? 's' : ''} réparti{totalClients > 1 ? 's' : ''} sur {Object.keys(clientsData).length} ville{Object.keys(clientsData).length > 1 ? 's' : ''}
+                  <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">{totalClients}</span> client{totalClients > 1 ? 's' : ''} réparti{totalClients > 1 ? 's' : ''} sur <span className="text-gray-300">{Object.keys(clientsData).length}</span> ville{Object.keys(clientsData).length > 1 ? 's' : ''}
                 </>
               )}
             </p>
           </div>
           <button
             onClick={fetchClientsByCityStream}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-md transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex items-center gap-2"
           >
-            <MapPin className="h-4 w-4" />
+            <MapPin className="h-4 w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
             Actualiser
           </button>
         </div>
 
         {/* Barre de recherche */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Rechercher par nom, téléphone ou adresse..."
-            className="w-full pl-10 pr-10 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full pl-10 pr-10 py-3 bg-gray-900/60 border border-indigo-500/30 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/20 transition-all duration-200"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]"
             >
               <X className="h-5 w-5" />
             </button>
@@ -1747,31 +1795,41 @@ const ClientsByCity: React.FC = () => {
             return (
               <div
                 key={sector}
-                className="bg-gray-800/50 rounded-lg border border-gray-700/50 overflow-hidden hover:border-indigo-500/50 transition-colors"
+                className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg border border-indigo-500/20 overflow-hidden hover:border-indigo-500/40 transition-all duration-200 shadow-lg shadow-indigo-500/5 hover:shadow-indigo-500/10"
+                style={{
+                  borderLeftColor: sector === 'Non assignés' ? '#F59E0B50' : '#8B5CF650',
+                  borderLeftWidth: '3px'
+                }}
               >
                 {/* En-tête du secteur */}
                 <button
                   onClick={() => toggleSector(sector)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-700/30 transition-colors"
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
                 >
                   <div className="flex items-center gap-3">
                     {isSectorExpanded ? (
-                      <ChevronDown className={`h-6 w-6 ${sector === 'Non assignés' ? 'text-yellow-400' : 'text-indigo-400'}`} />
+                      <ChevronDown className={`h-6 w-6 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
                     ) : (
-                      <ChevronRight className={`h-6 w-6 ${sector === 'Non assignés' ? 'text-yellow-400' : 'text-indigo-400'}`} />
+                      <ChevronRight className={`h-6 w-6 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
                     )}
-                    <Building className={`h-6 w-6 ${sector === 'Non assignés' ? 'text-yellow-400' : 'text-indigo-400'}`} />
-                    <span className="text-2xl font-bold text-white">{sector}</span>
-                    <span className={`px-3 py-1 rounded text-sm font-semibold ${sector === 'Non assignés' ? 'bg-yellow-600/20 text-yellow-300' : 'bg-indigo-600/20 text-indigo-300'}`}>
+                    <Building className={`h-6 w-6 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
+                    <span className="text-2xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)]">
+                      {sector}
+                    </span>
+                    <span className={`px-3 py-1 rounded text-sm font-semibold border backdrop-blur-sm ${
+                      sector === 'Non assignés' 
+                        ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-400/40 text-yellow-300 shadow-lg shadow-yellow-500/20' 
+                        : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-indigo-400/40 text-indigo-300 shadow-lg shadow-indigo-500/20'
+                    }`}>
                       {sectorClientCount} client{sectorClientCount > 1 ? 's' : ''}
                     </span>
                     {sector !== 'Non assignés' && (
-                    <span className="px-2 py-1 bg-purple-600/20 text-purple-300 rounded text-xs">
+                    <span className="px-2 py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
                       {sectorCityCount} ville{sectorCityCount > 1 ? 's' : ''}
                     </span>
                     )}
                     {sector === 'Non assignés' && (
-                      <span className="px-2 py-1 bg-yellow-600/20 text-yellow-300 rounded text-xs">
+                      <span className="px-2 py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/40 text-yellow-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-yellow-500/10">
                         {sectorCityCount} catégorie{sectorCityCount > 1 ? 's' : ''}
                       </span>
                     )}
@@ -1798,21 +1856,21 @@ const ClientsByCity: React.FC = () => {
                             return (
                               <div
                                 key={category}
-                                className="bg-gray-800/30 rounded-lg border border-gray-700/30 overflow-hidden hover:border-yellow-500/30 transition-colors"
+                                className="bg-gradient-to-br from-gray-900/80 to-gray-800/70 backdrop-blur-sm rounded-lg border border-yellow-500/20 overflow-hidden hover:border-yellow-500/40 transition-all duration-200 shadow-sm shadow-yellow-500/5"
                               >
                                 <button
                                   onClick={() => toggleCity(categoryKey)}
-                                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-700/20 transition-colors"
+                                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-yellow-500/5 hover:to-orange-500/5 transition-all duration-200"
                                 >
                                   <div className="flex items-center gap-3">
                                     {isExpanded ? (
-                                      <ChevronDown className="h-5 w-5 text-yellow-400" />
+                                      <ChevronDown className="h-5 w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]" />
                                     ) : (
-                                      <ChevronRight className="h-5 w-5 text-yellow-400" />
+                                      <ChevronRight className="h-5 w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]" />
                                     )}
-                                    <MapPin className="h-5 w-5 text-yellow-400" />
-                                    <span className="text-xl font-semibold text-white">{category}</span>
-                                    <span className="px-2 py-1 bg-yellow-600/20 text-yellow-300 rounded text-sm">
+                                    <MapPin className="h-5 w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]" />
+                                    <span className="text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(245,158,11,0.3)]">{category}</span>
+                                    <span className="px-2 py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/40 text-yellow-300 rounded text-sm backdrop-blur-sm shadow-sm shadow-yellow-500/10">
                                       {clientCount} client{clientCount > 1 ? 's' : ''}
                                     </span>
                                   </div>
@@ -1824,27 +1882,27 @@ const ClientsByCity: React.FC = () => {
                                       cityData.clients.map((client) => (
                                       <div
                                         key={client._id}
-                                        className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-yellow-500/30 transition-colors"
+                                        className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-yellow-500/15 hover:border-yellow-500/30 transition-all duration-200 shadow-sm"
                                       >
                                         <div className="flex items-start justify-between">
                                           <div className="flex-1">
-                                            <h4 className="font-medium text-white mb-1">
+                                            <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                               {client.givenName} {client.familyName}
                                             </h4>
                                             {client.addressLine1 && (
                                               <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                <MapPin className="h-3 w-3" />
+                                                <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                 {client.addressLine1}
                                               </p>
                                             )}
                                             {client.phoneNumber && (
                                               <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                <Phone className="h-3 w-3" />
+                                                <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                 {client.phoneNumber}
                                               </p>
                                             )}
                                             {client.district && (
-                                              <p className="text-sm text-yellow-400 mt-2">
+                                              <p className="text-sm text-yellow-400 mt-2 drop-shadow-[0_0_3px_rgba(245,158,11,0.6)]">
                                                 {client.district}
                                               </p>
                                             )}
@@ -1856,9 +1914,9 @@ const ClientsByCity: React.FC = () => {
                                                   setEditingClient(client);
                                                   setCorrectedAddress(client.addressLine1 || '');
                                                 }}
-                                                className="px-3 py-1.5 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-300 rounded text-xs transition-colors flex items-center gap-1"
+                                                className="px-3 py-1.5 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 border border-yellow-400/40 text-yellow-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-yellow-500/10 hover:shadow-yellow-500/20 flex items-center gap-1"
                                               >
-                                                <Edit2 className="h-3 w-3" />
+                                                <Edit2 className="h-3 w-3 drop-shadow-[0_0_2px_rgba(245,158,11,0.6)]" />
                                                 Corriger
                                               </button>
                                             )}
@@ -1867,7 +1925,7 @@ const ClientsByCity: React.FC = () => {
                                                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="px-3 py-1.5 bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-300 rounded text-xs transition-colors"
+                                                className="px-3 py-1.5 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 border border-yellow-400/40 text-yellow-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-yellow-500/10 hover:shadow-yellow-500/20"
                                               >
                                                 Voir carte
                                               </a>
@@ -1905,21 +1963,21 @@ const ClientsByCity: React.FC = () => {
                                 return (
                                   <div
                                     key={district}
-                                    className="bg-gray-800/20 rounded border border-gray-700/20"
+                                    className="bg-gradient-to-br from-gray-900/70 to-gray-800/60 backdrop-blur-sm rounded border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                   >
                                     <button
                                       onClick={() => toggleDistrict(sector, sector, district)}
-                                      className="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-700/20 transition-colors rounded"
+                                      className="w-full px-4 py-2 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200 rounded"
                                     >
                                       <div className="flex items-center gap-2">
                                         {isDistrictExpanded ? (
-                                          <ChevronDown className="h-4 w-4 text-indigo-400" />
+                                          <ChevronDown className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]" />
                                         ) : (
-                                          <ChevronRight className="h-4 w-4 text-indigo-400" />
+                                          <ChevronRight className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]" />
                                         )}
-                                        <Home className="h-4 w-4 text-indigo-400" />
-                                        <span className="font-medium text-gray-300">{district}</span>
-                                        <span className="px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded text-xs">
+                                        <Home className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]" />
+                                        <span className="font-medium text-gray-200 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">{district}</span>
+                                        <span className="px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
                                           {clients.length} client{clients.length > 1 ? 's' : ''}
                                         </span>
                                       </div>
@@ -1930,20 +1988,20 @@ const ClientsByCity: React.FC = () => {
                                         {clients.map((client) => (
                                           <div
                                             key={client._id}
-                                            className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                                            className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                           >
                                             <div className="flex items-start justify-between">
                                               <div className="flex-1">
-                                                <h4 className="font-medium text-white mb-1">
+                                                <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                                   {client.givenName} {client.familyName}
                                                 </h4>
                                                 <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                  <MapPin className="h-3 w-3" />
+                                                  <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                   {client.addressLine1}
                                                 </p>
                                                 {client.phoneNumber && (
                                                   <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                    <Phone className="h-3 w-3" />
+                                                    <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                                     {client.phoneNumber}
                                                   </p>
                                                 )}
@@ -1953,7 +2011,7 @@ const ClientsByCity: React.FC = () => {
                                                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                   target="_blank"
                                                   rel="noopener noreferrer"
-                                                  className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                                  className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
                                                 >
                                                   Voir carte
                                                 </a>
@@ -1971,12 +2029,12 @@ const ClientsByCity: React.FC = () => {
                         
                         {/* Afficher les clients sans district */}
                         {cities.clients && Array.isArray(cities.clients) && cities.clients.length > 0 && (
-                          <div className="bg-gray-800/20 rounded border border-gray-700/20">
+                          <div className="bg-gradient-to-br from-gray-900/70 to-gray-800/60 backdrop-blur-sm rounded border border-indigo-500/15 shadow-sm">
                             <div className="px-4 py-2 flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-indigo-400" />
-                                <span className="font-medium text-gray-300">Sans quartier assigné</span>
-                                <span className="px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded text-xs">
+                                <MapPin className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]" />
+                                <span className="font-medium text-gray-200 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">Sans quartier assigné</span>
+                                <span className="px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
                                   {cities.clients.length} client{cities.clients.length > 1 ? 's' : ''}
                                 </span>
                               </div>
@@ -1985,20 +2043,20 @@ const ClientsByCity: React.FC = () => {
                               {cities.clients.map((client) => (
                                 <div
                                   key={client._id}
-                                  className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                                  className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                 >
                                   <div className="flex items-start justify-between">
                                     <div className="flex-1">
-                                      <h4 className="font-medium text-white mb-1">
+                                      <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                         {client.givenName} {client.familyName}
                                       </h4>
                                       <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                        <MapPin className="h-3 w-3" />
+                                        <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                         {client.addressLine1}
                                       </p>
                                       {client.phoneNumber && (
                                         <p className="text-sm text-gray-400 flex items-center gap-1">
-                                          <Phone className="h-3 w-3" />
+                                          <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                           {client.phoneNumber}
                                         </p>
                                       )}
@@ -2008,7 +2066,7 @@ const ClientsByCity: React.FC = () => {
                                         href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                        className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
                                       >
                                         Voir carte
                                       </a>
@@ -2060,25 +2118,25 @@ const ClientsByCity: React.FC = () => {
                         return (
                           <div
                             key={city}
-                            className="bg-gray-800/30 rounded-lg border border-gray-700/30 overflow-hidden hover:border-indigo-500/30 transition-colors"
+                            className="bg-gradient-to-br from-gray-900/80 to-gray-800/70 backdrop-blur-sm rounded-lg border border-indigo-500/20 overflow-hidden hover:border-indigo-500/40 transition-all duration-200 shadow-sm shadow-indigo-500/5"
                           >
                             <button
                               onClick={() => toggleCity(cityKey)}
-                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-700/20 transition-colors"
+                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
                             >
                 <div className="flex items-center gap-3">
                   {isExpanded ? (
-                    <ChevronDown className="h-5 w-5 text-indigo-400" />
+                    <ChevronDown className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                   ) : (
-                    <ChevronRight className="h-5 w-5 text-indigo-400" />
+                    <ChevronRight className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                   )}
-                  <MapPin className="h-5 w-5 text-indigo-400" />
-                  <span className="text-xl font-semibold text-white">{city}</span>
-                  <span className="px-2 py-1 bg-indigo-600/20 text-indigo-300 rounded text-sm">
+                  <MapPin className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                  <span className="text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(139,92,246,0.3)]">{city}</span>
+                  <span className="px-2 py-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-400/40 text-indigo-300 rounded text-sm backdrop-blur-sm shadow-sm shadow-indigo-500/10">
                     {clientCount} client{clientCount > 1 ? 's' : ''}
                   </span>
                   {isMontrealOrLaval && hasDistricts && (
-                    <span className="px-2 py-1 bg-purple-600/20 text-purple-300 rounded text-xs">
+                    <span className="px-2 py-1 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
                       {Object.keys(cityData.districts!).length} quartier{Object.keys(cityData.districts!).length > 1 ? 's' : ''}
                     </span>
                   )}
@@ -2103,21 +2161,21 @@ const ClientsByCity: React.FC = () => {
                         return (
                           <div
                             key={district}
-                            className="bg-gray-900/50 rounded-lg border border-gray-700/30 overflow-hidden"
+                            className="bg-gradient-to-br from-gray-900/70 to-gray-800/60 backdrop-blur-sm rounded-lg border border-purple-500/20 overflow-hidden hover:border-purple-500/40 transition-all duration-200 shadow-sm"
                           >
                             <button
                                                   onClick={() => toggleDistrict(sector, city, district)}
-                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-800/50 transition-colors"
+                              className="w-full px-4 py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-purple-500/5 hover:to-pink-500/5 transition-all duration-200"
                             >
                               <div className="flex items-center gap-2">
                                 {isDistrictExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-purple-400" />
+                                  <ChevronDown className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
                                 ) : (
-                                  <ChevronRight className="h-4 w-4 text-purple-400" />
+                                  <ChevronRight className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
                                 )}
-                                <Home className="h-4 w-4 text-purple-400" />
-                                <span className="font-medium text-gray-200 capitalize">{district}</span>
-                                <span className="px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded text-xs">
+                                <Home className="h-4 w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)]" />
+                                <span className="font-medium text-gray-200 capitalize drop-shadow-[0_0_2px_rgba(168,85,247,0.2)]">{district}</span>
+                                <span className="px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
                                   {clients.length} client{clients.length > 1 ? 's' : ''}
                                 </span>
                               </div>
@@ -2128,20 +2186,20 @@ const ClientsByCity: React.FC = () => {
                                 {clients.map((client) => (
                                   <div
                                     key={client._id}
-                                    className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-purple-500/15 hover:border-purple-500/30 transition-all duration-200 shadow-sm"
                                   >
                                     <div className="flex items-start justify-between">
                                       <div className="flex-1">
-                                        <h4 className="font-medium text-white mb-1">
+                                        <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                           {client.givenName} {client.familyName}
                                         </h4>
                                         <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                          <MapPin className="h-3 w-3" />
+                                          <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                           {client.addressLine1}
                                         </p>
                                         {client.phoneNumber && (
                                           <p className="text-sm text-gray-400 flex items-center gap-1">
-                                            <Phone className="h-3 w-3" />
+                                            <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                             {client.phoneNumber}
                                           </p>
                                         )}
@@ -2151,7 +2209,7 @@ const ClientsByCity: React.FC = () => {
                                           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                          className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
                                         >
                                           Voir carte
                                         </a>
@@ -2171,20 +2229,20 @@ const ClientsByCity: React.FC = () => {
                                           cityData.clients.map((client) => (
                         <div
                           key={client._id}
-                          className="bg-gray-800/30 rounded p-3 border border-gray-700/20 hover:border-indigo-500/30 transition-colors"
+                          className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <h4 className="font-medium text-white mb-1">
+                              <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                                 {client.givenName} {client.familyName}
                               </h4>
                               <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
+                                <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                 {client.addressLine1}
                               </p>
                               {client.phoneNumber && (
                                 <p className="text-sm text-gray-400 flex items-center gap-1">
-                                  <Phone className="h-3 w-3" />
+                                  <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
                                   {client.phoneNumber}
                                 </p>
                               )}
@@ -2194,7 +2252,7 @@ const ClientsByCity: React.FC = () => {
                                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
                               >
                                 Voir carte
                               </a>
@@ -2224,51 +2282,51 @@ const ClientsByCity: React.FC = () => {
             .filter(Boolean)
         ) : (
           <div className="text-center py-12">
-            <Users className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400 text-lg">Aucune donnée disponible</p>
+            <Users className="h-16 w-16 text-cyan-400 mx-auto mb-4 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
+            <p className="text-gray-300 text-lg drop-shadow-[0_0_4px_rgba(139,92,246,0.3)]">Aucune donnée disponible</p>
           </div>
         )}
       </div>
 
       {Object.keys(clientsBySector).length === 0 && Object.keys(clientsData).length === 0 && !loading && (
         <div className="text-center py-12">
-          <Users className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400 text-lg">Aucun client trouvé</p>
+          <Users className="h-16 w-16 text-cyan-400 mx-auto mb-4 drop-shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
+          <p className="text-gray-300 text-lg drop-shadow-[0_0_4px_rgba(139,92,246,0.3)]">Aucun client trouvé</p>
         </div>
       )}
 
       {/* Modal de correction d'adresse */}
       {editingClient && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 border border-yellow-500/30">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <Edit2 className="h-5 w-5 text-yellow-400" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/90 backdrop-blur-md rounded-lg p-6 max-w-2xl w-full mx-4 border border-yellow-500/40 shadow-xl shadow-yellow-500/20">
+            <h3 className="text-xl font-bold bg-gradient-to-r from-yellow-300 to-orange-300 bg-clip-text text-transparent mb-4 flex items-center gap-2 drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]">
+              <Edit2 className="h-5 w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]" />
               Corriger l'adresse ambiguë
             </h3>
             
             <div className="mb-4">
-              <p className="text-gray-300 mb-2">
-                <strong>Client:</strong> {editingClient.givenName} {editingClient.familyName}
+              <p className="text-gray-200 mb-2">
+                <strong className="text-cyan-300 drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]">Client:</strong> <span className="text-gray-100">{editingClient.givenName} {editingClient.familyName}</span>
               </p>
               <p className="text-gray-400 text-sm mb-4">
-                <strong>Adresse actuelle:</strong> {editingClient.addressLine1}
+                <strong className="text-cyan-300 drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]">Adresse actuelle:</strong> {editingClient.addressLine1}
               </p>
               {editingClient.district && (
-                <p className="text-yellow-400 text-sm mb-4">
+                <p className="text-yellow-400 text-sm mb-4 drop-shadow-[0_0_3px_rgba(245,158,11,0.6)]">
                   <strong>Problème:</strong> {editingClient.district}
                 </p>
               )}
             </div>
 
             <div className="mb-4">
-              <label className="block text-gray-300 mb-2">
+              <label className="block text-gray-300 mb-2 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
                 Nouvelle adresse complète (avec ville et code postal si possible):
               </label>
               <textarea
                 value={correctedAddress}
                 onChange={(e) => setCorrectedAddress(e.target.value)}
                 placeholder="Ex: 123 rue Principale, Laval, QC H7X 1A1"
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                className="w-full px-4 py-2 bg-gray-900/60 border border-yellow-500/30 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500/50 focus:shadow-lg focus:shadow-yellow-500/20 transition-all duration-200"
                 rows={3}
               />
               <p className="text-gray-400 text-xs mt-2">
@@ -2282,7 +2340,7 @@ const ClientsByCity: React.FC = () => {
                   setEditingClient(null);
                   setCorrectedAddress('');
                 }}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                className="px-4 py-2 bg-gradient-to-r from-gray-700/20 to-gray-600/20 hover:from-gray-700/30 hover:to-gray-600/30 text-gray-300 rounded transition-all duration-200 border border-gray-500/40 backdrop-blur-sm shadow-sm"
                 disabled={isFixing}
               >
                 Annuler
@@ -2290,16 +2348,16 @@ const ClientsByCity: React.FC = () => {
               <button
                 onClick={handleFixAddress}
                 disabled={isFixing || !correctedAddress.trim()}
-                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 border border-yellow-400/40 text-yellow-300 rounded transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30"
               >
                 {isFixing ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-300"></div>
                     Correction...
                   </>
                 ) : (
                   <>
-                    <Check className="h-4 w-4" />
+                    <Check className="h-4 w-4 drop-shadow-[0_0_3px_rgba(245,158,11,0.6)]" />
                     Corriger
                   </>
                 )}
