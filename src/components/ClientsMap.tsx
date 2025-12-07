@@ -98,6 +98,7 @@ function getPositionIcon(color: string = '#22d3ee'): string {
 const ClientsMap: React.FC = () => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapWrapperRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const clientsHashRef = useRef<string>(''); // Hash des clients pour éviter la recréation inutile
   const hasCheckedChangesRef = useRef<boolean>(false); // Pour éviter de vérifier plusieurs fois les changements
@@ -528,14 +529,14 @@ const ClientsMap: React.FC = () => {
         // Centrer la carte sur la position de l'utilisateur avec animation
         if (mapRef.current) {
           // Utiliser flyTo pour une animation plus fluide
-          mapRef.current.flyTo([latitude, longitude], 15, {
+          mapRef.current.flyTo([latitude, longitude], 12, {
             duration: 1.0
           });
           
           // Alternative si flyTo ne fonctionne pas
           setTimeout(() => {
             if (mapRef.current) {
-              mapRef.current.setView([latitude, longitude], 15, {
+              mapRef.current.setView([latitude, longitude], 12, {
                 animate: true,
                 duration: 0.5
               });
@@ -736,10 +737,18 @@ const ClientsMap: React.FC = () => {
     setShowSuggestions(false);
     setSearchTerm(client.name || '');
     
-    // Centrer la carte sur le client
+    // Faire défiler vers la carte pour qu'elle soit visible à l'écran
+    if (mapWrapperRef.current) {
+      mapWrapperRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
+    
+    // Centrer la carte sur le client avec un zoom moins élevé pour voir plus de contexte
     mapRef.current.setView(
       [client.coordinates.lat, client.coordinates.lng],
-      15,
+      12,
       { animate: true, duration: 0.5 }
     );
     
@@ -1253,42 +1262,168 @@ const ClientsMap: React.FC = () => {
     .sort((a, b) => b[1] - a[1]);
 
   return (
-    <div className="min-h-screen bg-transparent p-1 sm:p-2 md:p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header - Compact sur mobile */}
-        <div className="mb-1 sm:mb-2 md:mb-3">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="p-1 sm:p-1.5 md:p-2 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
-              <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-indigo-300 drop-shadow-[0_0_6px_rgba(139,92,246,1)]" />
-            </div>
+    <div className="min-h-[calc(100vh-5rem-2rem)] bg-transparent p-0 overflow-y-auto overflow-x-hidden -my-4">
+      <div className="w-full max-w-full sm:max-w-5xl mx-auto flex flex-col min-h-0 overflow-x-hidden px-2 sm:px-4 py-2 sm:py-3 pb-32 sm:pb-40">
+        {/* Header */}
+        <div className="mb-3 sm:mb-4 flex-shrink-0 w-full min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 w-full min-w-0">
+            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
+              <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-300 drop-shadow-[0_0_6px_rgba(139,92,246,1)]" />
+              </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-base sm:text-lg md:text-xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] truncate">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] truncate">
                 Carte des Clients
               </h1>
-              <p className="text-gray-300 text-[10px] sm:text-xs mt-0.5">
+              <p className="text-gray-300 text-xs sm:text-sm mt-1">
                 {loading ? (
                   <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Chargement...</span>
                 ) : (
                   <>
                     <span className="text-gray-300">{totalClients} clients affichés</span>
-                    {totalWithCoordinates > 0 && totalWithCoordinates !== totalClients && (
+                      {totalWithCoordinates > 0 && totalWithCoordinates !== totalClients && (
                       <span className="text-cyan-400 ml-1 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]">
-                        ({totalWithCoordinates - totalClients} manquants)
-                      </span>
-                    )}
-                  </>
-                )}
-              </p>
+                          ({totalWithCoordinates - totalClients} manquants)
+                        </span>
+                      )}
+                    </>
+                  )}
+                </p>
             </div>
+              </div>
+            </div>
+            
+        {/* Statistiques par secteur */}
+        <div className="mb-3 sm:mb-4 flex-shrink-0 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-indigo-500/20 shadow-lg shadow-indigo-500/5 w-full min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-sm shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+            </div>
+            <h2 className="text-sm sm:text-base md:text-lg font-semibold bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)]">
+              Répartition par Secteur
+            </h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+            {sortedSectors.map(([sector, count]) => {
+              const color = getSectorColor(sector);
+              return (
+                <div
+                  key={sector}
+                  className="group relative bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5 backdrop-blur-sm"
+                  style={{
+                    borderLeftColor: color + '50',
+                    borderLeftWidth: '3px',
+                    boxShadow: `0 0 10px ${color}15`
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2 sm:gap-3 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 sm:gap-2.5 flex-1 min-w-0">
+                      <div
+                        className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full flex-shrink-0"
+                        style={{ 
+                          backgroundColor: color,
+                          boxShadow: `0 0 8px ${color}, 0 0 16px ${color}60`
+                        }}
+                      ></div>
+                      <div 
+                        className="text-xs sm:text-sm md:text-base font-medium truncate"
+                        style={{ 
+                          color: color + 'FF',
+                          textShadow: `0 0 4px ${color}80`
+                        }}
+                      >
+                        {sector}
+            </div>
+          </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-gray-100 font-bold text-base sm:text-lg md:text-xl leading-none drop-shadow-[0_0_4px_rgba(139,92,246,0.3)]">{count}</div>
+                      <div className="text-gray-400 text-[10px] sm:text-xs md:text-sm mt-0.5 leading-none">clients</div>
+                    </div>
+                  </div>
+                  {/* Effet de brillance au survol */}
+                  <div 
+                    className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                    style={{
+                      background: `linear-gradient(135deg, ${color}20 0%, transparent 60%)`,
+                      boxShadow: `inset 0 0 30px ${color}30`
+                    }}
+                  ></div>
+                </div>
+              );
+            })}
+        </div>
+
+          {/* Section d'information sur les clients manquants */}
+          <div className="mt-0.5 pt-0.5 border-t border-cyan-500/20 hidden">
+            {missingClients.length > 0 ? (
+              <>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <span className="text-cyan-400 font-semibold text-xs drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]">
+                    ⚠️ {missingClients.length} client(s) avec coordonnées non affichés
+                  </span>
+                </div>
+                <div className="max-h-32 overflow-y-auto rounded border border-cyan-500/20 bg-gray-900/40 backdrop-blur-sm">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-gray-900/90 backdrop-blur-sm">
+                      <tr className="border-b border-cyan-500/20">
+                        <th className="text-left py-1 px-2 text-cyan-300 text-xs font-semibold drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]">Nom</th>
+                        <th className="text-left py-1 px-2 text-cyan-300 text-xs font-semibold drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]">Adresse</th>
+                        <th className="text-left py-1 px-2 text-cyan-300 text-xs font-semibold drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]">Raison</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {missingClients.slice(0, 10).map((client) => (
+                        <tr key={client._id} className="border-b border-gray-800/50 hover:bg-cyan-500/5 transition-colors">
+                          <td className="py-1 px-2 text-gray-200 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">{client.name}</td>
+                          <td className="py-1 px-2 text-gray-400 text-xs">{client.address}</td>
+                          <td className="py-1 px-2 text-cyan-400 text-xs drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">{client.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {missingClients.length > 10 && (
+                    <p className="text-gray-400 text-xs mt-1 px-2 pb-1">
+                      ... et <span className="text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]">{missingClients.length - 10}</span> autres (voir les logs serveur)
+                    </p>
+                  )}
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
 
-        {/* Section de contrôle - Recherche et Actions - Compact sur mobile */}
-        <div className="mb-1 sm:mb-2 md:mb-3 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 md:p-2.5 border border-indigo-500/20 shadow-lg shadow-indigo-500/5 relative z-10">
+        {/* Carte */}
+        <div ref={mapWrapperRef} className="mb-3 sm:mb-4 h-[400px] sm:h-[500px] md:h-[600px] bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg border border-indigo-500/20 overflow-hidden shadow-lg shadow-indigo-500/5 flex flex-col w-full min-w-0 flex-shrink-0">
+          {loading || mapLoading ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 animate-spin mx-auto mb-2 drop-shadow-[0_0_8px_rgba(34,211,238,1)]" />
+                <p className="text-cyan-300 text-xs sm:text-sm drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]">
+                  {loading ? 'Chargement des données...' : 'Chargement de la carte...'}
+                </p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-rose-400 mb-2 font-semibold text-sm drop-shadow-[0_0_6px_rgba(244,63,94,0.8)]">Erreur</p>
+                <p className="text-rose-300 text-sm drop-shadow-[0_0_3px_rgba(244,63,94,0.5)]">{error}</p>
+              </div>
+            </div>
+          ) : (
+            <div
+              ref={mapContainerRef}
+              className="h-full w-full rounded-lg"
+              style={{ zIndex: 1 }}
+            />
+          )}
+        </div>
+
+        {/* Section de contrôle - Recherche */}
+        <div className="mb-3 sm:mb-4 flex-shrink-0 relative z-10 w-full min-w-0">
           {/* Barre de recherche */}
-          <div className="mb-1 sm:mb-2 relative z-[10000]">
-            <div className="relative">
-              <Search className="absolute left-1.5 sm:left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+          <div className="relative z-[10000] w-full min-w-0">
+            <div className="relative w-full min-w-0">
+              <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] z-10" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -1307,7 +1442,7 @@ const ClientsMap: React.FC = () => {
                   }
                 }}
                 placeholder="Rechercher..."
-                className="w-full pl-6 sm:pl-7 md:pl-8 pr-6 sm:pr-7 md:pr-8 py-1 sm:py-1.5 text-xs sm:text-sm bg-gray-900/60 border border-indigo-500/30 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 transition-all duration-200"
+                className="w-full pl-10 sm:pl-12 pr-10 sm:pr-12 py-2.5 sm:py-3 text-sm sm:text-base bg-gray-900/60 border border-indigo-500/30 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 transition-all duration-200 relative z-10"
               />
               {searchTerm && (
                 <button
@@ -1321,7 +1456,7 @@ const ClientsMap: React.FC = () => {
                       highlightedMarkerRef.current = null;
                     }
                   }}
-                  className="absolute right-1.5 sm:right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] p-0.5"
+                  className="absolute right-1.5 sm:right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] p-0.5 z-20"
                 >
                   <X className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5" />
                 </button>
@@ -1332,8 +1467,7 @@ const ClientsMap: React.FC = () => {
             {showSuggestions && searchSuggestions.length > 0 && (
               <div
                 ref={suggestionsRef}
-                className="absolute z-[9999] w-full mt-1 bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20 max-h-96 overflow-y-auto"
-                style={{ position: 'absolute', zIndex: 9999 }}
+                className="absolute top-full left-0 right-0 z-[9999] w-full mt-1 bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20 max-h-80 sm:max-h-96 overflow-y-auto"
               >
                 {searchSuggestions.map((client) => (
                   <button
@@ -1374,246 +1508,116 @@ const ClientsMap: React.FC = () => {
             )}
             
             {searchTerm && searchSuggestions.length === 0 && (
-              <div className="absolute z-[9999] w-full mt-1 bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm border border-rose-500/30 rounded-lg shadow-xl shadow-rose-500/20 p-4 text-center text-gray-400"
-                style={{ position: 'absolute', zIndex: 9999 }}
-              >
+              <div className="absolute top-full left-0 right-0 z-[9999] w-full mt-1 bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm border border-rose-500/30 rounded-lg shadow-xl shadow-rose-500/20 p-4 text-center text-gray-400">
                 Aucun client trouvé
               </div>
             )}
           </div>
           
           {/* Barre d'actions - Boutons groupés logiquement */}
-          <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+          <div className="flex items-center justify-between gap-1 sm:gap-3 mt-3 sm:mt-4 flex-shrink-0 w-full min-w-0">
             {/* Groupe: Actions de localisation */}
-            <div className="flex items-center gap-1 sm:gap-1.5">
+            <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0 min-w-0">
               <button
                 onClick={getUserLocation}
-                className="px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
+                className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
                 title="Afficher ma position"
               >
-                <Navigation className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-                <span className="hidden sm:inline text-[10px] sm:text-xs">Position</span>
-                <span className="hidden md:inline text-xs">Ma position</span>
+                <Navigation className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                <span className="text-[10px] sm:text-sm whitespace-nowrap">Ma position</span>
               </button>
               <button
                 onClick={toggleLocationTracking}
-                className={`px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 border shadow-lg hover:-translate-y-0.5 backdrop-blur-sm ${
+                className={`px-2 sm:px-4 py-1.5 sm:py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border shadow-lg hover:-translate-y-0.5 backdrop-blur-sm ${
                   isTrackingLocation
                     ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 hover:from-emerald-500/30 hover:to-cyan-500/30 text-emerald-200 border-emerald-400/40 shadow-emerald-500/20 hover:shadow-emerald-500/40'
                     : 'bg-gradient-to-r from-gray-700/20 to-gray-600/20 hover:from-gray-700/30 hover:to-gray-600/30 text-gray-300 border-gray-500/40 shadow-gray-500/10 hover:shadow-gray-500/20'
                 }`}
                 title={isTrackingLocation ? 'Arrêter le suivi' : 'Suivre ma position en temps réel'}
               >
-                <Navigation2 className={`h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 ${isTrackingLocation ? 'drop-shadow-[0_0_4px_rgba(16,185,129,0.8)]' : ''}`} />
-                <span className="hidden sm:inline text-[10px] sm:text-xs">Suivi actif</span>
-                <span className="hidden md:inline text-xs">Actif</span>
+                <Navigation2 className={`h-3.5 w-3.5 sm:h-5 sm:w-5 ${isTrackingLocation ? 'drop-shadow-[0_0_4px_rgba(16,185,129,0.8)]' : ''}`} />
+                <span className="text-[10px] sm:text-sm whitespace-nowrap">Suivi actif</span>
               </button>
             </div>
             
             {/* Groupe: Actions de rafraîchissement */}
-            <div className="flex items-center gap-1 sm:gap-1.5">
-              <button
-                onClick={async () => {
-                  // Vérifier d'abord s'il y a des changements avant de recharger
-                  const result = await checkForChanges();
-                  if (result.hasChanges) {
-                    if (result.changedClients && result.changedClients.length > 0) {
-                      console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
-                      // Mettre à jour seulement les clients modifiés
-                      updateMapWithChangedClients(result.changedClients);
-                      // Mettre à jour le timestamp du cache
-                      localStorage.setItem('clientsMapLastUpdate', new Date().toISOString());
-                    } else {
-                      console.log('🔄 Changements détectés mais pas de clients avec coordonnées, rechargement complet...');
-                      localStorage.removeItem('clientsMapCache');
-                      localStorage.removeItem('clientsMapLastUpdate');
-                      hasCheckedChangesRef.current = false;
-                      fetchClients(true);
-                    }
+            <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0 min-w-0">
+            <button
+              onClick={async () => {
+                // Vérifier d'abord s'il y a des changements avant de recharger
+                const result = await checkForChanges();
+                if (result.hasChanges) {
+                  if (result.changedClients && result.changedClients.length > 0) {
+                    console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
+                    // Mettre à jour seulement les clients modifiés
+                    updateMapWithChangedClients(result.changedClients);
+                    // Mettre à jour le timestamp du cache
+                    localStorage.setItem('clientsMapLastUpdate', new Date().toISOString());
                   } else {
-                    console.log('✅ Aucun changement détecté, pas de rechargement nécessaire');
-                    alert('Aucun changement détecté dans la base de données. La carte est déjà à jour.');
+                    console.log('🔄 Changements détectés mais pas de clients avec coordonnées, rechargement complet...');
+                    localStorage.removeItem('clientsMapCache');
+                    localStorage.removeItem('clientsMapLastUpdate');
+                    hasCheckedChangesRef.current = false;
+                    fetchClients(true);
                   }
-                }}
-                className="px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
+                } else {
+                  console.log('✅ Aucun changement détecté, pas de rechargement nécessaire');
+                  alert('Aucun changement détecté dans la base de données. La carte est déjà à jour.');
+                }
+              }}
+                className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
                 title="Actualiser"
-              >
-                <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
-                <span className="hidden sm:inline text-[10px] sm:text-xs md:text-sm">Actualiser</span>
-              </button>
-              <button
-                onClick={() => {
-                  // Forcer un rechargement complet depuis l'API
-                  console.log('🔄 Rechargement complet depuis l\'API...');
-                  
-                  // Supprimer tout le cache
-                  localStorage.removeItem('clientsMapCache');
-                  localStorage.removeItem('clientsMapLastUpdate');
-                  localStorage.removeItem('clientsMapMissing');
-                  
-                  // Réinitialiser les flags
-                  hasCheckedChangesRef.current = false;
-                  clientsHashRef.current = '';
-                  
-                  // Réinitialiser les états
-                  setClients([]);
-                  setSectorStats({});
-                  setMissingClients([]);
-                  setTotalWithCoordinates(0);
-                  setError(null);
-                  
-                  // Retirer tous les marqueurs de la carte
-                  if (mapRef.current) {
-                    markersRef.current.forEach(marker => {
-                      if (mapRef.current) {
-                        mapRef.current.removeLayer(marker);
-                      }
-                      marker.remove();
-                    });
-                    markersRef.current = [];
-                  }
-                  
-                  // Recharger depuis l'API
-                  fetchClients(true);
-                }}
-                className="px-1.5 sm:px-2 md:px-2.5 py-1 sm:py-1.5 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 text-rose-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
-                title="Recharger complètement depuis l'API (supprime le cache)"
-              >
-                <Loader2 className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-4 md:w-4 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]" />
-                <span className="hidden sm:inline text-[10px] sm:text-xs md:text-sm">Recharger</span>
-              </button>
-            </div>
+            >
+                <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
+                <span className="text-[10px] sm:text-sm whitespace-nowrap">Actualiser</span>
+            </button>
+            <button
+              onClick={() => {
+                // Forcer un rechargement complet depuis l'API
+                console.log('🔄 Rechargement complet depuis l\'API...');
+                
+                // Supprimer tout le cache
+                localStorage.removeItem('clientsMapCache');
+                localStorage.removeItem('clientsMapLastUpdate');
+                localStorage.removeItem('clientsMapMissing');
+                
+                // Réinitialiser les flags
+                hasCheckedChangesRef.current = false;
+                clientsHashRef.current = '';
+                
+                // Réinitialiser les états
+                setClients([]);
+                setSectorStats({});
+                setMissingClients([]);
+                setTotalWithCoordinates(0);
+                setError(null);
+                
+                // Retirer tous les marqueurs de la carte
+                if (mapRef.current) {
+                  markersRef.current.forEach(marker => {
+                    if (mapRef.current) {
+                      mapRef.current.removeLayer(marker);
+                    }
+                    marker.remove();
+                  });
+                  markersRef.current = [];
+                }
+                
+                // Recharger depuis l'API
+                fetchClients(true);
+              }}
+                className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 text-rose-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
+              title="Recharger complètement depuis l'API (supprime le cache)"
+            >
+                <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]" />
+                <span className="text-[10px] sm:text-sm whitespace-nowrap">Recharger</span>
+            </button>
           </div>
         </div>
-
-        {/* Statistiques par secteur - Compact sur mobile */}
-        <div className="mb-1 sm:mb-2 md:mb-3 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-1.5 sm:p-2 md:p-3 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 md:mb-3">
-            <div className="p-0.5 sm:p-1 md:p-1.5 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-sm shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
-              <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
-            </div>
-            <h2 className="text-[10px] sm:text-xs md:text-sm font-semibold bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)]">
-              Répartition par Secteur
-            </h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-2.5">
-            {sortedSectors.map(([sector, count]) => {
-              const color = getSectorColor(sector);
-              return (
-                <div
-                  key={sector}
-                  className="group relative bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg p-2 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5 backdrop-blur-sm"
-                  style={{
-                    borderLeftColor: color + '50',
-                    borderLeftWidth: '3px',
-                    boxShadow: `0 0 10px ${color}15`
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-1 sm:gap-1.5 md:gap-2">
-                    <div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 flex-1 min-w-0">
-                      <div
-                        className="w-1 h-1 sm:w-1.5 sm:h-1.5 md:w-2 md:h-2 rounded-full flex-shrink-0"
-                        style={{ 
-                          backgroundColor: color,
-                          boxShadow: `0 0 8px ${color}, 0 0 16px ${color}60`
-                        }}
-                      ></div>
-                      <div 
-                        className="text-[9px] sm:text-[10px] md:text-xs font-medium truncate"
-                        style={{ 
-                          color: color + 'FF',
-                          textShadow: `0 0 4px ${color}80`
-                        }}
-                      >
-                        {sector}
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-gray-100 font-bold text-xs sm:text-sm md:text-base leading-none drop-shadow-[0_0_4px_rgba(139,92,246,0.3)]">{count}</div>
-                      <div className="text-gray-400 text-[7px] sm:text-[8px] md:text-[9px] mt-0.5 leading-none">clients</div>
-                    </div>
-                  </div>
-                  {/* Effet de brillance au survol */}
-                  <div 
-                    className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
-                    style={{
-                      background: `linear-gradient(135deg, ${color}20 0%, transparent 60%)`,
-                      boxShadow: `inset 0 0 30px ${color}30`
-                    }}
-                  ></div>
-                </div>
-              );
-            })}
           </div>
           
-          {/* Section d'information sur les clients manquants */}
-          <div className="mt-2 pt-2 border-t border-cyan-500/20">
-            {missingClients.length > 0 ? (
-              <>
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <span className="text-cyan-400 font-semibold text-xs drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]">
-                    ⚠️ {missingClients.length} client(s) avec coordonnées non affichés
-                  </span>
-                </div>
-                <div className="max-h-32 overflow-y-auto rounded border border-cyan-500/20 bg-gray-900/40 backdrop-blur-sm">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-gray-900/90 backdrop-blur-sm">
-                      <tr className="border-b border-cyan-500/20">
-                        <th className="text-left py-1 px-2 text-cyan-300 text-xs font-semibold drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]">Nom</th>
-                        <th className="text-left py-1 px-2 text-cyan-300 text-xs font-semibold drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]">Adresse</th>
-                        <th className="text-left py-1 px-2 text-cyan-300 text-xs font-semibold drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]">Raison</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {missingClients.slice(0, 10).map((client) => (
-                        <tr key={client._id} className="border-b border-gray-800/50 hover:bg-cyan-500/5 transition-colors">
-                          <td className="py-1 px-2 text-gray-200 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">{client.name}</td>
-                          <td className="py-1 px-2 text-gray-400 text-xs">{client.address}</td>
-                          <td className="py-1 px-2 text-cyan-400 text-xs drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">{client.reason}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {missingClients.length > 10 && (
-                    <p className="text-gray-400 text-xs mt-1 px-2 pb-1">
-                      ... et <span className="text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]">{missingClients.length - 10}</span> autres (voir les logs serveur)
-                    </p>
-                  )}
-                </div>
-              </>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Carte */}
-        <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg border border-indigo-500/20 overflow-hidden shadow-lg shadow-indigo-500/5">
-          {loading || mapLoading ? (
-            <div className="h-[500px] sm:h-[550px] md:h-[600px] lg:h-[700px] flex items-center justify-center">
-              <div className="text-center">
-                <Loader2 className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 animate-spin mx-auto mb-2 drop-shadow-[0_0_8px_rgba(34,211,238,1)]" />
-                <p className="text-cyan-300 text-xs sm:text-sm drop-shadow-[0_0_4px_rgba(34,211,238,0.6)]">
-                  {loading ? 'Chargement des données...' : 'Chargement de la carte...'}
-                </p>
-              </div>
-            </div>
-          ) : error ? (
-            <div className="h-[500px] sm:h-[550px] md:h-[600px] lg:h-[700px] flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-rose-400 mb-2 font-semibold text-sm drop-shadow-[0_0_6px_rgba(244,63,94,0.8)]">Erreur</p>
-                <p className="text-rose-300 text-sm drop-shadow-[0_0_3px_rgba(244,63,94,0.5)]">{error}</p>
-              </div>
-            </div>
-          ) : (
-            <div
-              ref={mapContainerRef}
-              className="h-[500px] sm:h-[550px] md:h-[600px] lg:h-[700px] w-full rounded-lg"
-              style={{ zIndex: 1 }}
-            />
-          )}
-        </div>
-
-        {/* Section des clients sans coordonnées - Compact sur mobile */}
-        {clientsWithoutCoordinates.length > 0 && (
+        {/* Section des clients sans coordonnées - Masquée pour économiser l'espace */}
+        {/* {clientsWithoutCoordinates.length > 0 && (
           <div className="mt-1 sm:mt-2 md:mt-3 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg border border-cyan-500/20 overflow-hidden shadow-lg shadow-cyan-500/5">
             <div className="p-1.5 sm:p-2 md:p-2.5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 mb-1 sm:mb-1.5">
@@ -1715,7 +1719,7 @@ const ClientsMap: React.FC = () => {
               </div>
             )}
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );
