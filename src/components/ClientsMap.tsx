@@ -94,6 +94,38 @@ function getPositionIcon(color: string = '#22d3ee'): string {
   </svg>`;
 }
 
+// Fonction helper pour générer le contenu de popup compact pour mobile
+function getClientPopupContent(client: Client, isHighlighted: boolean = false): string {
+  const color = getSectorColor(client.sector);
+  // Détecter si on est sur mobile (évalué à chaque appel)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640; // sm breakpoint
+  
+  if (isMobile) {
+    // Version compacte pour mobile
+    return `
+      <div style="min-width: 150px; max-width: 200px;">
+        ${isHighlighted ? `<div style="margin-bottom: 4px; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.2)); border: 1px solid rgba(245, 158, 11, 0.5); color: #fbbf24; font-weight: 600; font-size: 10px; text-shadow: 0 0 4px rgba(245, 158, 11, 0.8);">${getSearchIcon('#fbbf24')}<span>Client sélectionné</span></div>` : ''}
+        <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 6px rgba(139, 92, 246, 0.6); display: block; margin-top: ${isHighlighted ? '4px' : '0'}; font-size: 13px; line-height: 1.2;">${client.name}</strong>
+        ${client.address ? `<div style="margin-top: 4px; color: #d1d5db; font-size: 11px; display: flex; align-items: center; line-height: 1.3;">${getLocationIcon('#60a5fa')}<span style="word-break: break-word;">${client.address}</span></div>` : ''}
+        ${client.phoneNumber ? `<div style="margin-top: 3px; color: #60a5fa; font-size: 11px; text-shadow: 0 0 3px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
+        ${client.sector ? `<div style="margin-top: 4px; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 10px; text-shadow: 0 0 4px ${color}80;">${getLocationIcon(color)}<span>${client.sector}</span></div>` : ''}
+      </div>
+    `;
+  } else {
+    // Version normale pour desktop
+    return `
+      <div style="min-width: 200px;">
+        ${isHighlighted ? `<div style="margin-bottom: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.2)); border: 1px solid rgba(245, 158, 11, 0.5); color: #fbbf24; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px rgba(245, 158, 11, 0.8); box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);">${getSearchIcon('#fbbf24')}<span>Client sélectionné</span></div>` : ''}
+        <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6); display: block; margin-top: ${isHighlighted ? '8px' : '0'};">${client.name}</strong>
+        ${client.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${client.address}</span></div>` : ''}
+        ${client.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
+        ${client.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${client.city}</span></div>` : ''}
+        ${client.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${client.district}</span></div>` : ''}
+        ${client.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${client.sector}</span></div>` : ''}
+      </div>
+    `;
+  }
+}
 
 const ClientsMap: React.FC = () => {
   const mapRef = useRef<L.Map | null>(null);
@@ -248,18 +280,7 @@ const ClientsMap: React.FC = () => {
           }
 
           // Mettre à jour la popup
-          const color = getSectorColor(changedClient.sector);
-          const popupContent = `
-            <div style="min-width: 200px;">
-              <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${changedClient.name}</strong>
-              ${changedClient.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${changedClient.address}</span></div>` : ''}
-              ${changedClient.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${changedClient.phoneNumber}</span></div>` : ''}
-              ${changedClient.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${changedClient.city}</span></div>` : ''}
-              ${changedClient.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${changedClient.district}</span></div>` : ''}
-              ${changedClient.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${changedClient.sector}</span></div>` : ''}
-            </div>
-          `;
-          existingMarker.setPopupContent(popupContent);
+          existingMarker.setPopupContent(getClientPopupContent(changedClient));
         } else {
           // Nouveau client, créer un nouveau marqueur
           const color = getSectorColor(changedClient.sector);
@@ -284,17 +305,7 @@ const ClientsMap: React.FC = () => {
 
           (marker as any).clientId = changedClient._id;
 
-          const popupContent = `
-            <div style="min-width: 200px;">
-              <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${changedClient.name}</strong>
-              ${changedClient.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${changedClient.address}</span></div>` : ''}
-              ${changedClient.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${changedClient.phoneNumber}</span></div>` : ''}
-              ${changedClient.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${changedClient.city}</span></div>` : ''}
-              ${changedClient.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${changedClient.district}</span></div>` : ''}
-              ${changedClient.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${changedClient.sector}</span></div>` : ''}
-            </div>
-          `;
-          marker.bindPopup(popupContent);
+          marker.bindPopup(getClientPopupContent(changedClient));
 
           markersRef.current.push(marker);
           console.log(`➕ Nouveau marqueur ajouté pour ${changedClient.name}`);
@@ -792,29 +803,19 @@ const ClientsMap: React.FC = () => {
         { icon: highlightIcon, zIndexOffset: 2000 }
       ).addTo(mapRef.current);
       
-      highlightMarker.bindPopup(`
-        <div style="min-width: 200px;">
-          <div style="margin-bottom: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.2)); border: 1px solid rgba(245, 158, 11, 0.5); color: #fbbf24; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px rgba(245, 158, 11, 0.8); box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);">${getSearchIcon('#fbbf24')}<span>Client sélectionné</span></div>
-          <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6); display: block; margin-top: 8px;">${client.name}</strong>
-          ${client.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${client.address}</span></div>` : ''}
-          ${client.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
-          ${client.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${client.city}</span></div>` : ''}
-          ${client.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${client.district}</span></div>` : ''}
-          ${client.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${getSectorColor(client.sector)}20; border: 1px solid ${getSectorColor(client.sector)}50; color: ${getSectorColor(client.sector)}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${getSectorColor(client.sector)}80; box-shadow: 0 0 8px ${getSectorColor(client.sector)}40;">${getLocationIcon(getSectorColor(client.sector))}<span>${client.sector}</span></div>` : ''}
-        </div>
-      `).openPopup();
+      highlightMarker.bindPopup(getClientPopupContent(client, true)).openPopup();
       
       highlightedMarkerRef.current = highlightMarker;
       setHighlightedClientId(client._id);
       
-      // Retirer la surbrillance après 5 secondes
+      // Retirer la surbrillance après 15 secondes
       setTimeout(() => {
         if (highlightedMarkerRef.current) {
           highlightedMarkerRef.current.remove();
           highlightedMarkerRef.current = null;
           setHighlightedClientId(null);
         }
-      }, 5000);
+      }, 15000);
       
       console.log('✅ Client sélectionné:', client.name);
     } else {
@@ -1055,18 +1056,7 @@ const ClientsMap: React.FC = () => {
             existingMarker.setLatLng([client.coordinates.lat, client.coordinates.lng]);
             
             // Mettre à jour la popup si nécessaire
-            const color = getSectorColor(client.sector);
-            const popupContent = `
-              <div style="min-width: 200px;">
-                <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${client.name}</strong>
-                ${client.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${client.address}</span></div>` : ''}
-                ${client.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
-                ${client.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${client.city}</span></div>` : ''}
-                ${client.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${client.district}</span></div>` : ''}
-                ${client.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${client.sector}</span></div>` : ''}
-              </div>
-            `;
-            existingMarker.setPopupContent(popupContent);
+            existingMarker.setPopupContent(getClientPopupContent(client));
           }
         } else {
           // Nouveau client, créer un nouveau marqueur
@@ -1093,17 +1083,7 @@ const ClientsMap: React.FC = () => {
           // Stocker l'ID du client dans le marqueur pour référence future
           (marker as any).clientId = client._id;
 
-          const popupContent = `
-            <div style="min-width: 200px;">
-              <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${client.name}</strong>
-              ${client.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${client.address}</span></div>` : ''}
-              ${client.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
-              ${client.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${client.city}</span></div>` : ''}
-              ${client.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${client.district}</span></div>` : ''}
-              ${client.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${client.sector}</span></div>` : ''}
-            </div>
-          `;
-          marker.bindPopup(popupContent);
+          marker.bindPopup(getClientPopupContent(client));
 
           markersRef.current.push(marker);
         }
@@ -1191,17 +1171,7 @@ const ClientsMap: React.FC = () => {
       (marker as any).clientId = client._id;
 
       // Popup avec informations du client
-      const popupContent = `
-        <div style="min-width: 200px;">
-          <strong style="background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">${client.name}</strong>
-          ${client.address ? `<div style="margin-top: 8px; color: #d1d5db; font-size: 13px; display: flex; align-items: center;">${getLocationIcon('#60a5fa')}<span>${client.address}</span></div>` : ''}
-          ${client.phoneNumber ? `<div style="margin-top: 6px; color: #60a5fa; font-size: 13px; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6); display: flex; align-items: center;">${getPhoneIcon('#60a5fa')}<span>${client.phoneNumber}</span></div>` : ''}
-          ${client.city ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getCityIcon('#9ca3af')}<span>${client.city}</span></div>` : ''}
-          ${client.district ? `<div style="margin-top: 6px; color: #9ca3af; font-size: 12px; display: flex; align-items: center;">${getDistrictIcon('#9ca3af')}<span>${client.district}</span></div>` : ''}
-          ${client.sector ? `<div style="margin-top: 8px; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; background: ${color}20; border: 1px solid ${color}50; color: ${color}; font-weight: 600; font-size: 12px; text-shadow: 0 0 6px ${color}80; box-shadow: 0 0 8px ${color}40;">${getLocationIcon(color)}<span>${client.sector}</span></div>` : ''}
-        </div>
-      `;
-      marker.bindPopup(popupContent);
+      marker.bindPopup(getClientPopupContent(client));
 
       markersRef.current.push(marker);
     });
@@ -1514,34 +1484,28 @@ const ClientsMap: React.FC = () => {
             )}
           </div>
           
-          {/* Barre d'actions - Boutons groupés logiquement */}
-          <div className="flex items-center justify-between gap-1 sm:gap-3 mt-3 sm:mt-4 flex-shrink-0 w-full min-w-0">
-            {/* Groupe: Actions de localisation */}
-            <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0 min-w-0">
-              <button
-                onClick={getUserLocation}
-                className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
-                title="Afficher ma position"
-              >
-                <Navigation className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-                <span className="text-[10px] sm:text-sm whitespace-nowrap">Ma position</span>
-              </button>
-              <button
-                onClick={toggleLocationTracking}
-                className={`px-2 sm:px-4 py-1.5 sm:py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border shadow-lg hover:-translate-y-0.5 backdrop-blur-sm ${
-                  isTrackingLocation
-                    ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 hover:from-emerald-500/30 hover:to-cyan-500/30 text-emerald-200 border-emerald-400/40 shadow-emerald-500/20 hover:shadow-emerald-500/40'
-                    : 'bg-gradient-to-r from-gray-700/20 to-gray-600/20 hover:from-gray-700/30 hover:to-gray-600/30 text-gray-300 border-gray-500/40 shadow-gray-500/10 hover:shadow-gray-500/20'
-                }`}
-                title={isTrackingLocation ? 'Arrêter le suivi' : 'Suivre ma position en temps réel'}
-              >
-                <Navigation2 className={`h-3.5 w-3.5 sm:h-5 sm:w-5 ${isTrackingLocation ? 'drop-shadow-[0_0_4px_rgba(16,185,129,0.8)]' : ''}`} />
-                <span className="text-[10px] sm:text-sm whitespace-nowrap">Suivi actif</span>
-              </button>
-            </div>
-            
-            {/* Groupe: Actions de rafraîchissement */}
-            <div className="flex items-center gap-1 sm:gap-3 flex-shrink-0 min-w-0">
+          {/* Barre d'actions - Boutons avec espacement égal */}
+          <div className="flex items-center justify-start gap-2 sm:gap-3 md:gap-4 mt-3 sm:mt-4 flex-shrink-0 w-full min-w-0 flex-wrap">
+            <button
+              onClick={getUserLocation}
+              className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0"
+              title="Afficher ma position"
+            >
+              <Navigation className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+              <span className="text-[10px] sm:text-sm whitespace-nowrap">Position</span>
+            </button>
+            <button
+              onClick={toggleLocationTracking}
+              className={`px-2 sm:px-4 py-1.5 sm:py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border shadow-lg hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0 ${
+                isTrackingLocation
+                  ? 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 hover:from-emerald-500/30 hover:to-cyan-500/30 text-emerald-200 border-emerald-400/40 shadow-emerald-500/20 hover:shadow-emerald-500/40'
+                  : 'bg-gradient-to-r from-gray-700/20 to-gray-600/20 hover:from-gray-700/30 hover:to-gray-600/30 text-gray-300 border-gray-500/40 shadow-gray-500/10 hover:shadow-gray-500/20'
+              }`}
+              title={isTrackingLocation ? 'Arrêter le suivi' : 'Suivre ma position en temps réel'}
+            >
+              <Navigation2 className={`h-3.5 w-3.5 sm:h-5 sm:w-5 ${isTrackingLocation ? 'drop-shadow-[0_0_4px_rgba(16,185,129,0.8)]' : ''}`} />
+              <span className="text-[10px] sm:text-sm whitespace-nowrap">Suivi</span>
+            </button>
             <button
               onClick={async () => {
                 // Vérifier d'abord s'il y a des changements avant de recharger
@@ -1565,11 +1529,11 @@ const ClientsMap: React.FC = () => {
                   alert('Aucun changement détecté dans la base de données. La carte est déjà à jour.');
                 }
               }}
-                className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
-                title="Actualiser"
+              className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0"
+              title="Actualiser"
             >
-                <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
-                <span className="text-[10px] sm:text-sm whitespace-nowrap">Actualiser</span>
+              <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
+              <span className="text-[10px] sm:text-sm whitespace-nowrap">Actualiser</span>
             </button>
             <button
               onClick={() => {
@@ -1606,15 +1570,14 @@ const ClientsMap: React.FC = () => {
                 // Recharger depuis l'API
                 fetchClients(true);
               }}
-                className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 text-rose-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
+              className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 text-rose-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0"
               title="Recharger complètement depuis l'API (supprime le cache)"
             >
-                <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]" />
-                <span className="text-[10px] sm:text-sm whitespace-nowrap">Recharger</span>
+              <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]" />
+              <span className="text-[10px] sm:text-sm whitespace-nowrap">Reboot</span>
             </button>
           </div>
         </div>
-          </div>
           
         {/* Section des clients sans coordonnées - Masquée pour économiser l'espace */}
         {/* {clientsWithoutCoordinates.length > 0 && (
