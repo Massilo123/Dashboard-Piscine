@@ -162,44 +162,13 @@ const ClientsMap: React.FC = () => {
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Fonction pour charger depuis le cache
-  const loadFromCache = (): boolean => {
+  // Fonction pour sauvegarder seulement le timestamp (les données viennent du cache MongoDB)
+  const saveTimestamp = (timestamp: string) => {
     try {
-      const cached = localStorage.getItem('clientsMapCache');
-      const cachedTimestamp = localStorage.getItem('clientsMapLastUpdate');
-      
-      if (cached && cachedTimestamp) {
-        const cacheData = JSON.parse(cached);
-        const cachedClients = cacheData.clients || [];
-        
-        // Ne charger que si on a des clients avec coordonnées
-        if (cachedClients.length > 0) {
-          setClients(cachedClients);
-          setSectorStats(cacheData.sectorStats || {});
-          setMissingClients(cacheData.missingClients || []);
-          setTotalWithCoordinates(cacheData.totalWithCoordinates || 0);
-          setLastUpdate(cachedTimestamp);
-          return true;
-        }
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement du cache:', error);
-    }
-    return false;
-  };
-
-  // Fonction pour sauvegarder dans le cache
-  const saveToCache = (clientsData: Client[], stats: Record<string, number>, missing: Array<{_id: string, name: string, address: string, reason: string}>, totalWithCoords: number, timestamp: string) => {
-    try {
-      localStorage.setItem('clientsMapCache', JSON.stringify({
-        clients: clientsData,
-        sectorStats: stats,
-        missingClients: missing,
-        totalWithCoordinates: totalWithCoords
-      }));
       localStorage.setItem('clientsMapLastUpdate', timestamp);
       setLastUpdate(timestamp);
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde du cache:', error);
+      console.error('Erreur lors de la sauvegarde du timestamp:', error);
     }
   };
 
@@ -335,50 +304,37 @@ const ClientsMap: React.FC = () => {
       // Mettre à jour les statistiques dans l'état pour qu'elles soient affichées correctement
       setSectorStats(stats);
       
-      // Obtenir les clients sans coordonnées depuis le cache
-      const cachedMissing = localStorage.getItem('clientsMapMissing');
-      const missingClients = cachedMissing ? JSON.parse(cachedMissing) : [];
-      
-      // Sauvegarder dans le cache
+      // Sauvegarder le timestamp
       const updateTimestamp = new Date().toISOString();
-      saveToCache(updated, stats, missingClients, updated.length, updateTimestamp);
-      console.log('✅ Cache de la carte mis à jour après modification incrémentale');
+      saveTimestamp(updateTimestamp);
+      console.log('✅ Timestamp mis à jour après modification incrémentale');
       console.log('📊 Statistiques mises à jour:', stats);
       
       return updated;
     });
   };
 
-  // Fonction fetchClients accessible depuis le bouton
+  // Fonction fetchClients - charge depuis l'API qui utilise le cache MongoDB
   const fetchClients = async (forceRefresh: boolean = false) => {
     try {
       setLoading(true);
       
-      // Si pas de rechargement forcé, vérifier le cache
+      // Si pas de rechargement forcé, vérifier les changements
       if (!forceRefresh) {
-        const cached = localStorage.getItem('clientsMapCache');
         const cachedTimestamp = localStorage.getItem('clientsMapLastUpdate');
         
-        // Si on a déjà un cache, vérifier les changements
-        if (cached && cachedTimestamp) {
+        if (cachedTimestamp) {
           const hasChanges = await checkForChanges();
           
-          if (!hasChanges) {
-            // Pas de changements, charger depuis le cache
-            if (loadFromCache()) {
-              setLoading(false);
-              console.log('✅ Données de la carte chargées depuis le cache (aucun changement détecté)');
-              
-              // Charger quand même les clients sans coordonnées (peuvent changer)
-              fetchClientsWithoutCoordinates();
-              return;
-            }
+          if (!hasChanges.hasChanges) {
+            // Pas de changements, charger depuis l'API (qui utilise le cache MongoDB)
+            console.log('✅ Aucun changement détecté, chargement depuis le cache MongoDB');
           }
           // Si hasChanges est true, continuer pour charger depuis l'API
         }
       }
 
-      // Charger depuis l'API
+      // Charger depuis l'API (qui utilise le cache MongoDB côté serveur)
       const response = await fetch(`${API_CONFIG.baseUrl}/api/clients/for-map`);
       const result = await response.json();
 
@@ -399,18 +355,12 @@ const ClientsMap: React.FC = () => {
           const lastUpdateResponse = await fetch(`${API_CONFIG.baseUrl}/api/clients/last-update`);
           const lastUpdateResult = await lastUpdateResponse.json();
           if (lastUpdateResult.success && lastUpdateResult.lastUpdate) {
-            // Sauvegarder dans le cache
-            saveToCache(
-              result.clients,
-              stats,
-              result.missingClients || [],
-              result.totalWithCoordinates || 0,
-              lastUpdateResult.lastUpdate
-            );
-            console.log('✅ Données de la carte sauvegardées dans le cache');
+            // Sauvegarder seulement le timestamp
+            saveTimestamp(lastUpdateResult.lastUpdate);
+            console.log('✅ Timestamp sauvegardé');
           }
         } catch (cacheError) {
-          console.error('Erreur lors de la sauvegarde du cache:', cacheError);
+          console.error('Erreur lors de la sauvegarde du timestamp:', cacheError);
         }
         
         setTotalWithCoordinates(result.totalWithCoordinates || 0);
@@ -448,7 +398,7 @@ const ClientsMap: React.FC = () => {
   };
 
   useEffect(() => {
-    // Charger immédiatement depuis le cache si disponible
+    // Charger depuis l'API (qui utilise le cache MongoDB côté serveur)
     // Ce useEffect ne doit s'exécuter qu'une seule fois au montage du composant
     const loadInitialData = async () => {
       // Si on a déjà vérifié les changements, ne pas re-vérifier (évite les rechargements quand on revient sur la page)
@@ -457,46 +407,32 @@ const ClientsMap: React.FC = () => {
         return;
       }
       
-      const cached = localStorage.getItem('clientsMapCache');
       const cachedTimestamp = localStorage.getItem('clientsMapLastUpdate');
       
-      if (cached && cachedTimestamp) {
-        console.log('📦 Chargement immédiat depuis le cache...');
-        if (loadFromCache()) {
-          setLoading(false);
-          console.log('✅ Données de la carte chargées depuis le cache');
-          
-          // Charger les clients sans coordonnées
-          fetchClientsWithoutCoordinates();
-          
-          // Vérifier les changements en arrière-plan UNE SEULE FOIS (sans bloquer l'UI)
-          // Mais ne recharger que si des changements sont détectés
-          hasCheckedChangesRef.current = true;
-          checkForChanges().then((result) => {
-            if (result.hasChanges) {
-              if (result.changedClients && result.changedClients.length > 0) {
-                console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
-                // Mettre à jour seulement les clients modifiés
-                updateMapWithChangedClients(result.changedClients);
-                // Mettre à jour le timestamp du cache
-                localStorage.setItem('clientsMapLastUpdate', new Date().toISOString());
-              } else {
-                console.log('🔄 Changements détectés mais pas de clients avec coordonnées, rechargement complet...');
-                fetchClients(true); // Forcer le rechargement complet
-              }
+      if (cachedTimestamp) {
+        // Vérifier les changements en arrière-plan UNE SEULE FOIS (sans bloquer l'UI)
+        hasCheckedChangesRef.current = true;
+        checkForChanges().then((result) => {
+          if (result.hasChanges) {
+            if (result.changedClients && result.changedClients.length > 0) {
+              console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
+              // Mettre à jour seulement les clients modifiés
+              updateMapWithChangedClients(result.changedClients);
+              // Mettre à jour le timestamp
+              saveTimestamp(new Date().toISOString());
             } else {
-              console.log('✅ Aucun changement détecté, conservation du cache');
+              console.log('🔄 Changements détectés, rechargement complet...');
+              fetchClients(true); // Forcer le rechargement complet
             }
-          }).catch((err) => {
-            console.error('Erreur lors de la vérification des changements:', err);
-            // En cas d'erreur, garder le cache (ne pas recharger)
-          });
-          
-          return;
-        }
+          } else {
+            console.log('✅ Aucun changement détecté');
+          }
+        }).catch((err) => {
+          console.error('Erreur lors de la vérification des changements:', err);
+        });
       }
       
-      // Si pas de cache, charger depuis l'API
+      // Charger depuis l'API (qui utilise le cache MongoDB)
       hasCheckedChangesRef.current = true;
       fetchClients();
     };
@@ -950,7 +886,6 @@ const ClientsMap: React.FC = () => {
         
         // Recharger les clients après géocodage (forcer le refresh)
         setTimeout(() => {
-          localStorage.removeItem('clientsMapCache');
           localStorage.removeItem('clientsMapLastUpdate');
           fetchClients(true);
         }, 2000);
@@ -1508,73 +1443,78 @@ const ClientsMap: React.FC = () => {
             </button>
             <button
               onClick={async () => {
-                // Vérifier d'abord s'il y a des changements avant de recharger
-                const result = await checkForChanges();
-                if (result.hasChanges) {
-                  if (result.changedClients && result.changedClients.length > 0) {
-                    console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
-                    // Mettre à jour seulement les clients modifiés
-                    updateMapWithChangedClients(result.changedClients);
-                    // Mettre à jour le timestamp du cache
-                    localStorage.setItem('clientsMapLastUpdate', new Date().toISOString());
-                  } else {
-                    console.log('🔄 Changements détectés mais pas de clients avec coordonnées, rechargement complet...');
-                    localStorage.removeItem('clientsMapCache');
-                    localStorage.removeItem('clientsMapLastUpdate');
-                    hasCheckedChangesRef.current = false;
-                    fetchClients(true);
-                  }
-                } else {
-                  console.log('✅ Aucun changement détecté, pas de rechargement nécessaire');
-                  alert('Aucun changement détecté dans la base de données. La carte est déjà à jour.');
-                }
-              }}
-              className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0"
-              title="Actualiser"
-            >
-              <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
-              <span className="text-[10px] sm:text-sm whitespace-nowrap">Actualiser</span>
-            </button>
-            <button
-              onClick={() => {
-                // Forcer un rechargement complet depuis l'API
-                console.log('🔄 Rechargement complet depuis l\'API...');
+                // Forcer un recalcul complet du cache MongoDB avec toutes les requêtes HERE
+                console.log('🔄 Recalcul complet du cache MongoDB...');
                 
-                // Supprimer tout le cache
-                localStorage.removeItem('clientsMapCache');
-                localStorage.removeItem('clientsMapLastUpdate');
-                localStorage.removeItem('clientsMapMissing');
-                
-                // Réinitialiser les flags
-                hasCheckedChangesRef.current = false;
-                clientsHashRef.current = '';
-                
-                // Réinitialiser les états
-                setClients([]);
-                setSectorStats({});
-                setMissingClients([]);
-                setTotalWithCoordinates(0);
-                setError(null);
-                
-                // Retirer tous les marqueurs de la carte
-                if (mapRef.current) {
-                  markersRef.current.forEach(marker => {
-                    if (mapRef.current) {
-                      mapRef.current.removeLayer(marker);
-                    }
-                    marker.remove();
+                try {
+                  setLoading(true);
+                  setError(null);
+                  
+                  // Appeler la route qui force un recalcul complet
+                  const response = await fetch(`${API_CONFIG.baseUrl}/api/clients/for-map/update-cache`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
                   });
-                  markersRef.current = [];
+
+                  const result = await response.json();
+
+                  if (result.success) {
+                    // Supprimer le timestamp pour forcer une vérification complète
+                    localStorage.removeItem('clientsMapLastUpdate');
+                    
+                    // Réinitialiser les flags
+                    hasCheckedChangesRef.current = false;
+                    clientsHashRef.current = '';
+                    
+                    // Réinitialiser les états
+                    setClients([]);
+                    setSectorStats({});
+                    setMissingClients([]);
+                    setTotalWithCoordinates(0);
+                    
+                    // Retirer tous les marqueurs de la carte
+                    if (mapRef.current) {
+                      markersRef.current.forEach(marker => {
+                        if (mapRef.current) {
+                          mapRef.current.removeLayer(marker);
+                        }
+                        marker.remove();
+                      });
+                      markersRef.current = [];
+                    }
+                    
+                    // Recharger depuis le cache MongoDB mis à jour
+                    await fetchClients(true);
+                    
+                    alert(`✅ Cache MongoDB mis à jour avec succès !\n${result.total || 0} clients traités.\n${result.totalInDatabase || 0} clients dans la base de données.`);
+                  } else {
+                    throw new Error(result.error || 'Erreur lors de la mise à jour du cache');
+                  }
+                } catch (err) {
+                  console.error('Erreur lors du recalcul du cache:', err);
+                  setError(err instanceof Error ? err.message : 'Erreur lors du recalcul du cache');
+                  alert(`❌ Erreur: ${err instanceof Error ? err.message : 'Erreur inconnue'}`);
+                } finally {
+                  setLoading(false);
                 }
-                
-                // Recharger depuis l'API
-                fetchClients(true);
               }}
-              className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 text-rose-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0"
-              title="Recharger complètement depuis l'API (supprime le cache)"
+              disabled={loading}
+              className="px-2 sm:px-4 py-1.5 sm:py-2.5 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 disabled:from-gray-600/20 disabled:to-gray-600/20 disabled:cursor-not-allowed text-rose-200 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0"
+              title="Recalculer complètement le cache MongoDB (fait ~500 requêtes HERE API)"
             >
-              <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]" />
-              <span className="text-[10px] sm:text-sm whitespace-nowrap">Reboot</span>
+              {loading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] animate-spin" />
+                  <span className="text-[10px] sm:text-sm whitespace-nowrap">Calcul...</span>
+                </>
+              ) : (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 sm:h-5 sm:w-5 drop-shadow-[0_0_4px_rgba(244,63,94,0.8)]" />
+                  <span className="text-[10px] sm:text-sm whitespace-nowrap">Reboot</span>
+                </>
+              )}
             </button>
           </div>
         </div>

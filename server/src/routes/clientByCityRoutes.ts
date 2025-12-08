@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import Client from '../models/Client';
+import { ClientByCityCache } from '../models/ClientCache';
 
 const router = Router();
 
@@ -1611,6 +1612,24 @@ router.get('/by-city-stream', async (req: Request, res: Response): Promise<void>
     console.log(`🏙️  Villes trouvées: ${totalCities}`);
     console.log(`========================================\n`);
 
+    // Sauvegarder dans le cache MongoDB avant d'envoyer la réponse finale
+    try {
+      await ClientByCityCache.findOneAndUpdate(
+        { cacheType: 'by-city' },
+        {
+          cacheType: 'by-city',
+          data: result,
+          totalClients: allClients.length,
+          lastUpdate: new Date()
+        },
+        { upsert: true, new: true }
+      );
+      console.log('✅ Cache MongoDB by-city mis à jour après streaming');
+    } catch (cacheError) {
+      console.error('❌ Erreur lors de la sauvegarde du cache MongoDB:', cacheError);
+      // Ne pas bloquer si la sauvegarde du cache échoue
+    }
+
     sendProgress({
       type: 'complete',
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1630,13 +1649,210 @@ router.get('/by-city-stream', async (req: Request, res: Response): Promise<void>
   }
 });
 
-// Route classique (conservée pour compatibilité)
-router.get('/by-city', async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Récupérer TOUS les clients
-    const allClients = await Client.find({});
-    const clients = allClients.filter(c => c.addressLine1 && c.addressLine1.trim() !== '');
+// Fonction pour traiter un seul client et retourner ses données formatées
+async function processSingleClient(client: any): Promise<{
+  clientWithLocation: ClientWithLocation;
+  sector: string;
+  city: string;
+  district?: string;
+}> {
+  if (!client.addressLine1 || client.addressLine1.trim() === '') {
+    throw new Error('Client sans adresse');
+  }
 
+  const { city, district } = await extractCityAndDistrict(client.addressLine1);
+  const sector = getSector(city);
+
+  const clientWithLocation: ClientWithLocation = {
+    _id: client._id.toString(),
+    givenName: client.givenName || '',
+    familyName: client.familyName || '',
+    phoneNumber: client.phoneNumber ?? undefined,
+    addressLine1: client.addressLine1,
+    coordinates: client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null
+      ? { lng: client.coordinates.lng, lat: client.coordinates.lat }
+      : undefined,
+    city,
+    district
+  };
+
+  return { clientWithLocation, sector, city, district };
+}
+
+// Fonction pour ajouter un client au cache "by-city" de manière incrémentale
+export async function addClientToByCityCache(clientId: string): Promise<void> {
+  try {
+    const client = await Client.findById(clientId);
+    if (!client || !client.addressLine1 || client.addressLine1.trim() === '') {
+      console.log(`⚠️ Client ${clientId} sans adresse, ignoré pour le cache by-city`);
+      return;
+    }
+
+    // Récupérer le cache existant
+    const cached = await ClientByCityCache.findOne({ cacheType: 'by-city' });
+    if (!cached || !cached.data) {
+      console.log('⚠️ Pas de cache by-city existant, création complète nécessaire');
+      return;
+    }
+
+    // Traiter le nouveau client
+    const { clientWithLocation, sector, city, district } = await processSingleClient(client);
+    
+    // Mettre à jour le cache
+    const cacheData = cached.data as any;
+    
+    // Initialiser le secteur s'il n'existe pas
+    if (!cacheData[sector]) {
+      cacheData[sector] = {};
+    }
+
+    // Pour Montréal et Laval
+    if ((sector === 'Montréal' && city.toLowerCase() === 'montréal') || 
+        (sector === 'Laval' && city.toLowerCase() === 'laval')) {
+      const sectorKey = sector;
+      
+      if (!cacheData[sector][sectorKey]) {
+        cacheData[sector][sectorKey] = {
+          clients: [],
+          districts: {}
+        };
+      }
+      
+      if (district) {
+        if (!cacheData[sector][sectorKey].districts) {
+          cacheData[sector][sectorKey].districts = {};
+        }
+        if (!cacheData[sector][sectorKey].districts[district]) {
+          cacheData[sector][sectorKey].districts[district] = [];
+        }
+        cacheData[sector][sectorKey].districts[district].push(clientWithLocation);
+      } else {
+        cacheData[sector][sectorKey].clients.push(clientWithLocation);
+      }
+    } else {
+      // Pour les autres villes
+      if (!cacheData[sector][city]) {
+        cacheData[sector][city] = { clients: [] };
+      }
+      cacheData[sector][city].clients.push(clientWithLocation);
+    }
+
+    // Sauvegarder le cache mis à jour
+    await ClientByCityCache.findOneAndUpdate(
+      { cacheType: 'by-city' },
+      {
+        data: cacheData,
+        totalClients: cached.totalClients + 1,
+        lastUpdate: new Date()
+      }
+    );
+
+    console.log(`✅ Client ${clientId} ajouté au cache by-city (${sector} - ${city}${district ? ` - ${district}` : ''})`);
+  } catch (error) {
+    console.error(`❌ Erreur lors de l'ajout du client ${clientId} au cache by-city:`, error);
+    // En cas d'erreur, invalider le cache pour forcer un recalcul
+    await ClientByCityCache.deleteMany({ cacheType: 'by-city' });
+  }
+}
+
+// Fonction pour retirer un client du cache "by-city"
+export async function removeClientFromByCityCache(clientId: string): Promise<void> {
+  try {
+    const cached = await ClientByCityCache.findOne({ cacheType: 'by-city' });
+    if (!cached || !cached.data) {
+      return;
+    }
+
+    const cacheData = cached.data as any;
+    let found = false;
+
+    // Parcourir tous les secteurs pour trouver et retirer le client
+    for (const sector of Object.keys(cacheData)) {
+      const sectorData = cacheData[sector];
+      
+      // Pour Montréal et Laval
+      if (sector === 'Montréal' || sector === 'Laval') {
+        if (sectorData[sector]) {
+          const cityData = sectorData[sector];
+          
+          // Chercher dans les districts
+          if (cityData.districts) {
+            for (const district of Object.keys(cityData.districts)) {
+              const clients = cityData.districts[district];
+              const index = clients.findIndex((c: ClientWithLocation) => c._id === clientId);
+              if (index >= 0) {
+                clients.splice(index, 1);
+                found = true;
+                break;
+              }
+            }
+          }
+          
+          // Chercher dans les clients sans district
+          if (!found && cityData.clients) {
+            const index = cityData.clients.findIndex((c: ClientWithLocation) => c._id === clientId);
+            if (index >= 0) {
+              cityData.clients.splice(index, 1);
+              found = true;
+            }
+          }
+        }
+      } else {
+        // Pour les autres secteurs
+        for (const city of Object.keys(sectorData)) {
+          const cityData = sectorData[city];
+          if (cityData.clients) {
+            const index = cityData.clients.findIndex((c: ClientWithLocation) => c._id === clientId);
+            if (index >= 0) {
+              cityData.clients.splice(index, 1);
+              found = true;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (found) break;
+    }
+
+    if (found) {
+      await ClientByCityCache.findOneAndUpdate(
+        { cacheType: 'by-city' },
+        {
+          data: cacheData,
+          totalClients: Math.max(0, cached.totalClients - 1),
+          lastUpdate: new Date()
+        }
+      );
+      console.log(`✅ Client ${clientId} retiré du cache by-city`);
+    }
+  } catch (error) {
+    console.error(`❌ Erreur lors de la suppression du client ${clientId} du cache by-city:`, error);
+  }
+}
+
+// Fonction pour mettre à jour un client dans le cache "by-city"
+export async function updateClientInByCityCache(clientId: string): Promise<void> {
+  try {
+    // Retirer l'ancien client
+    await removeClientFromByCityCache(clientId);
+    // Ajouter le client mis à jour
+    await addClientToByCityCache(clientId);
+    console.log(`✅ Client ${clientId} mis à jour dans le cache by-city`);
+  } catch (error) {
+    console.error(`❌ Erreur lors de la mise à jour du client ${clientId} dans le cache by-city:`, error);
+    // En cas d'erreur, invalider le cache
+    await ClientByCityCache.deleteMany({ cacheType: 'by-city' });
+  }
+}
+
+// Fonction utilitaire pour mettre à jour le cache "by-city"
+async function updateByCityCache(): Promise<{ data: any; totalClients: number }> {
+  // Récupérer TOUS les clients
+  const allClients = await Client.find({});
+  const clients = allClients.filter(c => c.addressLine1 && c.addressLine1.trim() !== '');
+
+  try {
     console.log(`\n========================================`);
     console.log(`🚀 DÉBUT DU TRAITEMENT (mode classique)`);
     console.log(`📊 Total de clients: ${allClients.length}`);
@@ -1904,13 +2120,88 @@ router.get('/by-city', async (req: Request, res: Response): Promise<void> => {
     console.log(`🏙️  Villes trouvées: ${totalCities}`);
     console.log(`========================================\n`);
 
+    return { data: result, totalClients: totalAllClients };
+  } catch (error) {
+    console.error('❌ Erreur lors du calcul des clients par ville:', error);
+    throw error;
+  }
+}
+
+// Route classique (conservée pour compatibilité) - Utilise maintenant le cache
+router.get('/by-city', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Vérifier si le cache existe
+    const cached = await ClientByCityCache.findOne({ cacheType: 'by-city' });
+    
+    if (cached && cached.data) {
+      console.log('✅ Utilisation du cache pour /by-city');
+      res.json({
+        success: true,
+        data: cached.data,
+        totalClients: cached.totalClients
+      });
+      return;
+    }
+    
+    // Si pas de cache, calculer et sauvegarder
+    console.log('📦 Pas de cache, calcul en cours...');
+    const result = await updateByCityCache();
+    
+    // Sauvegarder dans le cache
+    await ClientByCityCache.findOneAndUpdate(
+      { cacheType: 'by-city' },
+      {
+        cacheType: 'by-city',
+        data: result.data,
+        totalClients: result.totalClients,
+        lastUpdate: new Date()
+      },
+      { upsert: true, new: true }
+    );
+    
+    console.log('✅ Cache mis à jour pour /by-city');
+    
     res.json({
       success: true,
-      data: result,
-      totalClients: totalAllClients
+      data: result.data,
+      totalClients: result.totalClients
     });
   } catch (error) {
     console.error('❌ Erreur lors de la récupération des clients par ville:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Une erreur est survenue'
+    });
+  }
+});
+
+// Route pour forcer la mise à jour du cache "by-city"
+router.post('/by-city/update-cache', async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('🔄 Mise à jour forcée du cache by-city...');
+    const result = await updateByCityCache();
+    
+    // Sauvegarder dans le cache
+    await ClientByCityCache.findOneAndUpdate(
+      { cacheType: 'by-city' },
+      {
+        cacheType: 'by-city',
+        data: result.data,
+        totalClients: result.totalClients,
+        lastUpdate: new Date()
+      },
+      { upsert: true, new: true }
+    );
+    
+    console.log('✅ Cache by-city mis à jour avec succès');
+    
+    res.json({
+      success: true,
+      message: 'Cache mis à jour avec succès',
+      totalClients: result.totalClients
+    });
+  } catch (error) {
+    console.error('❌ Erreur lors de la mise à jour du cache:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Une erreur est survenue'
@@ -1960,9 +2251,23 @@ router.post('/fix-ambiguous-address', async (req: Request, res: Response): Promi
 
     // Géocoder automatiquement le client après correction de l'adresse
     const { geocodeClient } = await import('../utils/geocodeClient');
-    geocodeClient(client._id.toString()).catch(err => {
-      console.error('Erreur lors du géocodage automatique après correction:', err);
-    });
+    geocodeClient(client._id.toString())
+      .then(() => {
+        // Après géocodage, mettre à jour le cache
+        updateClientInByCityCache(client._id.toString()).catch(err => {
+          console.error('Erreur lors de la mise à jour du cache by-city:', err);
+        });
+        updateClientInForMapCache(client._id.toString()).catch(err => {
+          console.error('Erreur lors de la mise à jour du cache for-map:', err);
+        });
+      })
+      .catch(err => {
+        console.error('Erreur lors du géocodage automatique après correction:', err);
+        // Même si le géocodage échoue, essayer de mettre à jour le cache
+        updateClientInByCityCache(client._id.toString()).catch(err => {
+          console.error('Erreur lors de la mise à jour du cache by-city:', err);
+        });
+      });
 
     res.json({
       success: true,
@@ -2174,6 +2479,39 @@ router.get('/by-city-changes', async (req: Request, res: Response): Promise<void
 
     console.log(`✅ ${clientsForByCity.length} client(s) formaté(s) pour ClientsByCity`);
 
+    // Mettre à jour les caches MongoDB pour chaque client modifié
+    for (const client of changedClients) {
+      const clientId = client._id.toString();
+      try {
+        await updateClientInByCityCache(clientId);
+      } catch (err) {
+        console.error(`❌ Erreur cache by-city pour ${clientId}:`, err);
+      }
+
+      // Mettre à jour le cache for-map seulement si le client a des coordonnées
+      const hasCoords = client.coordinates && 
+        typeof client.coordinates === 'object' &&
+        client.coordinates !== null &&
+        'lng' in client.coordinates &&
+        'lat' in client.coordinates &&
+        client.coordinates.lng != null &&
+        client.coordinates.lat != null;
+
+      if (hasCoords) {
+        try {
+          await updateClientInForMapCache(clientId);
+        } catch (err) {
+          console.error(`❌ Erreur cache for-map pour ${clientId}:`, err);
+        }
+      } else {
+        try {
+          await removeClientFromForMapCache(clientId);
+        } catch {
+          // Log silencieux pour les clients sans coordonnées
+        }
+      }
+    }
+
     // Toujours retourner clientsForByCity, même s'il est vide (pour éviter les rechargements complets inutiles)
     res.json({
       success: true,
@@ -2222,11 +2560,24 @@ router.post('/update-single-client', async (req: Request, res: Response): Promis
     client.coordinates = undefined;
     await client.save();
 
-    // Géocoder automatiquement le client après mise à jour de l'adresse
+    // Géocoder automatiquement le client après mise à jour de l'adresse (ATTENDRE que ce soit terminé)
     const { geocodeClient } = await import('../utils/geocodeClient');
-    geocodeClient(client._id.toString()).catch(err => {
-      console.error('Erreur lors du géocodage automatique après mise à jour:', err);
-    });
+    try {
+      await geocodeClient(client._id.toString());
+      
+      // Attendre un peu pour s'assurer que la base de données est à jour
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Recharger le client depuis la base pour avoir les nouvelles coordonnées
+      const updatedClient = await Client.findById(clientId);
+      if (updatedClient) {
+        // Mettre à jour la référence du client avec les nouvelles données
+        client.set(updatedClient.toObject());
+        await client.save();
+      }
+    } catch (err) {
+      console.error('❌ Erreur lors du géocodage automatique après mise à jour:', err);
+    }
 
     // Traiter ce client pour obtenir sa nouvelle localisation
     const addressResult = await extractCityAndDistrict(newAddress);
@@ -2276,6 +2627,49 @@ router.post('/update-single-client', async (req: Request, res: Response): Promis
       district: district
     };
 
+    // Mettre à jour le cache by-city (fonctionne toujours, même sans coordonnées)
+    try {
+      await updateClientInByCityCache(client._id.toString());
+    } catch (err) {
+      console.error('❌ Erreur lors de la mise à jour du cache by-city:', err);
+    }
+
+    // Mettre à jour le cache for-map
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Vérifier à nouveau les coordonnées directement depuis la base de données
+    const finalClient = await Client.findById(clientId).lean();
+    const hasFinalCoordinates = finalClient && finalClient.coordinates && 
+      typeof finalClient.coordinates === 'object' &&
+      finalClient.coordinates !== null &&
+      'lng' in finalClient.coordinates &&
+      'lat' in finalClient.coordinates &&
+      finalClient.coordinates.lng != null &&
+      finalClient.coordinates.lat != null;
+    
+    if (hasFinalCoordinates) {
+      try {
+        await updateClientInForMapCache(client._id.toString());
+      } catch (err) {
+        console.error('❌ Erreur lors de la mise à jour du cache for-map:', err);
+        // En cas d'erreur, essayer de forcer la mise à jour en retirant puis ajoutant
+        try {
+          await removeClientFromForMapCache(client._id.toString());
+          await addClientToForMapCache(client._id.toString());
+        } catch (retryErr) {
+          console.error('❌ Erreur lors de la mise à jour de secours:', retryErr);
+        }
+      }
+    } else {
+      // Si pas de coordonnées, retirer le client du cache for-map
+      try {
+        await removeClientFromForMapCache(client._id.toString());
+      } catch (err) {
+        console.error('❌ Erreur lors de la suppression du client du cache for-map:', err);
+      }
+    }
+
+    console.log('📤 Envoi de la réponse au client...');
     res.json({
       success: true,
       message: 'Client mis à jour avec succès.',
@@ -2288,7 +2682,6 @@ router.post('/update-single-client', async (req: Request, res: Response): Promis
     });
 
   } catch (error) {
-    console.error('❌ Erreur lors de la mise à jour du client:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Une erreur est survenue'
@@ -2416,7 +2809,196 @@ function extractClientsFromSectorData(clientsBySector: Record<string, Record<str
 
 // Route pour récupérer tous les clients avec leurs coordonnées pour la carte
 // Réutilise la même logique que /by-city-stream pour garantir la cohérence
-router.get('/for-map', async (req: Request, res: Response): Promise<void> => {
+// Fonction pour ajouter un client au cache "for-map" de manière incrémentale
+export async function addClientToForMapCache(clientId: string): Promise<void> {
+  try {
+    const client = await Client.findById(clientId).lean();
+    
+    if (!client) {
+      return;
+    }
+
+    // Vérifier si le client a des coordonnées
+    const hasCoordinates = client.coordinates && 
+      typeof client.coordinates === 'object' &&
+      client.coordinates !== null &&
+      'lng' in client.coordinates &&
+      'lat' in client.coordinates &&
+      client.coordinates.lng != null &&
+      client.coordinates.lat != null;
+
+    if (!hasCoordinates) {
+      console.log(`⚠️ Client ${clientId} (${client.givenName || ''} ${client.familyName || ''}) sans coordonnées, ignoré pour le cache for-map`);
+      console.log(`   - addressLine1: ${client.addressLine1 || 'null'}`);
+      console.log(`   - coordinates: ${JSON.stringify(client.coordinates)}`);
+      return;
+    }
+    
+    const coords = client.coordinates as { lng: number; lat: number };
+    console.log(`📍 Ajout du client ${clientId} au cache for-map avec coordonnées: ${coords.lng}, ${coords.lat}`);
+
+    // Récupérer le cache existant
+    const cached = await ClientByCityCache.findOne({ cacheType: 'for-map' });
+    if (!cached || !cached.data) {
+      return;
+    }
+
+    // Traiter le client
+    let city = 'Inconnu';
+    let district: string | undefined;
+    let sector = 'Non assignés';
+
+    if (client.addressLine1) {
+      try {
+        const addressResult = await extractCityAndDistrict(client.addressLine1);
+        city = addressResult.city;
+        district = addressResult.district;
+        sector = getSector(city);
+      } catch (error) {
+        console.warn(`Erreur lors de l'extraction de la ville pour ${client.givenName}:`, error);
+        if (client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null) {
+          const coordsResult = await extractCityFromCoordinates(client.coordinates.lng, client.coordinates.lat);
+          if (coordsResult) {
+            city = coordsResult.city;
+            district = coordsResult.district;
+            sector = getSector(city);
+          }
+        }
+      }
+    }
+
+    const cacheData = cached.data as any;
+    const formattedClient = {
+      _id: client._id.toString(),
+      name: `${client.givenName || ''} ${client.familyName || ''}`.trim(),
+      phoneNumber: client.phoneNumber || undefined,
+      address: client.addressLine1 || '',
+      city: city,
+      district: district || undefined,
+      sector: sector,
+      coordinates: {
+        lng: (client.coordinates as any).lng,
+        lat: (client.coordinates as any).lat
+      }
+    };
+
+    // Vérifier si le client existe déjà dans le cache (éviter les doublons)
+    if (!cacheData.clients) {
+      cacheData.clients = [];
+    }
+    
+    // Retirer l'ancienne entrée si elle existe (au cas où)
+    const existingIndex = cacheData.clients.findIndex((c: any) => c._id === clientId);
+    if (existingIndex >= 0) {
+      cacheData.clients.splice(existingIndex, 1);
+    }
+    
+    // Ajouter le client à la liste
+    cacheData.clients.push(formattedClient);
+
+    // Mettre à jour les statistiques (ne pas incrémenter si le client existait déjà)
+    const wasNew = existingIndex < 0;
+    cacheData.total = cacheData.clients.length;
+    if (wasNew) {
+      cacheData.totalInDatabase = (cacheData.totalInDatabase || 0) + 1;
+      cacheData.totalWithCoordinates = (cacheData.totalWithCoordinates || 0) + 1;
+    }
+
+    // Sauvegarder
+    const updateResult = await ClientByCityCache.findOneAndUpdate(
+      { cacheType: 'for-map' },
+      {
+        data: cacheData,
+        totalClients: cacheData.totalInDatabase,
+        lastUpdate: new Date()
+      },
+      { new: true }
+    );
+    
+    if (!updateResult) {
+      throw new Error('Échec de la sauvegarde du cache for-map');
+    }
+  } catch (error) {
+    console.error(`❌ Erreur lors de l'ajout du client ${clientId} au cache for-map:`, error);
+    await ClientByCityCache.deleteMany({ cacheType: 'for-map' });
+  }
+}
+
+// Fonction pour retirer un client du cache "for-map"
+export async function removeClientFromForMapCache(clientId: string): Promise<void> {
+  try {
+    const cached = await ClientByCityCache.findOne({ cacheType: 'for-map' });
+    if (!cached || !cached.data) {
+      return;
+    }
+
+    const cacheData = cached.data as any;
+    if (cacheData.clients) {
+      const index = cacheData.clients.findIndex((c: any) => c._id === clientId);
+      if (index >= 0) {
+        cacheData.clients.splice(index, 1);
+        cacheData.total = cacheData.clients.length;
+        cacheData.totalInDatabase = Math.max(0, cacheData.totalInDatabase - 1);
+        cacheData.totalWithCoordinates = Math.max(0, cacheData.totalWithCoordinates - 1);
+
+        await ClientByCityCache.findOneAndUpdate(
+          { cacheType: 'for-map' },
+          {
+            data: cacheData,
+            totalClients: cacheData.totalInDatabase,
+            lastUpdate: new Date()
+          }
+        );
+      }
+    }
+  } catch (error) {
+    console.error(`❌ Erreur lors de la suppression du client ${clientId} du cache for-map:`, error);
+  }
+}
+
+// Fonction pour mettre à jour un client dans le cache "for-map"
+export async function updateClientInForMapCache(clientId: string): Promise<void> {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Vérifier que le client a bien des coordonnées avant de continuer
+    const clientCheck = await Client.findById(clientId).lean();
+    if (!clientCheck) {
+      await removeClientFromForMapCache(clientId);
+      return;
+    }
+    
+    const hasCoords = clientCheck.coordinates && 
+      typeof clientCheck.coordinates === 'object' &&
+      clientCheck.coordinates !== null &&
+      'lng' in clientCheck.coordinates &&
+      'lat' in clientCheck.coordinates &&
+      clientCheck.coordinates.lng != null &&
+      clientCheck.coordinates.lat != null;
+    
+    if (!hasCoords) {
+      await removeClientFromForMapCache(clientId);
+      return;
+    }
+    
+    // Retirer puis ajouter
+    await removeClientFromForMapCache(clientId);
+    await addClientToForMapCache(clientId);
+  } catch (error) {
+    console.error(`❌ Erreur lors de la mise à jour du client ${clientId} dans le cache for-map:`, error);
+    throw error;
+  }
+}
+
+// Fonction utilitaire pour mettre à jour le cache "for-map"
+async function updateForMapCache(): Promise<{
+  clients: any[];
+  total: number;
+  totalInDatabase: number;
+  totalWithCoordinates: number;
+  withoutCoordinates: number;
+  missingClients: Array<{_id: string, name: string, address: string, reason: string}>;
+}> {
   try {
     // Utiliser la même logique que /by-city pour obtenir les données traitées
     // On va appeler la logique interne sans streaming
@@ -2797,22 +3379,116 @@ router.get('/for-map', async (req: Request, res: Response): Promise<void> => {
       coordinates: client.coordinates
     }));
 
-    res.json({
-      success: true,
+    return {
       clients: formattedClients,
       total: formattedClients.length,
       totalInDatabase: allClients.length,
       totalWithCoordinates: clientsWithCoordinates.length,
       withoutCoordinates: totalWithoutCoordinates,
-      missingClients: missingClients,
-      message: missingClients.length > 0
-        ? `${missingClients.length} client(s) avec coordonnées ne sont pas affichés. Voir les logs serveur pour plus de détails.`
-        : totalWithoutCoordinates > 0 
-          ? `${totalWithoutCoordinates} client(s) ne peuvent pas être affichés sur la carte (sans coordonnées GPS)`
+      missingClients: missingClients
+    };
+  } catch (error) {
+    console.error('❌ Erreur lors du calcul des clients pour la carte:', error);
+    throw error;
+  }
+}
+
+// Route pour la carte - Utilise maintenant le cache
+router.get('/for-map', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Vérifier si le cache existe
+    const cached = await ClientByCityCache.findOne({ cacheType: 'for-map' });
+    
+    if (cached && cached.data) {
+      const cacheData = cached.data as any;
+      console.log('✅ Utilisation du cache pour /for-map');
+      
+      res.json({
+        success: true,
+        clients: cacheData.clients || [],
+        total: cacheData.total || 0,
+        totalInDatabase: cacheData.totalInDatabase || 0,
+        totalWithCoordinates: cacheData.totalWithCoordinates || 0,
+        withoutCoordinates: cacheData.withoutCoordinates || 0,
+        missingClients: cacheData.missingClients || [],
+        message: cacheData.missingClients && cacheData.missingClients.length > 0
+          ? `${cacheData.missingClients.length} client(s) avec coordonnées ne sont pas affichés. Voir les logs serveur pour plus de détails.`
+          : cacheData.withoutCoordinates && cacheData.withoutCoordinates > 0 
+            ? `${cacheData.withoutCoordinates} client(s) ne peuvent pas être affichés sur la carte (sans coordonnées GPS)`
+            : 'Tous les clients sont affichés sur la carte'
+      });
+      return;
+    }
+    
+    // Si pas de cache, calculer et sauvegarder
+    console.log('📦 Pas de cache, calcul en cours pour /for-map...');
+    const result = await updateForMapCache();
+    
+    // Sauvegarder dans le cache
+    await ClientByCityCache.findOneAndUpdate(
+      { cacheType: 'for-map' },
+      {
+        cacheType: 'for-map',
+        data: result,
+        totalClients: result.totalInDatabase,
+        lastUpdate: new Date()
+      },
+      { upsert: true, new: true }
+    );
+    
+    console.log('✅ Cache mis à jour pour /for-map');
+    
+    res.json({
+      success: true,
+      clients: result.clients,
+      total: result.total,
+      totalInDatabase: result.totalInDatabase,
+      totalWithCoordinates: result.totalWithCoordinates,
+      withoutCoordinates: result.withoutCoordinates,
+      missingClients: result.missingClients,
+      message: result.missingClients.length > 0
+        ? `${result.missingClients.length} client(s) avec coordonnées ne sont pas affichés. Voir les logs serveur pour plus de détails.`
+        : result.withoutCoordinates > 0 
+          ? `${result.withoutCoordinates} client(s) ne peuvent pas être affichés sur la carte (sans coordonnées GPS)`
           : 'Tous les clients sont affichés sur la carte'
     });
   } catch (error) {
     console.error('❌ Erreur lors de la récupération des clients pour la carte:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Une erreur est survenue'
+    });
+  }
+});
+
+// Route pour forcer la mise à jour du cache "for-map"
+router.post('/for-map/update-cache', async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('🔄 Mise à jour forcée du cache for-map...');
+    const result = await updateForMapCache();
+    
+    // Sauvegarder dans le cache
+    await ClientByCityCache.findOneAndUpdate(
+      { cacheType: 'for-map' },
+      {
+        cacheType: 'for-map',
+        data: result,
+        totalClients: result.totalInDatabase,
+        lastUpdate: new Date()
+      },
+      { upsert: true, new: true }
+    );
+    
+    console.log('✅ Cache for-map mis à jour avec succès');
+    
+    res.json({
+      success: true,
+      message: 'Cache mis à jour avec succès',
+      total: result.total,
+      totalInDatabase: result.totalInDatabase
+    });
+  } catch (error) {
+    console.error('❌ Erreur lors de la mise à jour du cache:', error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Une erreur est survenue'

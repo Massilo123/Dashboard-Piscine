@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { MapPin, Users, ChevronDown, ChevronRight, Phone, Home, Search, X, Building, Edit2, Check } from 'lucide-react';
+import { MapPin, Users, ChevronDown, ChevronRight, Phone, Home, Search, X, Building, Edit2, Check, Loader2 } from 'lucide-react';
 import API_CONFIG from '../config/api';
 
 interface Client {
@@ -727,12 +727,12 @@ const ClientsByCity: React.FC = () => {
       } else {
         // Si la mise à jour locale échoue, recharger tout
         alert(`Client mis à jour. Rechargement des données...`);
-        fetchClientsByCityStream(true);
+        fetchClientsByCityStream();
       }
     } catch (error) {
       console.error('Erreur lors de la correction:', error);
       alert('Erreur lors de la correction de l\'adresse. Rechargement des données...');
-      fetchClientsByCityStream(true);
+      fetchClientsByCityStream();
     } finally {
       setIsFixing(false);
     }
@@ -1684,13 +1684,49 @@ const ClientsByCity: React.FC = () => {
               )}
             </p>
           </div>
-          <button
-            onClick={fetchClientsByCityStream}
-            className="px-3 py-2 sm:px-4 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-md transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex items-center justify-center gap-2 text-sm sm:text-base flex-shrink-0"
-          >
-            <MapPin className="h-3 w-3 sm:h-4 sm:w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
-            Actualiser
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={() => {
+                // Forcer un recalcul complet avec streaming (barre de progression)
+                console.log('🔄 Recalcul complet du cache MongoDB by-city avec streaming...');
+                
+                // Supprimer le cache local pour forcer un rechargement complet
+                localStorage.removeItem('clientsByCityLastUpdate');
+                localStorage.removeItem('clientsByCityCache');
+                localStorage.removeItem('clientsBySectorData');
+                localStorage.removeItem('lastUpdate');
+                
+                // Réinitialiser les flags
+                hasInitializedRef.current = false;
+                
+                // Réinitialiser les états
+                setClientsBySector({});
+                setClientsData({});
+                setTotalClients(0);
+                
+                // Réinitialiser la progression
+                setProgress({ processed: 0, total: 0, percentage: 0, currentClient: '', city: '', district: '', elapsed: '0s', estimated: '0s' });
+                
+                // Lancer le streaming qui va mettre à jour le cache MongoDB et afficher la progression
+                fetchClientsByCityStream();
+              }}
+              disabled={loading}
+              className="px-3 py-2 sm:px-4 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 disabled:from-gray-600/20 disabled:to-gray-600/20 disabled:cursor-not-allowed text-rose-200 rounded-md transition-all duration-200 flex items-center justify-center gap-2 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0 text-sm sm:text-base"
+              title="Recalculer complètement le cache MongoDB avec barre de progression (fait ~500 requêtes HERE API)"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 drop-shadow-[0_0_3px_rgba(244,63,94,0.8)] animate-spin" />
+                  <span>Calcul...</span>
+                </>
+              ) : (
+                <>
+                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 drop-shadow-[0_0_3px_rgba(244,63,94,0.8)]" />
+                  <span>Reboot</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Barre de recherche */}
