@@ -1760,55 +1760,100 @@ export async function removeClientFromByCityCache(clientId: string): Promise<voi
   try {
     const cached = await ClientByCityCache.findOne({ cacheType: 'by-city' });
     if (!cached || !cached.data) {
+      console.log(`⚠️ Pas de cache by-city trouvé pour retirer le client ${clientId}`);
       return;
     }
 
     const cacheData = cached.data as any;
     let found = false;
 
-    // Parcourir tous les secteurs pour trouver et retirer le client
+    console.log(`🔍 Recherche du client ${clientId} dans le cache by-city...`);
+
+    // Parcourir tous les secteurs (Montréal, Laval, Rive Nord, etc.)
     for (const sector of Object.keys(cacheData)) {
       const sectorData = cacheData[sector];
       
-      // Pour Montréal et Laval
+      if (!sectorData || typeof sectorData !== 'object') {
+        console.log(`  ⚠️ Secteur ${sector} n'est pas un objet valide`);
+        continue;
+      }
+      
+      // Pour Montréal et Laval : structure { districts: {...}, clients: [...] }
       if (sector === 'Montréal' || sector === 'Laval') {
-        if (sectorData[sector]) {
-          const cityData = sectorData[sector];
+        console.log(`  🔍 Recherche dans ${sector}...`);
+        
+        // Chercher dans les districts
+        if (sectorData.districts && typeof sectorData.districts === 'object') {
+          const districtKeys = Object.keys(sectorData.districts);
+          console.log(`    📍 Districts disponibles: ${districtKeys.join(', ')}`);
           
-          // Chercher dans les districts
-          if (cityData.districts) {
-            for (const district of Object.keys(cityData.districts)) {
-              const clients = cityData.districts[district];
-              const index = clients.findIndex((c: ClientWithLocation) => c._id === clientId);
-              if (index >= 0) {
-                clients.splice(index, 1);
-                found = true;
-                break;
+          for (const district of districtKeys) {
+            if (Array.isArray(sectorData.districts[district])) {
+              const clientsInDistrict = sectorData.districts[district];
+              console.log(`    🔍 Vérification du district ${district} (${clientsInDistrict.length} clients)`);
+              
+              // Vérifier tous les IDs pour le débogage
+              const clientIds = clientsInDistrict.map((c: any) => c?._id).filter(Boolean);
+              if (clientIds.includes(clientId)) {
+                const index = clientsInDistrict.findIndex((c: any) => c && String(c._id) === String(clientId));
+                if (index >= 0) {
+                  sectorData.districts[district].splice(index, 1);
+                  found = true;
+                  console.log(`    ✅ Client ${clientId} retiré du district ${district} (${sector})`);
+                  break;
+                }
               }
             }
           }
-          
-          // Chercher dans les clients sans district
-          if (!found && cityData.clients) {
-            const index = cityData.clients.findIndex((c: ClientWithLocation) => c._id === clientId);
+        }
+        
+        // Chercher dans les clients sans district
+        if (!found && sectorData.clients && Array.isArray(sectorData.clients)) {
+          console.log(`    🔍 Vérification des clients sans district (${sectorData.clients.length} clients)`);
+          const clientIds = sectorData.clients.map((c: any) => c?._id).filter(Boolean);
+          if (clientIds.includes(clientId)) {
+            const index = sectorData.clients.findIndex((c: any) => c && String(c._id) === String(clientId));
             if (index >= 0) {
-              cityData.clients.splice(index, 1);
+              sectorData.clients.splice(index, 1);
               found = true;
+              console.log(`    ✅ Client ${clientId} retiré des clients sans district (${sector})`);
             }
           }
         }
       } else {
-        // Pour les autres secteurs
+        // Pour les autres secteurs : structure { "Ville": { clients: [...], districts: {...} } }
+        console.log(`  🔍 Recherche dans ${sector} (autres secteurs)...`);
         for (const city of Object.keys(sectorData)) {
           const cityData = sectorData[city];
-          if (cityData.clients) {
-            const index = cityData.clients.findIndex((c: ClientWithLocation) => c._id === clientId);
+          if (!cityData || typeof cityData !== 'object') continue;
+          
+          // Chercher dans les districts de la ville
+          if (cityData.districts && typeof cityData.districts === 'object') {
+            for (const district of Object.keys(cityData.districts)) {
+              if (Array.isArray(cityData.districts[district])) {
+                const index = cityData.districts[district].findIndex((c: any) => c && String(c._id) === String(clientId));
+                if (index >= 0) {
+                  cityData.districts[district].splice(index, 1);
+                  found = true;
+                  console.log(`    ✅ Client ${clientId} retiré du district ${district} de ${city} (${sector})`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Chercher dans les clients de la ville
+          if (!found && cityData.clients && Array.isArray(cityData.clients)) {
+            const index = cityData.clients.findIndex((c: any) => c && String(c._id) === String(clientId));
             if (index >= 0) {
               cityData.clients.splice(index, 1);
               found = true;
+              console.log(`    ✅ Client ${clientId} retiré de ${city} (${sector})`);
               break;
             }
           }
+          
+          if (found) break;
         }
       }
       
@@ -1824,7 +1869,10 @@ export async function removeClientFromByCityCache(clientId: string): Promise<voi
           lastUpdate: new Date()
         }
       );
-      console.log(`✅ Client ${clientId} retiré du cache by-city`);
+      console.log(`✅ Client ${clientId} retiré du cache by-city et cache mis à jour`);
+    } else {
+      console.log(`⚠️ Client ${clientId} non trouvé dans le cache by-city`);
+      console.log(`   Structure du cache: ${JSON.stringify(Object.keys(cacheData))}`);
     }
   } catch (error) {
     console.error(`❌ Erreur lors de la suppression du client ${clientId} du cache by-city:`, error);

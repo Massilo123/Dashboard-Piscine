@@ -339,6 +339,24 @@ const ClientsMap: React.FC = () => {
       const result = await response.json();
 
       if (result.success) {
+        // Comparer les IDs pour détecter les suppressions
+        const newClientIds = new Set(result.clients.map((c: Client) => c._id));
+        
+        // Retirer les marqueurs des clients supprimés
+        if (mapRef.current) {
+          markersRef.current = markersRef.current.filter((marker) => {
+            const clientId = (marker as any).clientId;
+            if (!newClientIds.has(clientId)) {
+              // Client supprimé, retirer le marqueur
+              mapRef.current?.removeLayer(marker);
+              marker.remove();
+              console.log(`🗑️ Marqueur retiré pour le client supprimé: ${clientId}`);
+              return false;
+            }
+            return true;
+          });
+        }
+        
         setClients(result.clients);
         setMissingClients(result.missingClients || []);
 

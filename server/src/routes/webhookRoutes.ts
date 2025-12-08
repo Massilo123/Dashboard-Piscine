@@ -128,20 +128,34 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 break;
 
             case 'customer.deleted':
-                console.log('Client supprimé dans Square');
+                console.log('🗑️ Client supprimé dans Square');
                 if (data.object?.customer?.id) {
                     const client = await Client.findOne({ squareId: data.object.customer.id });
                     if (client) {
                         const clientId = client._id.toString();
-                        await Client.deleteOne({ squareId: data.object.customer.id });
+                        const clientName = `${client.givenName || ''} ${client.familyName || ''}`.trim();
+                        console.log(`🗑️ Suppression du client ${clientId} (${clientName})`);
                         
-                        // Retirer du cache
-                        removeClientFromByCityCache(clientId).catch(err => {
-                            console.error('Erreur lors de la suppression du cache by-city:', err);
-                        });
-                        removeClientFromForMapCache(clientId).catch(err => {
-                            console.error('Erreur lors de la suppression du cache for-map:', err);
-                        });
+                        // IMPORTANT: Retirer du cache AVANT de supprimer de MongoDB
+                        try {
+                            await removeClientFromByCityCache(clientId);
+                            console.log(`✅ Client retiré du cache by-city`);
+                        } catch (err) {
+                            console.error('❌ Erreur lors de la suppression du cache by-city:', err);
+                        }
+                        
+                        try {
+                            await removeClientFromForMapCache(clientId);
+                            console.log(`✅ Client retiré du cache for-map`);
+                        } catch (err) {
+                            console.error('❌ Erreur lors de la suppression du cache for-map:', err);
+                        }
+                        
+                        // Supprimer de MongoDB après avoir retiré du cache
+                        await Client.deleteOne({ squareId: data.object.customer.id });
+                        console.log(`✅ Client supprimé de MongoDB`);
+                    } else {
+                        console.log(`⚠️ Client avec squareId ${data.object.customer.id} non trouvé dans MongoDB`);
                     }
                 }
                 break;
