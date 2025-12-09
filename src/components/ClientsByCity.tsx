@@ -213,6 +213,25 @@ const ClientsByCity: React.FC = () => {
   // Fonction pour détecter et retirer les clients supprimés en comparant avec la liste complète
   const detectAndRemoveDeletedClients = useCallback(async () => {
     try {
+      // Vérifier d'abord si le cache contient des clients
+      // Si le cache est vide (totalClients: 0), ne pas faire la comparaison car cela viderait tout
+      const cached = localStorage.getItem('clientsByCityCache');
+      if (cached) {
+        try {
+          const cacheData = JSON.parse(cached);
+          if (cacheData.totalClients === 0 || !cacheData.clientsBySector || Object.keys(cacheData.clientsBySector).length === 0) {
+            console.log('ℹ️ Cache vide (0 clients), pas de vérification de suppressions nécessaire');
+            return;
+          }
+        } catch (e) {
+          console.warn('⚠️ Erreur lors de la lecture du cache, pas de vérification de suppressions');
+          return;
+        }
+      } else {
+        console.log('ℹ️ Pas de cache, pas de vérification de suppressions nécessaire');
+        return;
+      }
+      
       // Charger tous les clients depuis l'API pour obtenir la liste complète des IDs
       const response = await fetch(`${API_CONFIG.baseUrl}/api/clients/by-city`);
       const result = await response.json();
@@ -223,36 +242,54 @@ const ClientsByCity: React.FC = () => {
       }
       
       // Extraire tous les IDs des clients actuels depuis la réponse
+      // La structure est: { sector: { city: { clients: [...] } } } ou { sector: { districts: { district: [...] } } }
       const allClientIds = new Set<string>();
       
       const extractIds = (data: any) => {
         if (Array.isArray(data)) {
+          // Si c'est un tableau de clients
           data.forEach(item => {
             if (item._id) allClientIds.add(item._id);
-            if (item.clients) extractIds(item.clients);
-            if (item.districts) {
-              Object.values(item.districts).forEach((districtClients: any) => {
-                if (Array.isArray(districtClients)) extractIds(districtClients);
-              });
-            }
           });
         } else if (typeof data === 'object' && data !== null) {
-          Object.values(data).forEach((value: any) => {
-            if (typeof value === 'object' && value !== null) {
-              if ('clients' in value && Array.isArray(value.clients)) {
-                extractIds(value.clients);
-              }
-              if ('districts' in value && typeof value.districts === 'object' && value.districts !== null) {
-                Object.values(value.districts).forEach((districtClients: any) => {
-                  if (Array.isArray(districtClients)) extractIds(districtClients);
-                });
-              }
+          // Parcourir tous les secteurs (Laval, Rive Nord, etc.)
+          Object.values(data).forEach((sectorData: any) => {
+            if (typeof sectorData === 'object' && sectorData !== null) {
+              // Parcourir toutes les villes ou districts dans le secteur
+              Object.values(sectorData).forEach((cityOrDistrictData: any) => {
+                if (typeof cityOrDistrictData === 'object' && cityOrDistrictData !== null) {
+                  // Si c'est une structure avec 'clients' (ville)
+                  if ('clients' in cityOrDistrictData && Array.isArray(cityOrDistrictData.clients)) {
+                    cityOrDistrictData.clients.forEach((client: any) => {
+                      if (client._id) allClientIds.add(client._id);
+                    });
+                  }
+                  // Si c'est une structure avec 'districts' (Montréal/Laval)
+                  if ('districts' in cityOrDistrictData && typeof cityOrDistrictData.districts === 'object') {
+                    Object.values(cityOrDistrictData.districts).forEach((districtClients: any) => {
+                      if (Array.isArray(districtClients)) {
+                        districtClients.forEach((client: any) => {
+                          if (client._id) allClientIds.add(client._id);
+                        });
+                      }
+                    });
+                  }
+                  // Si c'est directement un tableau de clients (cas spécial)
+                  if (Array.isArray(cityOrDistrictData)) {
+                    cityOrDistrictData.forEach((client: any) => {
+                      if (client._id) allClientIds.add(client._id);
+                    });
+                  }
+                }
+              });
             }
           });
         }
       };
       
       extractIds(result.data);
+      
+      console.log(`🔍 ${allClientIds.size} ID(s) de client(s) extrait(s) depuis l'API`);
       
       // Comparer avec les clients actuels dans l'état pour détecter les suppressions
       setClientsBySector(prevSector => {
@@ -549,9 +586,80 @@ const ClientsByCity: React.FC = () => {
     });
   }, []);
 
-  useEffect(() => {
-    let eventSource: EventSource | null = null;
+  // Fonction pour charger directement depuis MongoDB (route optimisée, pas d'appels API externes)
+  const loadFromAPI = useCallback(async (forceReload: boolean = false) => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        if (forceReload) {
+          setClientsData({});
+          setClientsBySector({});
+          setExpandedSectors(new Set());
+          setExpandedCities(new Set());
+          setExpandedDistricts(new Set());
+        }
 
+        console.log('📦 Chargement depuis MongoDB (route optimisée /by-city)...');
+        const response = await fetch(`${API_CONFIG.baseUrl}/api/clients/by-city`);
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || 'Erreur lors du chargement');
+        }
+
+        // Les données sont déjà dans le bon format depuis l'API
+        const finalClientsBySector = result.data as ClientsBySectorData;
+        setClientsBySector(finalClientsBySector);
+        
+        // Aplatir pour clientsData (version sans secteurs)
+        const flattened: ClientsByCityData = {};
+        Object.values(finalClientsBySector).forEach(sector => {
+          if (typeof sector === 'object' && sector !== null) {
+            // Pour Montréal/Laval, la structure est différente
+            if ('districts' in sector || 'clients' in sector) {
+              const sectorData = sector as { districts?: Record<string, Client[]>; clients: Client[] };
+              if (sectorData.districts) {
+                Object.values(sectorData.districts).forEach(districtClients => {
+                  districtClients.forEach(client => {
+                    if (!flattened[client.city]) {
+                      flattened[client.city] = { clients: [] };
+                    }
+                    flattened[client.city].clients.push(client);
+                  });
+                });
+              }
+              if (sectorData.clients) {
+                sectorData.clients.forEach(client => {
+                  if (!flattened[client.city]) {
+                    flattened[client.city] = { clients: [] };
+                  }
+                  flattened[client.city].clients.push(client);
+                });
+              }
+            } else {
+              // Pour les autres secteurs, c'est directement organisé par ville
+              Object.assign(flattened, sector);
+            }
+          }
+        });
+        setClientsData(flattened);
+        setTotalClients(result.totalClients);
+        
+        // Sauvegarder dans le cache localStorage (optimisation)
+        const updateTimestamp = new Date().toISOString();
+        saveToCache(finalClientsBySector, flattened, result.totalClients, updateTimestamp);
+        
+        setLoading(false);
+        console.log(`✅ Chargement terminé (${result.totalClients} clients)`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+        setLoading(false);
+        console.error('❌ Erreur lors du chargement depuis l\'API:', err);
+      }
+  }, []);
+
+  useEffect(() => {
     const startStream = async (forceReload: boolean = false) => {
       try {
         // Vérifier si le cache existe
@@ -568,6 +676,7 @@ const ClientsByCity: React.FC = () => {
               console.log('✅ Données chargées depuis le cache (aucun changement détecté)');
               // Le timestamp est déjà mis à jour dans checkForChanges() avec celui du serveur
               // Détecter les suppressions même après chargement depuis le cache
+              // (la fonction vérifie elle-même si le cache est valide)
               detectAndRemoveDeletedClients();
               return;
             }
@@ -589,133 +698,17 @@ const ClientsByCity: React.FC = () => {
           // Si pas de hasChanges, continuer pour charger depuis l'API (cas normal)
         }
         
-        // Si pas de cache ou rechargement forcé, charger depuis l'API
+        // Si pas de cache ou rechargement forcé, charger depuis l'API (route optimisée)
         if (!hasCache || forceReload) {
           console.log(forceReload ? '🔄 Rechargement forcé depuis l\'API...' : '📦 Pas de cache, chargement depuis l\'API...');
+          loadFromAPI(forceReload);
+          return;
         }
 
-        setLoading(true);
-        setError(null);
-        if (forceReload) {
-        setClientsData({});
-        setClientsBySector({});
-          setExpandedSectors(new Set());
-          setExpandedCities(new Set());
-          setExpandedDistricts(new Set());
-        }
-        setProgress({ processed: 0, total: 0, percentage: 0, currentClient: '', city: '', district: '', elapsed: '0s', estimated: '0s' });
-
-        eventSource = new EventSource(`${API_CONFIG.baseUrl}/api/clients/by-city-stream`);
-
-        eventSource.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-
-            switch (data.type) {
-              case 'start':
-                setTotalClients(data.total);
-                setProgress(prev => ({ ...prev, total: data.total }));
-                console.log('🚀 Début du traitement:', data.message);
-                break;
-
-              case 'progress':
-                setProgress({
-                  processed: data.processed,
-                  total: data.total,
-                  percentage: data.progress,
-                  currentClient: data.currentClient,
-                  city: data.city,
-                  district: data.district,
-                  elapsed: data.elapsed,
-                  estimated: data.estimated
-                });
-                console.log(`📊 Progression: ${data.progress}% (${data.processed}/${data.total}) - ${data.currentClient} - ${data.city}${data.district ? ` - ${data.district}` : ''}`);
-                break;
-
-              case 'update':
-                // Vérifier si les données sont organisées par secteur
-                if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
-                  const firstKey = Object.keys(data.data)[0];
-                  // Si la première clé est un secteur (Montréal, Laval, Rive Nord, etc.)
-                  if (firstKey === 'Montréal' || firstKey === 'Laval' || firstKey === 'Rive Nord' || firstKey === 'Rive Sud' || firstKey === 'Autres') {
-                    setClientsBySector(data.data as ClientsBySectorData);
-                    // Aplatir pour compatibilité avec l'ancien code
-                    const flattened: ClientsByCityData = {};
-                    Object.values(data.data as ClientsBySectorData).forEach(sector => {
-                      Object.assign(flattened, sector);
-                    });
-                    setClientsData(flattened);
-                  } else {
-                    setClientsData(data.data as ClientsByCityData);
-                  }
-                }
-                // Ne pas ouvrir automatiquement les secteurs/villes - laisser l'utilisateur choisir
-                break;
-
-              case 'complete':
-                // Vérifier si les données sont organisées par secteur
-                let finalClientsBySector: ClientsBySectorData = {};
-                let finalClientsData: ClientsByCityData = {};
-                
-                if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
-                  const firstKey = Object.keys(data.data)[0];
-                  // Si la première clé est un secteur (Montréal, Laval, Rive Nord, etc.)
-                  if (firstKey === 'Montréal' || firstKey === 'Laval' || firstKey === 'Rive Nord' || firstKey === 'Rive Sud' || firstKey === 'Autres' || firstKey === 'Non assignés') {
-                    finalClientsBySector = data.data as ClientsBySectorData;
-                    setClientsBySector(finalClientsBySector);
-                    // Aplatir pour compatibilité avec l'ancien code
-                    const flattened: ClientsByCityData = {};
-                    Object.values(finalClientsBySector).forEach(sector => {
-                      if (typeof sector === 'object' && sector !== null) {
-                      Object.assign(flattened, sector);
-                      }
-                    });
-                    finalClientsData = flattened;
-                    setClientsData(finalClientsData);
-                  } else {
-                    finalClientsData = data.data as ClientsByCityData;
-                    setClientsData(finalClientsData);
-                  }
-                }
-                setTotalClients(data.totalClients);
-                
-                // Sauvegarder dans le cache
-                const updateTimestamp = new Date().toISOString();
-                saveToCache(finalClientsBySector, finalClientsData, data.totalClients, updateTimestamp);
-                
-                setLoading(false);
-                console.log('✅ Traitement terminé et sauvegardé dans le cache');
-                
-                // Vérifier immédiatement que le cache est accessible
-                const verifyCache = localStorage.getItem('clientsByCityCache');
-                const verifyTimestamp = localStorage.getItem('clientsByCityLastUpdate');
-                if (verifyCache && verifyTimestamp) {
-                  console.log('✅ Vérification: Cache accessible immédiatement après sauvegarde');
-                } else {
-                  console.error('❌ Vérification: Cache non accessible après sauvegarde !');
-                }
-                
-                eventSource?.close();
-                break;
-
-              case 'error':
-                setError(data.error);
-                setLoading(false);
-                console.error('❌ Erreur:', data.error);
-                eventSource?.close();
-                break;
-            }
-          } catch (err) {
-            console.error('Erreur parsing SSE:', err);
-          }
-        };
-
-        eventSource.onerror = (err) => {
-          console.error('Erreur EventSource:', err);
-          setError('Erreur de connexion au serveur');
-          setLoading(false);
-          eventSource?.close();
-        };
+        // Si on arrive ici, c'est qu'il y a un cache mais qu'on veut quand même recharger
+        // On utilise loadFromAPI à la place du streaming pour éviter les 500 appels API
+        console.log('⚠️ Cache existant mais chargement via API optimisée (pas de streaming)');
+        loadFromAPI(forceReload);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Une erreur est survenue');
         console.error('Erreur:', err);
@@ -739,6 +732,7 @@ const ClientsByCity: React.FC = () => {
         setLoading(false);
         console.log('✅ Données chargées depuis le cache');
         // Détecter les suppressions même après chargement depuis le cache
+        // (la fonction vérifie elle-même si le cache est valide)
         detectAndRemoveDeletedClients();
       }
       
@@ -753,7 +747,7 @@ const ClientsByCity: React.FC = () => {
           hasTimestamp: !!cachedTimestamp,
           hasCachedData: !!cachedData
         });
-        startStream(false);
+        loadFromAPI(false);
         return;
       }
       
@@ -785,13 +779,10 @@ const ClientsByCity: React.FC = () => {
 
     // Nettoyer lors du démontage
     return () => {
-      if (eventSource) {
-        eventSource.close();
-      }
       // Réinitialiser le flag si le composant est démonté
       hasInitializedRef.current = false;
     };
-  }, [refreshKey, updateClientsIncremental, detectAndRemoveDeletedClients]);
+  }, [refreshKey, updateClientsIncremental, detectAndRemoveDeletedClients, loadFromAPI]);
 
   const fetchClientsByCityStream = () => {
     // Réinitialiser tous les états pour fermer les menus
@@ -808,8 +799,8 @@ const ClientsByCity: React.FC = () => {
     // Réinitialiser le flag d'initialisation pour permettre un nouveau chargement
     hasInitializedRef.current = false;
     
-    // Forcer le re-render en changeant la clé
-    setRefreshKey(prev => prev + 1);
+    // Charger depuis l'API (route optimisée, pas de streaming)
+    loadFromAPI(true);
   };
 
   const handleFixAddress = async () => {
@@ -1230,14 +1221,21 @@ const ClientsByCity: React.FC = () => {
                     // Calculer le nombre de clients pour chaque secteur
                     const getSectorClientCount = (sector: string, cities: any): number => {
                       if (sector === 'Montréal' || sector === 'Laval') {
-                        if ('districts' in cities && cities.districts) {
-                          const districtCount = Object.values(cities.districts).reduce((sum: number, district: any) => {
-                            return sum + (Array.isArray(district) ? district.length : 0);
-                          }, 0);
-                          const directClientsCount = Array.isArray(cities.clients) ? cities.clients.length : 0;
-                          return districtCount + directClientsCount;
+                        // La structure est { "Montréal": { districts: {...}, clients: [...] } } ou { "Laval": { districts: {...}, clients: [...] } }
+                        const sectorData = cities[sector] || cities;
+                        if (sectorData && typeof sectorData === 'object') {
+                          let count = 0;
+                          if (sectorData.districts && typeof sectorData.districts === 'object') {
+                            count += Object.values(sectorData.districts).reduce((sum: number, district: any) => {
+                              return sum + (Array.isArray(district) ? district.length : 0);
+                            }, 0);
+                          }
+                          if (Array.isArray(sectorData.clients)) {
+                            count += sectorData.clients.length;
+                          }
+                          return count;
                         }
-                        return Array.isArray(cities.clients) ? cities.clients.length : 0;
+                        return 0;
                       }
                       // Pour les autres secteurs, compter les clients dans toutes les villes
                       if (typeof cities === 'object' && cities !== null) {
@@ -1269,11 +1267,17 @@ const ClientsByCity: React.FC = () => {
                     let sectorCityCount = 0;
                     
                     // Pour Montréal et Laval, la structure est différente (districts directement)
-                    if ((sector === 'Montréal' || sector === 'Laval') && 'districts' in cities) {
-                      if (cities.districts && Object.keys(cities.districts).length > 0) {
-                        sectorClientCount += Object.values(cities.districts).reduce((sum, clients) => sum + clients.length, 0);
+                    if (sector === 'Montréal' || sector === 'Laval') {
+                      // La structure est { "Montréal": { districts: {...}, clients: [...] } } ou { "Laval": { districts: {...}, clients: [...] } }
+                      const sectorData = cities[sector] || cities;
+                      if (sectorData && typeof sectorData === 'object') {
+                        if (sectorData.districts && Object.keys(sectorData.districts).length > 0) {
+                          sectorClientCount += Object.values(sectorData.districts).reduce((sum, clients) => sum + clients.length, 0);
+                        }
+                        if (sectorData.clients && Array.isArray(sectorData.clients)) {
+                          sectorClientCount += sectorData.clients.length;
+                        }
                       }
-                      sectorClientCount += cities.clients?.length || 0;
                       sectorCityCount = 1; // Montréal/Laval compte comme 1 ville
                     } else {
                       // Pour les autres secteurs, structure normale avec villes
@@ -1316,13 +1320,15 @@ const ClientsByCity: React.FC = () => {
                         {isSectorExpanded && (
                           <div className="px-6 pb-4 space-y-4 mt-2">
                             {/* Pour Montréal et Laval, afficher directement les quartiers (pas de niveau ville) */}
-                            {(sector === 'Montréal' || sector === 'Laval') && 
-                             'districts' in cities ? (
+                            {(sector === 'Montréal' || sector === 'Laval') ? (
                               <div className="space-y-2">
                                 {/* Afficher les districts */}
-                                {cities.districts && Object.keys(cities.districts).length > 0 && (
-                                  <>
-                                {Object.entries(cities.districts)
+                                {(() => {
+                                  const sectorData = cities[sector] || cities;
+                                  if (sectorData && typeof sectorData === 'object' && sectorData.districts && Object.keys(sectorData.districts).length > 0) {
+                                    return (
+                                      <>
+                                {Object.entries(sectorData.districts)
                                   .sort(([districtA, clientsA], [districtB, clientsB]) => {
                                     if (clientsA.length !== clientsB.length) {
                                       return clientsB.length - clientsA.length;
@@ -1398,22 +1404,28 @@ const ClientsByCity: React.FC = () => {
                                     );
                                   })}
                                   </>
-                                )}
+                                    );
+                                  }
+                                  return null;
+                                })()}
                                 
                                 {/* Afficher les clients sans district */}
-                                {cities.clients && Array.isArray(cities.clients) && cities.clients.length > 0 && (
+                                {(() => {
+                                  const sectorData = cities[sector] || cities;
+                                  if (sectorData && typeof sectorData === 'object' && sectorData.clients && Array.isArray(sectorData.clients) && sectorData.clients.length > 0) {
+                                    return (
                                   <div className="bg-gray-800/20 rounded border border-gray-700/20">
                                     <div className="px-4 py-2 flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <MapPin className="h-4 w-4 text-indigo-400" />
                                         <span className="font-medium text-gray-300">Sans quartier assigné</span>
                                         <span className="px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded text-xs">
-                                          {cities.clients.length} client{cities.clients.length > 1 ? 's' : ''}
+                                          {sectorData.clients.length} client{sectorData.clients.length > 1 ? 's' : ''}
                                         </span>
                                       </div>
                                     </div>
                                     <div className="px-4 pb-3 space-y-2">
-                                      {cities.clients.map((client) => (
+                                      {sectorData.clients.map((client) => (
                                         <div
                                           key={client._id}
                                           className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
@@ -1449,7 +1461,10 @@ const ClientsByCity: React.FC = () => {
                                       ))}
                                     </div>
                                   </div>
-                                )}
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                             ) : (
                               // Pour les autres secteurs, afficher les villes normalement
@@ -1904,7 +1919,7 @@ const ClientsByCity: React.FC = () => {
               }}
               disabled={loading}
               className="px-3 py-2 sm:px-4 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 disabled:from-gray-600/20 disabled:to-gray-600/20 disabled:cursor-not-allowed text-rose-200 rounded-md transition-all duration-200 flex items-center justify-center gap-2 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0 text-sm sm:text-base"
-              title="Recalculer complètement le cache MongoDB avec barre de progression (fait ~500 requêtes HERE API)"
+              title="Recharger depuis MongoDB (route optimisée, pas d'appels API externes)"
             >
               {loading ? (
                 <>
@@ -1954,14 +1969,21 @@ const ClientsByCity: React.FC = () => {
               // Calculer le nombre de clients pour chaque secteur
               const getSectorClientCount = (sector: string, cities: any): number => {
                 if (sector === 'Montréal' || sector === 'Laval') {
-                  if ('districts' in cities && cities.districts) {
-                    const districtCount = Object.values(cities.districts).reduce((sum: number, district: any) => {
-                      return sum + (Array.isArray(district) ? district.length : 0);
-                    }, 0);
-                    const directClientsCount = Array.isArray(cities.clients) ? cities.clients.length : 0;
-                    return districtCount + directClientsCount;
+                  // La structure est { "Montréal": { districts: {...}, clients: [...] } } ou { "Laval": { districts: {...}, clients: [...] } }
+                  const sectorData = cities[sector] || cities;
+                  if (sectorData && typeof sectorData === 'object') {
+                    let count = 0;
+                    if (sectorData.districts && typeof sectorData.districts === 'object') {
+                      count += Object.values(sectorData.districts).reduce((sum: number, district: any) => {
+                        return sum + (Array.isArray(district) ? district.length : 0);
+                      }, 0);
+                    }
+                    if (Array.isArray(sectorData.clients)) {
+                      count += sectorData.clients.length;
+                    }
+                    return count;
                   }
-                  return Array.isArray(cities.clients) ? cities.clients.length : 0;
+                  return 0;
                 }
                 // Pour les autres secteurs, compter les clients dans toutes les villes
                 if (typeof cities === 'object' && cities !== null) {
@@ -1997,12 +2019,16 @@ const ClientsByCity: React.FC = () => {
             let sectorCityCount = 0;
             
             // Pour Montréal et Laval, la structure est différente (districts directement)
-            if ((sector === 'Montréal' || sector === 'Laval') && 'districts' in cities) {
-              if (cities.districts && Object.keys(cities.districts).length > 0) {
-                sectorClientCount += Object.values(cities.districts).reduce((sum: number, clients: Client[]) => sum + clients.length, 0);
-              }
-              if (cities.clients && Array.isArray(cities.clients)) {
-                sectorClientCount += cities.clients.length;
+            if (sector === 'Montréal' || sector === 'Laval') {
+              // La structure est { "Montréal": { districts: {...}, clients: [...] } } ou { "Laval": { districts: {...}, clients: [...] } }
+              const sectorData = cities[sector] || cities;
+              if (sectorData && typeof sectorData === 'object') {
+                if (sectorData.districts && Object.keys(sectorData.districts).length > 0) {
+                  sectorClientCount += Object.values(sectorData.districts).reduce((sum: number, clients: Client[]) => sum + clients.length, 0);
+                }
+                if (sectorData.clients && Array.isArray(sectorData.clients)) {
+                  sectorClientCount += sectorData.clients.length;
+                }
               }
               sectorCityCount = 1; // Montréal ou Laval compte comme 1 ville
             } else if (sector === 'Non assignés') {
@@ -2172,13 +2198,13 @@ const ClientsByCity: React.FC = () => {
                             );
                           })}
                       </div>
-                    ) : (sector === 'Montréal' || sector === 'Laval') && 
-                     'districts' in cities ? (
+                    ) : (sector === 'Montréal' || sector === 'Laval') ? (() => {
+                      const sectorData = (cities as any)[sector] || cities;
+                      if (sectorData && typeof sectorData === 'object' && sectorData.districts && Object.keys(sectorData.districts).length > 0) {
+                        return (
                       <div className="space-y-2">
                         {/* Afficher les districts */}
-                        {cities.districts && Object.keys(cities.districts).length > 0 && (
-                          <>
-                            {Object.entries(cities.districts)
+                        {Object.entries(sectorData.districts as Record<string, Client[]>)
                               .sort(([districtA, clientsA], [districtB, clientsB]) => {
                                 if (clientsA.length !== clientsB.length) {
                                   return clientsB.length - clientsA.length;
@@ -2214,7 +2240,7 @@ const ClientsByCity: React.FC = () => {
 
                                     {isDistrictExpanded && (
                                       <div className="px-4 pb-3 space-y-2">
-                                        {clients.map((client) => (
+                                        {clients.map((client: Client) => (
                                           <div
                                             key={client._id}
                                             className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
@@ -2253,23 +2279,21 @@ const ClientsByCity: React.FC = () => {
                                   </div>
                                 );
                               })}
-                          </>
-                        )}
                         
                         {/* Afficher les clients sans district */}
-                        {cities.clients && Array.isArray(cities.clients) && cities.clients.length > 0 && (
+                        {sectorData.clients && Array.isArray(sectorData.clients) && sectorData.clients.length > 0 && (
                           <div className="bg-gradient-to-br from-gray-900/70 to-gray-800/60 backdrop-blur-sm rounded border border-indigo-500/15 shadow-sm">
                             <div className="px-4 py-2 flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <MapPin className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]" />
                                 <span className="font-medium text-gray-200 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">Sans quartier assigné</span>
                                 <span className="px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10">
-                                  {cities.clients.length} client{cities.clients.length > 1 ? 's' : ''}
+                                  {sectorData.clients.length} client{sectorData.clients.length > 1 ? 's' : ''}
                                 </span>
                               </div>
                             </div>
                             <div className="px-4 pb-3 space-y-2">
-                              {cities.clients.map((client) => (
+                              {sectorData.clients.map((client: Client) => (
                                 <div
                                   key={client._id}
                                   className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
@@ -2307,7 +2331,10 @@ const ClientsByCity: React.FC = () => {
                           </div>
                         )}
                       </div>
-                    ) : (
+                        );
+                      }
+                      return null;
+                    })() : (
                       // Pour les autres secteurs, afficher les villes normalement
                       <div className="space-y-4">
                         {cities && typeof cities === 'object' && !('districts' in cities) ? (

@@ -1,6 +1,17 @@
 import { Router, Request, Response } from 'express';
 import Client from '../models/Client';
 import { ClientByCityCache } from '../models/ClientCache';
+import {
+  MONTREAL_AGGLO_CITIES,
+  LAVAL_DISTRICTS_SEARCH_LIST,
+  MONTREAL_DISTRICTS_SEARCH_LIST,
+  LAVAL_NORMALIZED_CITIES,
+  RIVE_NORD_CITIES,
+  RIVE_SUD_CITIES,
+  validateLavalDistrict,
+  getLavalDistrictFromPostalCode
+} from '../config/districts';
+import { getSector } from '../utils/geocodeAndExtractLocation';
 
 const router = Router();
 
@@ -49,175 +60,7 @@ interface ProgressData {
   error?: string;
 }
 
-// Liste des villes de l'agglomération de Montréal qui doivent être classées sous "Montréal"
-// Inclut toutes les variantes possibles (avec/sans tirets, majuscules/minuscules)
-const MONTREAL_AGGLO_CITIES = [
-  'dollard-des-ormeaux',
-  'dollard des ormeaux',
-  'dollard-des ormeaux',
-  'dollard des-ormeaux',
-  'dollard-des-ormeaux',
-  'kirkland',
-  'dorval',
-  'pointe-claire',
-  'pointe claire',
-  'beaconsfield',
-  'baie-d\'urfé',
-  'baie d\'urfé',
-  'baie-d\'urfé',
-  'hampstead',
-  'côte-saint-luc',
-  'côte saint-luc',
-  'côte-saint luc',
-  'mont-royal',
-  'mont royal',
-  'montréal-est',
-  'montreal-est',
-  'montréal-nord',
-  'montreal-nord',
-  'montréal-ouest',
-  'montreal-ouest',
-  'westmount',
-  'outremont',
-  'sainte-anne-de-bellevue',
-  'sainte anne de bellevue',
-  'ste-anne-de-bellevue',
-  'ste anne de bellevue',
-  'saint anne de bellevue',
-  'st-anne-de-bellevue',
-  'st anne de bellevue',
-  'ile-bizard',
-  'île-bizard',
-  'pierrefonds-roxboro',
-  'pierrefonds',
-  'roxboro',
-  'sainte-geneviève',
-  'sainte geneviève',
-  'senneville'
-];
-
-// Mapping des codes postaux de Laval vers les quartiers
-// Format: préfixe du code postal (3 caractères) -> quartier ou liste de quartiers possibles
-const LAVAL_POSTAL_CODE_TO_DISTRICT: Record<string, string | string[]> = {
-  // Chomedey
-  'H7T': 'Chomedey', // Secteur nord-ouest de Chomedey
-  'H7W': 'Chomedey',
-  'H7S': ['Chomedey', 'Vimont'], // Partagé entre Chomedey et Vimont, priorité à Chomedey
-  // Codes postaux partagés (Chomedey et Sainte-Dorothée)
-  'H7X': ['Chomedey', 'Sainte-Dorothée'], // Partagé entre Chomedey et Sainte-Dorothée
-  'H7Y': ['Chomedey', 'Sainte-Dorothée'], // Partagé entre Chomedey et Sainte-Dorothée
-  // Duvernay
-  'H7E': 'Duvernay',
-  'H7G': 'Duvernay',
-  // Fabreville
-  'H7P': 'Fabreville',
-  // Laval-des-Rapides
-  'H7N': 'Laval-des-Rapides',
-  'H7R': 'Laval-des-Rapides',
-  // Laval-Ouest / Chomedey (partagé)
-  'H7V': ['Laval-Ouest', 'Chomedey'], // Partagé entre Laval-Ouest et Chomedey, priorité à Laval-Ouest
-  // Pont-Viau
-  // (H7H déplacé vers Auteuil)
-  // Sainte-Rose
-  'H7L': 'Sainte-Rose',
-  // Saint-François
-  'H7A': 'Saint-François',
-  'H7B': 'Saint-François',
-  // Saint-Vincent-de-Paul
-  'H7C': 'Saint-Vincent-de-Paul',
-  // Vimont
-  'H7M': 'Vimont',
-  // Auteuil
-  'H7H': 'Auteuil',
-  'H7J': ['Auteuil', 'Saint-François'], // Partagé entre Auteuil et Saint-François, priorité à Auteuil
-  'H7K': 'Auteuil',
-};
-
-// Liste des quartiers valides de Laval (basés uniquement sur les codes postaux confirmés)
-// Tous les quartiers détectés par HERE ou autres méthodes doivent être dans cette liste
-// Note: St-Dorothée-Station est fusionné avec Sainte-Dorothée
-const VALID_LAVAL_DISTRICTS = new Set([
-  'Chomedey',
-  'Sainte-Dorothée', // Inclut St-Dorothée-Station
-  'Duvernay',
-  'Fabreville',
-  'Laval-des-Rapides',
-  'Laval-Ouest',
-  'Pont-Viau',
-  'Sainte-Rose',
-  'Saint-François',
-  'Saint-Vincent-de-Paul',
-  'Vimont',
-  'Auteuil',
-]);
-
-// Fonction pour valider et normaliser un quartier de Laval
-// Retourne le quartier normalisé s'il est valide, undefined sinon
-function validateLavalDistrict(district: string | undefined | null): string | undefined {
-  if (!district) return undefined;
-  
-  const districtNormalized = district.trim();
-  if (districtNormalized === '') return undefined;
-  
-  // Vérifier si le quartier est directement dans la liste valide
-  if (VALID_LAVAL_DISTRICTS.has(districtNormalized)) {
-    return districtNormalized;
-  }
-  
-  // Normaliser les variations communes
-  const districtLower = districtNormalized.toLowerCase();
-  
-  // Mapper les variations vers les quartiers valides
-  // Note: Toutes les variations de St-Dorothée-Station sont fusionnées avec Sainte-Dorothée
-  const districtMappings: Record<string, string> = {
-    'st-dorothée-station': 'Sainte-Dorothée', // Fusionné avec Sainte-Dorothée
-    'st dorothée station': 'Sainte-Dorothée', // Fusionné avec Sainte-Dorothée
-    'sainte-dorothée-station': 'Sainte-Dorothée', // Fusionné avec Sainte-Dorothée
-    'sainte dorothée station': 'Sainte-Dorothée', // Fusionné avec Sainte-Dorothée
-    'st-dorothée': 'Sainte-Dorothée',
-    'st dorothée': 'Sainte-Dorothée',
-    'sainte-dorothée': 'Sainte-Dorothée',
-    'sainte dorothée': 'Sainte-Dorothée',
-    'ste-dorothée': 'Sainte-Dorothée',
-    'ste dorothée': 'Sainte-Dorothée',
-    'st-françois': 'Saint-François',
-    'st françois': 'Saint-François',
-    'saint-françois': 'Saint-François',
-    'saint françois': 'Saint-François',
-    'st-francois': 'Saint-François',
-    'st francois': 'Saint-François',
-    'saint-francois': 'Saint-François',
-    'saint francois': 'Saint-François',
-    'st-rose': 'Sainte-Rose',
-    'st rose': 'Sainte-Rose',
-    'sainte-rose': 'Sainte-Rose',
-    'sainte rose': 'Sainte-Rose',
-    'ste-rose': 'Sainte-Rose',
-    'ste rose': 'Sainte-Rose',
-    'saint-rose': 'Sainte-Rose',
-    'saint rose': 'Sainte-Rose',
-    'laval-des-rapides': 'Laval-des-Rapides',
-    'laval des rapides': 'Laval-des-Rapides',
-    'laval-ouest': 'Laval-Ouest',
-    'laval ouest': 'Laval-Ouest',
-    'pont-viau': 'Pont-Viau',
-    'pont viau': 'Pont-Viau',
-    'saint-vincent-de-paul': 'Saint-Vincent-de-Paul',
-    'saint vincent de paul': 'Saint-Vincent-de-Paul',
-    'st-vincent-de-paul': 'Saint-Vincent-de-Paul',
-    'st vincent de paul': 'Saint-Vincent-de-Paul',
-  };
-  
-  // Vérifier les mappings
-  const normalized = districtMappings[districtLower];
-  if (normalized && VALID_LAVAL_DISTRICTS.has(normalized)) {
-    return normalized;
-  }
-  
-  // Si le quartier n'est pas valide, retourner undefined
-  // Cela forcera le système à utiliser le code postal comme fallback
-  return undefined;
-}
+// Les listes de districts sont maintenant importées depuis ../config/districts.ts
 
 // Fonction pour extraire le préfixe du code postal (3 premiers caractères)
 function extractPostalCodePrefix(postalCode: string | undefined | null): string | null {
@@ -234,134 +77,10 @@ function extractPostalCodePrefix(postalCode: string | undefined | null): string 
 // Fonction pour obtenir le quartier depuis le code postal
 // Pour les codes postaux partagés, on privilégie Sainte-Dorothée si c'est une option
 function getDistrictFromPostalCode(postalCode: string | undefined | null): string | undefined {
-  const prefix = extractPostalCodePrefix(postalCode);
-  if (!prefix) return undefined;
-  
-  const districtOrDistricts = LAVAL_POSTAL_CODE_TO_DISTRICT[prefix];
-  if (!districtOrDistricts) return undefined;
-  
-  // Si c'est un seul quartier, le retourner
-  if (typeof districtOrDistricts === 'string') {
-    return districtOrDistricts;
-  }
-  
-  // Si c'est une liste de quartiers possibles, privilégier Sainte-Dorothée si disponible
-  if (Array.isArray(districtOrDistricts)) {
-    // Priorité à Sainte-Dorothée pour les codes partagés
-    if (districtOrDistricts.includes('Sainte-Dorothée')) {
-      return 'Sainte-Dorothée';
-    }
-    // Pour H7S (Chomedey/Vimont), priorité à Chomedey
-    if (prefix === 'H7S' && districtOrDistricts.includes('Chomedey')) {
-      return 'Chomedey';
-    }
-    // Pour H7V (Laval-Ouest/Chomedey), priorité à Chomedey
-    if (prefix === 'H7V' && districtOrDistricts.includes('Chomedey')) {
-      return 'Chomedey';
-    }
-    // Sinon, retourner le premier de la liste
-    return districtOrDistricts[0];
-  }
-  
-  return undefined;
+  return getLavalDistrictFromPostalCode(postalCode || '');
 }
 
-// Liste des villes qui doivent être normalisées vers Laval
-const LAVAL_NORMALIZED_CITIES = [
-  'le val-st-françois',
-  'le val-st-francois',
-  'le val st-françois',
-  'le val st-francois',
-  'val-st-françois',
-  'val-st-francois',
-  'val st-françois',
-  'val st-francois'
-];
-
-// Classification des villes par secteur géographique
-const RIVE_NORD_CITIES = [
-  'terrebonne', 'blainville', 'repentigny', 'st-eustache', 'saint-eustache',
-  'mirabel', 'mascouche', 'st-jérôme', 'saint-jérôme', 'rosemère', 'rosemere',
-  'l\'assomption', 'lassomption', 'lorraine', 'bois-des-filion', 'bois des filion',
-  'st-joseph-du-lac', 'saint-joseph-du-lac', 'st-lin--laurentides', 'saint-lin--laurentides',
-  'ste-thérèse', 'sainte-thérèse', 'oka', 'prévost', 'prevost',
-  'ste-marthe-sur-le-lac', 'sainte-marthe-sur-le-lac', 'lanoraie',
-  'saint-sauveur', 'st-sauveur', 'boisbriand', 'bois-briand',
-  'brownsburg-chatham', 'brownsburg chatham', 'brownsburg', 'charlemagne', 'lavaltrie'
-];
-
-const RIVE_SUD_CITIES = [
-  'longueuil', 'brossard', 'candiac', 'st-constant', 'saint-constant',
-  'châteauguay', 'chateauguay', 'mercier', 'vaudreuil-dorion', 'vaudreuil dorion',
-  'sorel-tracy', 'sorel tracy',
-  'saint-rémi', 'st-rémi', 'saint remi', 'st remi'
-];
-
-// Fonction pour déterminer le secteur d'une ville
-function getSector(city: string): string {
-  const cityLower = city.toLowerCase().trim();
-  
-  // D'abord vérifier si c'est Montréal ou une ville de l'agglomération de Montréal
-  if (cityLower === 'montréal' || cityLower === 'montreal') {
-    return 'Montréal';
-  }
-  
-  // Vérifier si c'est une ville de l'agglomération de Montréal
-  const cityNormalized = cityLower.replace(/\s+/g, ' ');
-  for (const agglCity of MONTREAL_AGGLO_CITIES) {
-    const agglCityLower = agglCity.toLowerCase();
-    if (cityNormalized === agglCityLower || 
-        cityNormalized.includes(agglCityLower) || 
-        agglCityLower.includes(cityNormalized)) {
-      // Vérification flexible (sans espaces/tirets)
-      const cityClean = cityNormalized.replace(/[-\s]/g, '');
-      const agglCityClean = agglCityLower.replace(/[-\s]/g, '');
-      if (cityClean === agglCityClean || 
-          cityClean.includes(agglCityClean) || 
-          agglCityClean.includes(cityClean)) {
-        return 'Montréal';
-      }
-    }
-  }
-  
-  if (cityLower === 'laval') {
-    return 'Laval';
-  }
-  
-  // Vérifier si c'est une ville de la Rive Nord
-  for (const riveNordCity of RIVE_NORD_CITIES) {
-    if (cityLower === riveNordCity || cityLower.includes(riveNordCity) || riveNordCity.includes(cityLower)) {
-      return 'Rive Nord';
-    }
-  }
-  
-  // Vérification flexible pour Rive Nord
-  const cityClean = cityLower.replace(/[-\s]/g, '');
-  for (const riveNordCity of RIVE_NORD_CITIES) {
-    const riveNordCityClean = riveNordCity.replace(/[-\s]/g, '');
-    if (cityClean === riveNordCityClean || cityClean.includes(riveNordCityClean) || riveNordCityClean.includes(cityClean)) {
-      return 'Rive Nord';
-    }
-  }
-  
-  // Vérifier si c'est une ville de la Rive Sud
-  for (const riveSudCity of RIVE_SUD_CITIES) {
-    if (cityLower === riveSudCity || cityLower.includes(riveSudCity) || riveSudCity.includes(cityLower)) {
-      return 'Rive Sud';
-    }
-  }
-  
-  // Vérification flexible pour Rive Sud
-  for (const riveSudCity of RIVE_SUD_CITIES) {
-    const riveSudCityClean = riveSudCity.replace(/[-\s]/g, '');
-    if (cityClean === riveSudCityClean || cityClean.includes(riveSudCityClean) || riveSudCityClean.includes(cityClean)) {
-      return 'Rive Sud';
-    }
-  }
-  
-  // Par défaut, mettre dans "Autres"
-  return 'Autres';
-}
+// Les listes et fonctions sont maintenant importées depuis ../config/districts.ts et ../utils/geocodeAndExtractLocation.ts
 
 // Fonction pour extraire le nom de rue d'une adresse (avec ville pour éviter les ambiguïtés)
 function extractStreetName(address: string, city?: string): string | null {
@@ -425,15 +144,16 @@ function normalizeCity(city: string): string {
   // Vérifier si c'est "Le val-st-françois" ou ses variations -> normaliser vers Laval
   const cityNoSpaces = cityNormalized.replace(/\s+/g, '-');
   const cityNoDashes = cityNormalized.replace(/-/g, ' ');
+  const lavalCitiesArray = Array.from(LAVAL_NORMALIZED_CITIES);
   
-  if (LAVAL_NORMALIZED_CITIES.includes(cityNormalized) ||
-      LAVAL_NORMALIZED_CITIES.includes(cityNoSpaces) ||
-      LAVAL_NORMALIZED_CITIES.includes(cityNoDashes)) {
+  if (lavalCitiesArray.includes(cityNormalized as any) ||
+      lavalCitiesArray.includes(cityNoSpaces as any) ||
+      lavalCitiesArray.includes(cityNoDashes as any)) {
     return 'Laval';
   }
   
   // Vérification partielle pour "Le val-st-françois"
-  for (const lavalCity of LAVAL_NORMALIZED_CITIES) {
+  for (const lavalCity of lavalCitiesArray) {
     const lavalCityClean = lavalCity.toLowerCase().replace(/[-\s]/g, '');
     const cityClean = cityNormalized.replace(/[-\s]/g, '');
     if (lavalCityClean === cityClean) {
@@ -442,14 +162,15 @@ function normalizeCity(city: string): string {
   }
   
   // Vérifier si c'est une ville de l'agglomération de Montréal (comparaison flexible)
-  if (MONTREAL_AGGLO_CITIES.includes(cityNormalized) ||
-      MONTREAL_AGGLO_CITIES.includes(cityNoSpaces) ||
-      MONTREAL_AGGLO_CITIES.includes(cityNoDashes)) {
+  const agglCitiesArray = Array.from(MONTREAL_AGGLO_CITIES);
+  if (agglCitiesArray.includes(cityNormalized as any) ||
+      agglCitiesArray.includes(cityNoSpaces as any) ||
+      agglCitiesArray.includes(cityNoDashes as any)) {
     return 'Montréal';
   }
   
   // Vérification partielle pour les cas comme "Dollard-des-Ormeaux" vs "dollard-des-ormeaux"
-  for (const agglCity of MONTREAL_AGGLO_CITIES) {
+  for (const agglCity of agglCitiesArray) {
     const agglCityNormalized = agglCity.toLowerCase().trim();
     const cityNormalizedLower = cityNormalized.toLowerCase().trim();
     
@@ -745,44 +466,8 @@ async function extractCityAndDistrict(address: string, retryCount: number = 0): 
             console.log(`[DEBUG] Ville agglo détectée: "${rawCity}" -> Quartier: "${district}" sous Montréal`);
           } else {
             // Liste de quartiers connus pour Montréal et Laval
-            const montrealDistricts = [
-              'ahuntsic', 'anjou', 'baie-d\'urfé', 'beaconsfield', 'côte-des-neiges', 
-              'côte-saint-luc', 'dorval', 'dollard-des-ormeaux', 'dollard des ormeaux', 'hampstead', 'ile-bizard',
-              'kirkland', 'lachine', 'lasalle', 'mont-royal', 'montréal-est', 'montréal-nord',
-              'montréal-ouest', 'outremont', 'pierrefonds-roxboro', 'pierrefonds', 'pointe-claire', 
-              'rosemont', 'saint-laurent', 'saint-léonard', 'sainte-anne-de-bellevue',
-              'sainte-geneviève', 'sainte-marie', 'verdun', 'ville-marie', 'westmount',
-              'plateau-mont-royal', 'villeray', 'rosemont-la-petite-patrie', 'mercier',
-              'hochelaga-maisonneuve', 'rivière-des-prairies',
-              'ahuntsic-cartierville', 'côte-des-neiges–notre-dame-de-grâce', 'notre-dame-de-grâce',
-              'petite-patrie', 'cartierville', 'hochelaga', 'maisonneuve', 'roxboro', 'senneville'
-            ];
-            
-            const lavalDistricts = [
-              'chomedey', 'duvernay', 'fabreville', 'iles-laval', 'laval-des-rapides',
-              'laval-ouest', 'pont-viau', 
-              // Variations de Sainte-Dorothée
-              'sainte-dorothée', 'sainte dorothée', 'saint-dorothée', 'saint dorothée', 
-              'ste-dorothée', 'ste dorothée', 'st-dorothée', 'st dorothée',
-              'st-dorothée-station', 'st dorothée station', 'sainte-dorothée-station', 'sainte dorothée station',
-              // Variations de Sainte-Rose
-              'sainte-rose', 'sainte rose', 'saint-rose', 'saint rose',
-              'ste-rose', 'ste rose', 'st-rose', 'st rose',
-              // Variations de Saint-François
-              'saint-françois', 'saint françois', 'saint-francois', 'saint francois', 
-              'st-françois', 'st françois', 'st-francois', 'st francois',
-              'le val-st-françois', 'le val-st-francois', 'le val st-françois', 'le val st-francois',
-              'val-st-françois', 'val-st-francois', 'val st-françois', 'val st-francois',
-              // Autres quartiers
-              'saint-vincent-de-paul', 'souvenir', 'vieux-saint-martin', 'auteuil',
-              'saint-martin', 'st-martin', 'st martin', 'val-des-brises', 'val-des-arbres', 'val des arbres',
-              'vimont', 'champ-fleuri', 'champ fleuri', 'plage-idéale', 'plage idéale',
-              'plage-jacques-cartier', 'plage jacques cartier', 'renaud', 
-              'bélanger', 'saraguay', 'saint-laurent', 'st-laurent', 'st laurent',
-              'laval-sur-le-lac', 'laval sur le lac'
-            ];
-            
-            const allDistricts = [...montrealDistricts, ...lavalDistricts];
+            // Utiliser les listes centralisées depuis ../config/districts.ts
+            const allDistricts = [...MONTREAL_DISTRICTS_SEARCH_LIST, ...LAVAL_DISTRICTS_SEARCH_LIST];
             
             // Si district n'a pas encore été défini, chercher dans la liste
             if (!district) {
@@ -2215,12 +1900,29 @@ router.get('/by-city', async (req: Request, res: Response): Promise<void> => {
     console.log('📊 Calcul direct depuis MongoDB (optimisé avec aggregate)...');
     const startTime = Date.now();
 
-    // Récupérer tous les clients avec adresse et city/sector depuis MongoDB
-    const clients = await Client.find({
-      addressLine1: { $exists: true, $ne: '' },
-      city: { $exists: true, $ne: null },
-      sector: { $exists: true, $ne: null }
-    }).lean();
+    // Récupérer TOUS les clients (pas seulement ceux avec ville/secteur)
+    const allClients = await Client.find({}).lean();
+
+    // Séparer les clients selon leurs caractéristiques
+    const clientsWithAddressAndCitySector = allClients.filter(c => 
+      c.addressLine1 && c.addressLine1.trim() !== '' &&
+      c.city && c.city.trim() !== '' &&
+      c.sector && c.sector.trim() !== ''
+    );
+
+    const clientsWithoutAddress = allClients.filter(c => 
+      !c.addressLine1 || c.addressLine1.trim() === ''
+    );
+
+    // Clients avec adresse mais sans ville/secteur (non localisés)
+    const clientsWithAddressButNoCitySector = allClients.filter(c => 
+      c.addressLine1 && c.addressLine1.trim() !== '' &&
+      (!c.city || c.city.trim() === '' || !c.sector || c.sector.trim() === '')
+    );
+
+    console.log(`📊 Clients avec adresse + ville/secteur: ${clientsWithAddressAndCitySector.length}`);
+    console.log(`📊 Clients sans adresse: ${clientsWithoutAddress.length}`);
+    console.log(`📊 Clients non localisés (avec adresse mais sans ville/secteur): ${clientsWithAddressButNoCitySector.length}`);
 
     // Construire la structure hiérarchique directement en mémoire (très rapide)
     const clientsBySector: Record<string, Record<string, {
@@ -2228,7 +1930,8 @@ router.get('/by-city', async (req: Request, res: Response): Promise<void> => {
       districts?: Record<string, ClientWithLocation[]>;
     }>> = {};
 
-    for (const client of clients) {
+    // Traiter les clients avec adresse ET ville/secteur
+    for (const client of clientsWithAddressAndCitySector) {
       const sector = client.sector || 'Non assignés';
       const city = client.city || 'Inconnu';
       const district = client.district || undefined;
@@ -2283,8 +1986,136 @@ router.get('/by-city', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
+    // Traiter les clients sans adresse
+    if (clientsWithoutAddress.length > 0) {
+      // Séparer les clients sans adresse qui ont une ville/secteur de ceux qui n'en ont pas
+      const clientsWithoutAddressButWithCitySector = clientsWithoutAddress.filter(c => 
+        c.city && c.city.trim() !== '' && c.sector && c.sector.trim() !== ''
+      );
+      // Clients sans adresse ET sans ville/secteur (à mettre dans "Sans adresse")
+      const clientsWithoutAddressAndNoCitySector = clientsWithoutAddress.filter(c => 
+        !c.city || c.city.trim() === '' || !c.sector || c.sector.trim() === ''
+      );
+
+      // Traiter les clients sans adresse MAIS avec ville/secteur (les classer dans leur secteur/ville)
+      for (const client of clientsWithoutAddressButWithCitySector) {
+        const sector = client.sector || 'Non assignés';
+        const city = client.city || 'Inconnu';
+        const district = client.district || undefined;
+
+        const clientWithLocation: ClientWithLocation = {
+          _id: client._id.toString(),
+          givenName: client.givenName || '',
+          familyName: client.familyName || '',
+          phoneNumber: client.phoneNumber ?? undefined,
+          addressLine1: '',
+          coordinates: client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null
+            ? { lng: client.coordinates.lng, lat: client.coordinates.lat }
+            : undefined,
+          city: city,
+          district: district
+        };
+
+        // Initialiser le secteur
+        if (!clientsBySector[sector]) {
+          clientsBySector[sector] = {};
+        }
+
+        // Pour Montréal et Laval
+        if ((sector === 'Montréal' && city.toLowerCase() === 'montréal') || 
+            (sector === 'Laval' && city.toLowerCase() === 'laval')) {
+          const sectorKey = sector;
+          
+          if (!clientsBySector[sector][sectorKey]) {
+            clientsBySector[sector][sectorKey] = {
+              clients: [],
+              districts: {}
+            };
+          }
+          
+          if (district) {
+            if (!clientsBySector[sector][sectorKey].districts) {
+              clientsBySector[sector][sectorKey].districts = {};
+            }
+            if (!clientsBySector[sector][sectorKey].districts![district]) {
+              clientsBySector[sector][sectorKey].districts![district] = [];
+            }
+            clientsBySector[sector][sectorKey].districts![district].push(clientWithLocation);
+          } else {
+            clientsBySector[sector][sectorKey].clients.push(clientWithLocation);
+          }
+        } else {
+          // Pour les autres villes
+          if (!clientsBySector[sector][city]) {
+            clientsBySector[sector][city] = { clients: [] };
+          }
+          clientsBySector[sector][city].clients.push(clientWithLocation);
+        }
+      }
+
+      // Traiter les clients sans adresse ET sans ville/secteur (les mettre dans "Sans adresse")
+      if (clientsWithoutAddressAndNoCitySector.length > 0) {
+        // Initialiser "Non assignés" si nécessaire
+        if (!clientsBySector['Non assignés']) {
+          clientsBySector['Non assignés'] = {};
+        }
+        
+        // Initialiser "Sans adresse" si nécessaire
+        if (!clientsBySector['Non assignés']['Sans adresse']) {
+          clientsBySector['Non assignés']['Sans adresse'] = { clients: [] };
+        }
+
+        for (const client of clientsWithoutAddressAndNoCitySector) {
+          const clientWithLocation: ClientWithLocation = {
+            _id: client._id.toString(),
+            givenName: client.givenName || '',
+            familyName: client.familyName || '',
+            phoneNumber: client.phoneNumber ?? undefined,
+            addressLine1: '',
+            coordinates: client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null
+              ? { lng: client.coordinates.lng, lat: client.coordinates.lat }
+              : undefined,
+            city: 'Sans adresse',
+            district: undefined
+          };
+
+          clientsBySector['Non assignés']['Sans adresse'].clients.push(clientWithLocation);
+        }
+      }
+    }
+
+    // Traiter les clients non localisés (avec adresse mais sans ville/secteur)
+    if (clientsWithAddressButNoCitySector.length > 0) {
+      // Initialiser "Non assignés" si nécessaire
+      if (!clientsBySector['Non assignés']) {
+        clientsBySector['Non assignés'] = {};
+      }
+      
+      // Initialiser "Non localisé" si nécessaire
+      if (!clientsBySector['Non assignés']['Non localisé']) {
+        clientsBySector['Non assignés']['Non localisé'] = { clients: [] };
+      }
+
+      for (const client of clientsWithAddressButNoCitySector) {
+        const clientWithLocation: ClientWithLocation = {
+          _id: client._id.toString(),
+          givenName: client.givenName || '',
+          familyName: client.familyName || '',
+          phoneNumber: client.phoneNumber ?? undefined,
+          addressLine1: client.addressLine1 || '',
+          coordinates: client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null
+            ? { lng: client.coordinates.lng, lat: client.coordinates.lat }
+            : undefined,
+          city: 'Non localisé',
+          district: undefined
+        };
+
+        clientsBySector['Non assignés']['Non localisé'].clients.push(clientWithLocation);
+      }
+    }
+
     const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
-    const totalClients = clients.length;
+    const totalClients = allClients.length;
     console.log(`✅ Calcul terminé en ${totalTime}s (${totalClients} clients)`);
     
     res.json({
