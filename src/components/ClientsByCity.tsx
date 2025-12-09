@@ -1367,30 +1367,32 @@ const ClientsByCity: React.FC = () => {
                                             {clients.map((client) => (
                                               <div
                                                 key={client._id}
-                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                               >
-                                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                                  <div className="flex-1 min-w-0">
-                                                    <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
-                                                      {client.givenName} {client.familyName}
-                                                    </h4>
-                                                    <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                      <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                                      {client.addressLine1}
-                                                    </p>
-                                                    {client.phoneNumber && (
-                                                      <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                        <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                                        {client.phoneNumber}
+                                                <div className="flex flex-col gap-2">
+                                                  <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex-1 min-w-0">
+                                                      <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                                        {client.givenName} {client.familyName}
+                                                      </h4>
+                                                      <p className="text-xs sm:text-sm text-gray-400 mb-1.5 flex items-start gap-1">
+                                                        <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0 mt-0.5" />
+                                                        <span className="break-words">{client.addressLine1}</span>
                                                       </p>
-                                                    )}
+                                                      {client.phoneNumber && (
+                                                        <p className="text-xs sm:text-sm text-gray-400 flex items-center gap-1">
+                                                          <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0" />
+                                                          <span className="break-all">{client.phoneNumber}</span>
+                                                        </p>
+                                                      )}
+                                                    </div>
                                                   </div>
                                                   {client.coordinates && (
                                                     <a
                                                       href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                       target="_blank"
                                                       rel="noopener noreferrer"
-                                                      className="sm:ml-4 px-2 sm:px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20 w-full sm:w-auto text-center"
+                                                      className="mt-1 w-full sm:w-auto px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20 text-center"
                                                     >
                                                       Voir carte
                                                     </a>
@@ -1564,38 +1566,40 @@ const ClientsByCity: React.FC = () => {
                                                         {isDistrictExpanded && (
                                                           <div className="px-2.5 sm:px-3 md:px-4 pb-2 sm:pb-3 space-y-1.5 sm:space-y-2">
                                                             {clients.map((client) => (
-                                                              <div
-                                                                key={client._id}
-                                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
-                                                              >
-                                                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                                                  <div className="flex-1 min-w-0">
-                                                                    <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
-                                                                      {client.givenName} {client.familyName}
-                                                                    </h4>
-                                                                    <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                                      <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                                                      {client.addressLine1}
-                                                                    </p>
-                                                                    {client.phoneNumber && (
-                                                                      <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                                        <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                                                        {client.phoneNumber}
-                                                                      </p>
-                                                                    )}
-                                                                  </div>
-                                                                  {client.coordinates && (
-                                                                    <a
-                                                                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
-                                                                      target="_blank"
-                                                                      rel="noopener noreferrer"
-                                                                      className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
-                                                                    >
-                                                                      Voir carte
-                                                                    </a>
-                                                                  )}
-                                                                </div>
-                                                              </div>
+                                                  <div
+                                                    key={client._id}
+                                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                                  >
+                                                    <div className="flex flex-col gap-2">
+                                                      <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex-1 min-w-0">
+                                                          <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                                            {client.givenName} {client.familyName}
+                                                          </h4>
+                                                          <p className="text-xs sm:text-sm text-gray-400 mb-1.5 flex items-start gap-1">
+                                                            <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0 mt-0.5" />
+                                                            <span className="break-words">{client.addressLine1}</span>
+                                                          </p>
+                                                          {client.phoneNumber && (
+                                                            <p className="text-xs sm:text-sm text-gray-400 flex items-center gap-1">
+                                                              <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0" />
+                                                              <span className="break-all">{client.phoneNumber}</span>
+                                                            </p>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                      {client.coordinates && (
+                                                        <a
+                                                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
+                                                          target="_blank"
+                                                          rel="noopener noreferrer"
+                                                          className="mt-1 w-full sm:w-auto px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20 text-center"
+                                                        >
+                                                          Voir carte
+                                                        </a>
+                                                      )}
+                                                    </div>
+                                                  </div>
                                                             ))}
                                                           </div>
                                                         )}
@@ -1609,30 +1613,32 @@ const ClientsByCity: React.FC = () => {
                                                   cityData.clients.map((client) => (
                                                   <div
                                                     key={client._id}
-                                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                                   >
-                                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                                      <div className="flex-1 min-w-0">
-                                                        <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
-                                                          {client.givenName} {client.familyName}
-                                                        </h4>
-                                                        <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                          <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                                          {client.addressLine1}
-                                                        </p>
-                                                        {client.phoneNumber && (
-                                                          <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                            <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                                            {client.phoneNumber}
+                                                    <div className="flex flex-col gap-2">
+                                                      <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex-1 min-w-0">
+                                                          <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                                            {client.givenName} {client.familyName}
+                                                          </h4>
+                                                          <p className="text-xs sm:text-sm text-gray-400 mb-1.5 flex items-start gap-1">
+                                                            <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0 mt-0.5" />
+                                                            <span className="break-words">{client.addressLine1}</span>
                                                           </p>
-                                                        )}
+                                                          {client.phoneNumber && (
+                                                            <p className="text-xs sm:text-sm text-gray-400 flex items-center gap-1">
+                                                              <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0" />
+                                                              <span className="break-all">{client.phoneNumber}</span>
+                                                            </p>
+                                                          )}
+                                                        </div>
                                                       </div>
                                                       {client.coordinates && (
                                                         <a
                                                           href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                           target="_blank"
                                                           rel="noopener noreferrer"
-                                                          className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
+                                                          className="mt-1 w-full sm:w-auto px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20 text-center"
                                                         >
                                                           Voir carte
                                                         </a>
@@ -1798,30 +1804,32 @@ const ClientsByCity: React.FC = () => {
                             typedCityData.clients.map((client) => (
                             <div
                               key={client._id}
-                              className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                              className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                             >
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <h4 className="font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
-                                    {client.givenName} {client.familyName}
-                                  </h4>
-                                  <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                    <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                    {client.addressLine1}
-                                  </p>
-                                  {client.phoneNumber && (
-                                    <p className="text-sm text-gray-400 flex items-center gap-1">
-                                      <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                      {client.phoneNumber}
+                              <div className="flex flex-col gap-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                      {client.givenName} {client.familyName}
+                                    </h4>
+                                    <p className="text-xs sm:text-sm text-gray-400 mb-1.5 flex items-start gap-1">
+                                      <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0 mt-0.5" />
+                                      <span className="break-words">{client.addressLine1}</span>
                                     </p>
-                                  )}
+                                    {client.phoneNumber && (
+                                      <p className="text-xs sm:text-sm text-gray-400 flex items-center gap-1">
+                                        <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0" />
+                                        <span className="break-all">{client.phoneNumber}</span>
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
                                 {client.coordinates && (
                                   <a
                                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="ml-4 px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20"
+                                    className="mt-1 w-full sm:w-auto px-3 py-1.5 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 text-indigo-300 rounded text-xs transition-all duration-200 backdrop-blur-sm shadow-sm shadow-indigo-500/10 hover:shadow-indigo-500/20 text-center"
                                   >
                                     Voir carte
                                   </a>
@@ -2063,7 +2071,7 @@ const ClientsByCity: React.FC = () => {
                 {/* En-tête du secteur */}
                 <button
                   onClick={() => toggleSector(sector)}
-                  className="w-full px-3 sm:px-6 py-3 sm:py-4 flex items-center gap-2 sm:gap-3 hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
+                  className="w-full px-3 sm:px-4 md:px-6 py-3 sm:py-3.5 md:py-4 flex items-center gap-2 sm:gap-2.5 md:gap-3 hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
                 >
                   {isSectorExpanded ? (
                     <ChevronDown className={`h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
@@ -2071,10 +2079,10 @@ const ClientsByCity: React.FC = () => {
                     <ChevronRight className={`h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
                   )}
                   <Building className={`h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0 ${sector === 'Non assignés' ? 'text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)]' : 'text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]'}`} />
-                  <span className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)] flex-shrink-0">
+                  <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)] flex-shrink-0 truncate">
                     {sector}
                   </span>
-                  <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded text-xs sm:text-sm font-semibold border backdrop-blur-sm flex-shrink-0 ${
+                  <span className={`px-1.5 sm:px-2 md:px-3 py-0.5 sm:py-1 rounded text-xs sm:text-sm font-semibold border backdrop-blur-sm flex-shrink-0 whitespace-nowrap ${
                     sector === 'Non assignés' 
                       ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-yellow-400/40 text-yellow-300 shadow-lg shadow-yellow-500/20' 
                       : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-indigo-400/40 text-indigo-300 shadow-lg shadow-indigo-500/20'
@@ -2095,7 +2103,7 @@ const ClientsByCity: React.FC = () => {
 
                 {/* Contenu du secteur */}
                 {isSectorExpanded && (
-                  <div className="px-6 pb-4 space-y-4 mt-2">
+                  <div className="px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 space-y-2 sm:space-y-3 md:space-y-4 mt-2">
                     {/* Pour "Non assignés", afficher directement les catégories (pas de niveau ville) */}
                     {sector === 'Non assignés' ? (
                       <div className="space-y-2">
@@ -2117,54 +2125,56 @@ const ClientsByCity: React.FC = () => {
                               >
                                 <button
                                   onClick={() => toggleCity(categoryKey)}
-                                  className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-yellow-500/5 hover:to-orange-500/5 transition-all duration-200"
+                                  className="w-full px-2.5 sm:px-3 md:px-4 py-2.5 sm:py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-yellow-500/5 hover:to-orange-500/5 transition-all duration-200"
                                 >
-                                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 flex-1 min-w-0">
                                     {isExpanded ? (
-                                      <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)] flex-shrink-0" />
+                                      <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)] flex-shrink-0" />
                                     ) : (
-                                      <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)] flex-shrink-0" />
+                                      <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)] flex-shrink-0" />
                                     )}
-                                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)] flex-shrink-0" />
-                                    <span className="text-base sm:text-lg md:text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(245,158,11,0.3)] truncate">{category}</span>
-                                    <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/40 text-yellow-300 rounded text-xs sm:text-sm backdrop-blur-sm shadow-sm shadow-yellow-500/10 flex-shrink-0 ml-auto">
+                                    <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-yellow-400 drop-shadow-[0_0_4px_rgba(245,158,11,0.8)] flex-shrink-0" />
+                                    <span className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(245,158,11,0.3)] truncate">{category}</span>
+                                    <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/40 text-yellow-300 rounded text-xs sm:text-sm backdrop-blur-sm shadow-sm shadow-yellow-500/10 flex-shrink-0 ml-auto whitespace-nowrap">
                                       {clientCount} client{clientCount > 1 ? 's' : ''}
                                     </span>
                                   </div>
                                 </button>
 
                                 {isExpanded && (
-                                  <div className="px-3 sm:px-4 pb-3 space-y-2">
+                                  <div className="px-2.5 sm:px-3 md:px-4 pb-2 sm:pb-3 space-y-1.5 sm:space-y-2">
                                     {cityData.clients && Array.isArray(cityData.clients) ? (
                                       cityData.clients.map((client) => (
                                       <div
                                         key={client._id}
-                                        className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-yellow-500/15 hover:border-yellow-500/30 transition-all duration-200 shadow-sm"
+                                        className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-yellow-500/15 hover:border-yellow-500/30 transition-all duration-200 shadow-sm"
                                       >
-                                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                          <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
-                                              {client.givenName} {client.familyName}
-                                            </h4>
-                                            {client.addressLine1 && (
-                                              <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                                {client.addressLine1}
-                                              </p>
-                                            )}
-                                            {client.phoneNumber && (
-                                              <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                                {client.phoneNumber}
-                                              </p>
-                                            )}
-                                            {client.district && (
-                                              <p className="text-sm text-yellow-400 mt-2 drop-shadow-[0_0_3px_rgba(245,158,11,0.6)]">
-                                                {client.district}
-                                              </p>
-                                            )}
+                                        <div className="flex flex-col gap-2">
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                              <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                                {client.givenName} {client.familyName}
+                                              </h4>
+                                              {client.addressLine1 && (
+                                                <p className="text-xs sm:text-sm text-gray-400 mb-1.5 flex items-start gap-1">
+                                                  <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0 mt-0.5" />
+                                                  <span className="break-words">{client.addressLine1}</span>
+                                                </p>
+                                              )}
+                                              {client.phoneNumber && (
+                                                <p className="text-xs sm:text-sm text-gray-400 flex items-center gap-1">
+                                                  <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0" />
+                                                  <span className="break-all">{client.phoneNumber}</span>
+                                                </p>
+                                              )}
+                                              {client.district && (
+                                                <p className="text-xs sm:text-sm text-yellow-400 mt-1.5 drop-shadow-[0_0_3px_rgba(245,158,11,0.6)]">
+                                                  {client.district}
+                                                </p>
+                                              )}
+                                            </div>
                                           </div>
-                                          <div className="flex flex-col sm:flex-row gap-2 sm:ml-4 w-full sm:w-auto">
+                                          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                                             {category === 'Adresse ambiguë' && (
                                               <button
                                                 onClick={() => {
