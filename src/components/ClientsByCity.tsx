@@ -1428,30 +1428,32 @@ const ClientsByCity: React.FC = () => {
                                       {sectorData.clients.map((client) => (
                                         <div
                                           key={client._id}
-                                          className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                          className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
                                         >
-                                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                            <div className="flex-1 min-w-0">
-                                              <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
-                                                {client.givenName} {client.familyName}
-                                              </h4>
-                                              <p className="text-sm text-gray-400 mb-2 flex items-center gap-1">
-                                                <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)]" />
-                                                {client.addressLine1}
-                                              </p>
-                                              {client.phoneNumber && (
-                                                <p className="text-sm text-gray-400 flex items-center gap-1">
-                                                  <Phone className="h-3 w-3" />
-                                                  {client.phoneNumber}
+                                          <div className="flex flex-col gap-2">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm sm:text-base font-medium text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.2)]">
+                                                  {client.givenName} {client.familyName}
+                                                </h4>
+                                                <p className="text-xs sm:text-sm text-gray-400 mb-1.5 flex items-start gap-1">
+                                                  <MapPin className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.4)] flex-shrink-0 mt-0.5" />
+                                                  <span className="break-words">{client.addressLine1}</span>
                                                 </p>
-                                              )}
+                                                {client.phoneNumber && (
+                                                  <p className="text-xs sm:text-sm text-gray-400 flex items-center gap-1">
+                                                    <Phone className="h-3 w-3 flex-shrink-0" />
+                                                    <span className="break-all">{client.phoneNumber}</span>
+                                                  </p>
+                                                )}
+                                              </div>
                                             </div>
                                             {client.coordinates && (
                                               <a
                                                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(client.addressLine1)}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="ml-4 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors"
+                                                className="mt-1 w-full sm:w-auto px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 rounded text-xs transition-colors text-center"
                                               >
                                                 Voir carte
                                               </a>
@@ -1505,24 +1507,24 @@ const ClientsByCity: React.FC = () => {
                                       >
                                         <button
                                           onClick={() => toggleCity(cityKey)}
-                                          className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
+                                          className="w-full px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between hover:bg-gradient-to-r hover:from-indigo-500/5 hover:to-cyan-500/5 transition-all duration-200"
                                         >
-                                          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                                          <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 flex-1 min-w-0">
                                             {isExpanded ? (
-                                              <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                                              <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
                                             ) : (
-                                              <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                                              <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
                                             )}
-                                            <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
-                                            <span className="text-base sm:text-lg md:text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(139,92,246,0.3)] truncate">{city}</span>
-                                            <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-400/40 text-indigo-300 rounded text-xs sm:text-sm backdrop-blur-sm shadow-sm shadow-indigo-500/10 flex-shrink-0 ml-auto">
+                                            <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                                            <span className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold text-gray-100 drop-shadow-[0_0_2px_rgba(139,92,246,0.3)] truncate">{city}</span>
+                                            <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-400/40 text-indigo-300 rounded text-xs sm:text-sm backdrop-blur-sm shadow-sm shadow-indigo-500/10 flex-shrink-0 ml-auto whitespace-nowrap">
                                               {clientCount} client{clientCount > 1 ? 's' : ''}
                                             </span>
                                           </div>
                                         </button>
 
                                         {isExpanded && (
-                                          <div className="px-4 pb-3 space-y-3">
+                                          <div className="px-3 sm:px-4 pb-3 space-y-2 sm:space-y-3">
                                             {hasDistricts && isMontrealOrLaval ? (
                                               <div className="space-y-2">
                                                 {Object.entries(cityData.districts!)
@@ -1543,24 +1545,24 @@ const ClientsByCity: React.FC = () => {
                                                       >
                                                         <button
                                                           onClick={() => toggleDistrict(sector, city, district)}
-                                                          className="w-full px-3 sm:px-4 py-2 flex items-center justify-between hover:bg-gradient-to-r hover:from-purple-500/5 hover:to-pink-500/5 transition-all duration-200 rounded"
+                                                          className="w-full px-2.5 sm:px-3 md:px-4 py-2 flex items-center justify-between hover:bg-gradient-to-r hover:from-purple-500/5 hover:to-pink-500/5 transition-all duration-200 rounded"
                                                         >
                                                           <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
                                                             {isDistrictExpanded ? (
-                                                              <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0" />
+                                                              <ChevronDown className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0" />
                                                             ) : (
-                                                              <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0" />
+                                                              <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0" />
                                                             )}
-                                                            <Home className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0" />
-                                                            <span className="text-sm sm:text-base font-medium text-gray-200 drop-shadow-[0_0_2px_rgba(168,85,247,0.2)] truncate">{district}</span>
-                                                            <span className="px-1.5 sm:px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10 flex-shrink-0 ml-auto">
+                                                            <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-purple-400 drop-shadow-[0_0_3px_rgba(168,85,247,0.6)] flex-shrink-0" />
+                                                            <span className="text-xs sm:text-sm md:text-base font-medium text-gray-200 drop-shadow-[0_0_2px_rgba(168,85,247,0.2)] truncate">{district}</span>
+                                                            <span className="px-1.5 sm:px-2 py-0.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/40 text-purple-300 rounded text-xs backdrop-blur-sm shadow-sm shadow-purple-500/10 flex-shrink-0 ml-auto whitespace-nowrap">
                                                               {clients.length} client{clients.length > 1 ? 's' : ''}
                                                             </span>
                                                           </div>
                                                         </button>
 
                                                         {isDistrictExpanded && (
-                                                          <div className="px-4 pb-3 space-y-2">
+                                                          <div className="px-2.5 sm:px-3 md:px-4 pb-2 sm:pb-3 space-y-1.5 sm:space-y-2">
                                                             {clients.map((client) => (
                                                               <div
                                                                 key={client._id}
@@ -1868,30 +1870,30 @@ const ClientsByCity: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+    <div className="space-y-3 sm:space-y-4 md:space-y-6 px-2 sm:px-4 md:px-0 pb-4">
       {/* En-tête avec statistiques */}
-      <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-3 sm:p-6 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-3 sm:mb-4">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] mb-1 sm:mb-2 flex items-center gap-2">
-              <div className="p-1.5 sm:p-2 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
-                <Users className="h-4 w-4 sm:h-6 sm:w-6 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
-              </div>
-              <span className="truncate">Clients par Ville</span>
-            </h1>
-            <p className="text-sm sm:text-base text-gray-300">
-              {searchTerm ? (
-                <>
-                  <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">{filteredClientCount}</span> client{filteredClientCount > 1 ? 's' : ''} trouvé{filteredClientCount > 1 ? 's' : ''} sur <span className="text-gray-300">{totalClients}</span> total
-                </>
-              ) : (
-                <>
-                  <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">{totalClients}</span> client{totalClients > 1 ? 's' : ''} réparti{totalClients > 1 ? 's' : ''} sur <span className="text-gray-300">{Object.keys(clientsData).length}</span> ville{Object.keys(clientsData).length > 1 ? 's' : ''}
-                </>
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+      <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-4 sm:p-5 md:p-6 border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] mb-1.5 sm:mb-2 flex items-center gap-2">
+                <div className="p-1.5 sm:p-2 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
+                  <Users className="h-4 w-4 sm:h-5 sm:h-6 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+                </div>
+                <span className="truncate">Clients par Ville</span>
+              </h1>
+              <p className="text-xs sm:text-sm md:text-base text-gray-300 leading-relaxed">
+                {searchTerm ? (
+                  <>
+                    <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)] font-semibold">{filteredClientCount}</span> client{filteredClientCount > 1 ? 's' : ''} trouvé{filteredClientCount > 1 ? 's' : ''} sur <span className="text-gray-300">{totalClients}</span> total
+                  </>
+                ) : (
+                  <>
+                    <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)] font-semibold">{totalClients}</span> client{totalClients > 1 ? 's' : ''} réparti{totalClients > 1 ? 's' : ''} sur <span className="text-gray-300">{Object.keys(clientsData).length}</span> ville{Object.keys(clientsData).length > 1 ? 's' : ''}
+                  </>
+                )}
+              </p>
+            </div>
             <button
               onClick={() => {
                 // Forcer un recalcul complet avec streaming (barre de progression)
@@ -1918,47 +1920,47 @@ const ClientsByCity: React.FC = () => {
                 fetchClientsByCityStream();
               }}
               disabled={loading}
-              className="px-3 py-2 sm:px-4 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 disabled:from-gray-600/20 disabled:to-gray-600/20 disabled:cursor-not-allowed text-rose-200 rounded-md transition-all duration-200 flex items-center justify-center gap-2 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0 text-sm sm:text-base"
+              className="px-3 py-2 sm:px-4 sm:py-2.5 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 disabled:from-gray-600/20 disabled:to-gray-600/20 disabled:cursor-not-allowed text-rose-200 rounded-md transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 backdrop-blur-sm flex-shrink-0 text-xs sm:text-sm md:text-base"
               title="Recharger depuis MongoDB (route optimisée, pas d'appels API externes)"
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 drop-shadow-[0_0_3px_rgba(244,63,94,0.8)] animate-spin" />
-                  <span>Calcul...</span>
+                  <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 drop-shadow-[0_0_3px_rgba(244,63,94,0.8)] animate-spin" />
+                  <span className="hidden sm:inline">Calcul...</span>
                 </>
               ) : (
                 <>
-                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 drop-shadow-[0_0_3px_rgba(244,63,94,0.8)]" />
-                  <span>Reboot</span>
+                  <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 drop-shadow-[0_0_3px_rgba(244,63,94,0.8)]" />
+                  <span className="hidden sm:inline">Reboot</span>
                 </>
               )}
             </button>
           </div>
-        </div>
 
-        {/* Barre de recherche */}
-        <div className="relative">
-          <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Rechercher..."
-            className="w-full pl-8 sm:pl-10 pr-8 sm:pr-10 py-2 sm:py-3 bg-gray-900/60 border border-indigo-500/30 rounded-lg text-sm sm:text-base text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/20 transition-all duration-200"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-2 sm:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] p-1"
-            >
-              <X className="h-4 w-4 sm:h-5 sm:w-5" />
-            </button>
-          )}
+          {/* Barre de recherche */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Rechercher..."
+              className="w-full pl-9 sm:pl-11 pr-9 sm:pr-11 py-2.5 sm:py-3 bg-gray-900/60 border border-indigo-500/30 rounded-lg text-sm sm:text-base text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/20 transition-all duration-200"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] p-1"
+              >
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Liste des secteurs */}
-      <div className="space-y-3 sm:space-y-4">
+      <div className="space-y-2 sm:space-y-3 md:space-y-4">
         {filteredClientsBySector && typeof filteredClientsBySector === 'object' && Object.keys(filteredClientsBySector).length > 0 ? (
           Object.entries(filteredClientsBySector)
             .sort(([sectorA, citiesA], [sectorB, citiesB]) => {
