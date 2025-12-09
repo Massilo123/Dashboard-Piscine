@@ -2,14 +2,7 @@
 import { Router, Request, Response } from 'express';
 import squareClient from '../config/square';
 import Client from '../models/Client';
-import { 
-  addClientToByCityCache,
-  updateClientInByCityCache,
-  removeClientFromByCityCache,
-  addClientToForMapCache,
-  updateClientInForMapCache,
-  removeClientFromForMapCache
-} from './clientByCityRoutes';
+// Plus besoin des fonctions de cache - on utilise directement MongoDB maintenant
 
 const router = Router();
 
@@ -27,10 +20,6 @@ async function upsertClientInMongo(squareCustomerId: string) {
 
         const customer = customerResponse.customer;
 
-        // Vérifier si le client existe déjà
-        const existingClient = await Client.findOne({ squareId: customer.id });
-        const isNewClient = !existingClient;
-
         // Mettre à jour ou créer le client dans MongoDB
         const updatedClient = await Client.findOneAndUpdate(
             { squareId: customer.id },
@@ -46,54 +35,16 @@ async function upsertClientInMongo(squareCustomerId: string) {
 
         // Géocoder automatiquement le client s'il a une adresse
         if (updatedClient && updatedClient.addressLine1 && updatedClient.addressLine1.trim() !== '') {
-            const { geocodeClient } = await import('../utils/geocodeClient');
-            geocodeClient(updatedClient._id.toString())
-                .then(() => {
-                    // Après géocodage, mettre à jour le cache (ajouter si nouveau, mettre à jour si existant)
-                    if (isNewClient) {
-                        addClientToByCityCache(updatedClient._id.toString()).catch(err => {
-                            console.error('Erreur lors de l\'ajout au cache by-city:', err);
-                        });
-                        addClientToForMapCache(updatedClient._id.toString()).catch(err => {
-                            console.error('Erreur lors de l\'ajout au cache for-map:', err);
-                        });
-                    } else {
-                        updateClientInByCityCache(updatedClient._id.toString()).catch(err => {
-                            console.error('Erreur lors de la mise à jour du cache by-city:', err);
-                        });
-                        updateClientInForMapCache(updatedClient._id.toString()).catch(err => {
-                            console.error('Erreur lors de la mise à jour du cache for-map:', err);
-                        });
-                    }
+            const { geocodeAndExtractLocation } = await import('../utils/geocodeAndExtractLocation');
+            geocodeAndExtractLocation(updatedClient._id.toString())
+                .then((result) => {
+                    // Plus besoin de mettre à jour le cache - city/district/sector sont déjà dans MongoDB
+                    // Les routes lisent directement depuis MongoDB maintenant
+                    console.log(`✅ Client géocodé et localisé: ${result.city}${result.district ? ` (${result.district})` : ''} [${result.sector}]`);
                 })
                 .catch(err => {
                     console.error(`Erreur lors du géocodage automatique pour ${customer.givenName}:`, err);
-                    // Même si le géocodage échoue, essayer de mettre à jour le cache
-                    if (isNewClient) {
-                        addClientToByCityCache(updatedClient._id.toString()).catch(err => {
-                            console.error('Erreur lors de l\'ajout au cache by-city:', err);
-                        });
-                        // For-map nécessite des coordonnées, donc on ne l'ajoute pas si le géocodage échoue
-                    } else {
-                        updateClientInByCityCache(updatedClient._id.toString()).catch(err => {
-                            console.error('Erreur lors de la mise à jour du cache by-city:', err);
-                        });
-                        // For-map nécessite des coordonnées, donc on ne le met pas à jour si le géocodage échoue
-                    }
                 });
-        } else {
-            // Même sans adresse, essayer de mettre à jour le cache
-            if (isNewClient) {
-                addClientToByCityCache(updatedClient._id.toString()).catch(err => {
-                    console.error('Erreur lors de l\'ajout au cache by-city:', err);
-                });
-                // For-map nécessite des coordonnées, donc on ne l'ajoute pas sans adresse
-            } else {
-                updateClientInByCityCache(updatedClient._id.toString()).catch(err => {
-                    console.error('Erreur lors de la mise à jour du cache by-city:', err);
-                });
-                // For-map nécessite des coordonnées, donc on ne le met pas à jour sans adresse
-            }
         }
 
     } catch (error) {
@@ -136,22 +87,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
                         const clientName = `${client.givenName || ''} ${client.familyName || ''}`.trim();
                         console.log(`🗑️ Suppression du client ${clientId} (${clientName})`);
                         
-                        // IMPORTANT: Retirer du cache AVANT de supprimer de MongoDB
-                        try {
-                            await removeClientFromByCityCache(clientId);
-                            console.log(`✅ Client retiré du cache by-city`);
-                        } catch (err) {
-                            console.error('❌ Erreur lors de la suppression du cache by-city:', err);
-                        }
-                        
-                        try {
-                            await removeClientFromForMapCache(clientId);
-                            console.log(`✅ Client retiré du cache for-map`);
-                        } catch (err) {
-                            console.error('❌ Erreur lors de la suppression du cache for-map:', err);
-                        }
-                        
-                        // Supprimer de MongoDB après avoir retiré du cache
+                        // Plus besoin de retirer du cache - on utilise directement MongoDB maintenant
+                        // Supprimer directement de MongoDB
                         await Client.deleteOne({ squareId: data.object.customer.id });
                         console.log(`✅ Client supprimé de MongoDB`);
                     } else {

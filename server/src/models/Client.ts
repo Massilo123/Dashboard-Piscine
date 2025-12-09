@@ -9,7 +9,11 @@ const clientSchema = new mongoose.Schema({
     coordinates: {
         lng: { type: Number },
         lat: { type: Number }
-    }
+    },
+    // Champs géographiques extraits de l'adresse
+    city: { type: String },
+    district: { type: String },
+    sector: { type: String } // Montréal, Laval, Rive Nord, Rive Sud, Autres
 }, {
     timestamps: true // Ajoute automatiquement createdAt et updatedAt
 });

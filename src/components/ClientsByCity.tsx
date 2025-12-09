@@ -161,6 +161,13 @@ const ClientsByCity: React.FC = () => {
           message: result.message
         });
         
+        // Toujours mettre à jour le timestamp avec celui retourné par le serveur
+        // pour éviter de redétecter les mêmes clients modifiés précédemment
+        if (result.lastUpdate) {
+          localStorage.setItem('clientsByCityLastUpdate', result.lastUpdate);
+          setLastUpdate(result.lastUpdate);
+        }
+        
         if (result.hasChanges && result.clientsForByCity && result.clientsForByCity.length > 0) {
           // Convertir les clients formatés en gardant le secteur retourné par le serveur
           const changedClients = result.clientsForByCity.map((c: {
@@ -203,6 +210,179 @@ const ClientsByCity: React.FC = () => {
   };
 
   // Fonction pour mettre à jour seulement les clients modifiés
+  // Fonction pour détecter et retirer les clients supprimés en comparant avec la liste complète
+  const detectAndRemoveDeletedClients = useCallback(async () => {
+    try {
+      // Charger tous les clients depuis l'API pour obtenir la liste complète des IDs
+      const response = await fetch(`${API_CONFIG.baseUrl}/api/clients/by-city`);
+      const result = await response.json();
+      
+      if (!result.success || !result.data) {
+        console.warn('⚠️ Impossible de charger la liste complète des clients pour détecter les suppressions');
+        return;
+      }
+      
+      // Extraire tous les IDs des clients actuels depuis la réponse
+      const allClientIds = new Set<string>();
+      
+      const extractIds = (data: any) => {
+        if (Array.isArray(data)) {
+          data.forEach(item => {
+            if (item._id) allClientIds.add(item._id);
+            if (item.clients) extractIds(item.clients);
+            if (item.districts) {
+              Object.values(item.districts).forEach((districtClients: any) => {
+                if (Array.isArray(districtClients)) extractIds(districtClients);
+              });
+            }
+          });
+        } else if (typeof data === 'object' && data !== null) {
+          Object.values(data).forEach((value: any) => {
+            if (typeof value === 'object' && value !== null) {
+              if ('clients' in value && Array.isArray(value.clients)) {
+                extractIds(value.clients);
+              }
+              if ('districts' in value && typeof value.districts === 'object' && value.districts !== null) {
+                Object.values(value.districts).forEach((districtClients: any) => {
+                  if (Array.isArray(districtClients)) extractIds(districtClients);
+                });
+              }
+            }
+          });
+        }
+      };
+      
+      extractIds(result.data);
+      
+      // Comparer avec les clients actuels dans l'état pour détecter les suppressions
+      setClientsBySector(prevSector => {
+        const updated = JSON.parse(JSON.stringify(prevSector)); // Deep copy
+        let removedCount = 0;
+        
+        // Parcourir tous les secteurs
+        Object.keys(updated).forEach(sectorKey => {
+          const sector = updated[sectorKey];
+          
+          if (sectorKey === 'Montréal' || sectorKey === 'Laval') {
+            // Pour Montréal/Laval avec districts
+            const sectorData = sector as { districts?: Record<string, Client[]>; clients: Client[] };
+            if (sectorData.districts) {
+              Object.keys(sectorData.districts).forEach(district => {
+                const beforeCount = sectorData.districts![district].length;
+                sectorData.districts![district] = sectorData.districts![district].filter(
+                  c => allClientIds.has(c._id)
+                );
+                const afterCount = sectorData.districts![district].length;
+                removedCount += beforeCount - afterCount;
+              });
+            }
+            if (sectorData.clients) {
+              const beforeCount = sectorData.clients.length;
+              sectorData.clients = sectorData.clients.filter(c => allClientIds.has(c._id));
+              const afterCount = sectorData.clients.length;
+              removedCount += beforeCount - afterCount;
+            }
+          } else {
+            // Pour les autres secteurs (organisés par ville)
+            const sectorData = sector as ClientsByCityData;
+            Object.keys(sectorData).forEach(city => {
+              const cityData = sectorData[city];
+              if (cityData.clients) {
+                const beforeCount = cityData.clients.length;
+                cityData.clients = cityData.clients.filter(c => allClientIds.has(c._id));
+                const afterCount = cityData.clients.length;
+                removedCount += beforeCount - afterCount;
+              }
+              if (cityData.districts) {
+                Object.keys(cityData.districts).forEach(district => {
+                  const beforeCount = cityData.districts![district].length;
+                  cityData.districts![district] = cityData.districts![district].filter(
+                    c => allClientIds.has(c._id)
+                  );
+                  const afterCount = cityData.districts![district].length;
+                  removedCount += beforeCount - afterCount;
+                });
+              }
+            });
+          }
+        });
+        
+        if (removedCount > 0) {
+          console.log(`🗑️ ${removedCount} client(s) supprimé(s) détecté(s) et retiré(s)`);
+          
+          // Recalculer le total
+          let total = 0;
+          Object.values(updated).forEach(sect => {
+            if (typeof sect === 'object' && sect !== null && !Array.isArray(sect)) {
+              if ('districts' in sect || 'clients' in sect) {
+                const sectorData = sect as { districts?: Record<string, Client[]>; clients: Client[] };
+                if (sectorData.districts) {
+                  Object.values(sectorData.districts).forEach(districtClients => {
+                    total += districtClients.length;
+                  });
+                }
+                if (sectorData.clients) {
+                  total += sectorData.clients.length;
+                }
+              } else {
+                Object.values(sect as ClientsByCityData).forEach(cityData => {
+                  if (cityData.clients) {
+                    total += cityData.clients.length;
+                  }
+                  if (cityData.districts) {
+                    Object.values(cityData.districts).forEach(districtClients => {
+                      total += districtClients.length;
+                    });
+                  }
+                });
+              }
+            }
+          });
+          setTotalClients(total);
+          
+          // Mettre à jour aussi clientsData (version aplatie)
+          const flattened: ClientsByCityData = {};
+          Object.values(updated).forEach(sect => {
+            if (typeof sect === 'object' && sect !== null && !Array.isArray(sect)) {
+              if ('districts' in sect || 'clients' in sect) {
+                const sectorData = sect as { districts?: Record<string, Client[]>; clients: Client[] };
+                if (sectorData.districts) {
+                  Object.values(sectorData.districts).forEach(districtClients => {
+                    districtClients.forEach(client => {
+                      if (!flattened[client.city]) {
+                        flattened[client.city] = { clients: [] };
+                      }
+                      flattened[client.city].clients.push(client);
+                    });
+                  });
+                }
+                if (sectorData.clients) {
+                  sectorData.clients.forEach(client => {
+                    if (!flattened[client.city]) {
+                      flattened[client.city] = { clients: [] };
+                    }
+                    flattened[client.city].clients.push(client);
+                  });
+                }
+              } else {
+                Object.assign(flattened, sect);
+              }
+            }
+          });
+          setClientsData(flattened);
+          
+          // Sauvegarder dans le cache
+          const updateTimestamp = new Date().toISOString();
+          saveToCache(updated, flattened, total, updateTimestamp);
+        }
+        
+        return updated;
+      });
+    } catch (error) {
+      console.error('❌ Erreur lors de la détection des clients supprimés:', error);
+    }
+  }, []);
+
   const updateClientsIncremental = useCallback((changedClients: Array<Client & { sector?: string }>) => {
     if (changedClients.length === 0) return;
 
@@ -361,6 +541,8 @@ const ClientsByCity: React.FC = () => {
       const updateTimestamp = new Date().toISOString();
       saveToCache(updated, flattened, total, updateTimestamp);
       
+      return updated;
+      
       console.log('✅ Mise à jour incrémentale terminée et sauvegardée dans le cache');
       
       return updated;
@@ -384,12 +566,17 @@ const ClientsByCity: React.FC = () => {
             if (loadFromCache()) {
               setLoading(false);
               console.log('✅ Données chargées depuis le cache (aucun changement détecté)');
+              // Le timestamp est déjà mis à jour dans checkForChanges() avec celui du serveur
+              // Détecter les suppressions même après chargement depuis le cache
+              detectAndRemoveDeletedClients();
               return;
             }
           } else if (result.changedClients && result.changedClients.length > 0) {
             // Il y a des changements, mettre à jour incrémentalement
             console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
             updateClientsIncremental(result.changedClients);
+            // Détecter les suppressions en comparant avec la liste complète
+            detectAndRemoveDeletedClients();
             setLoading(false);
             return;
           } else if (result.hasChanges) {
@@ -551,6 +738,8 @@ const ClientsByCity: React.FC = () => {
       if (hasCache) {
         setLoading(false);
         console.log('✅ Données chargées depuis le cache');
+        // Détecter les suppressions même après chargement depuis le cache
+        detectAndRemoveDeletedClients();
       }
       
       // Vérifier si on a un timestamp de cache
@@ -575,6 +764,8 @@ const ClientsByCity: React.FC = () => {
           console.log(`🔄 ${result.changedClients.length} client(s) modifié(s), mise à jour incrémentale...`);
           // Mettre à jour seulement les clients modifiés
           updateClientsIncremental(result.changedClients);
+          // Détecter les suppressions en comparant avec la liste complète
+          detectAndRemoveDeletedClients();
         } else {
           // Si hasChanges mais pas de changedClients, c'est qu'il y a des changements mais aucun client avec adresse
           // Dans ce cas, on ne fait rien (pas de rechargement complet) car les clients sans adresse ne sont pas affichés dans ClientsByCity
@@ -584,6 +775,7 @@ const ClientsByCity: React.FC = () => {
         }
       } else {
         console.log('✅ Aucun changement détecté, conservation du cache');
+        // Le timestamp est déjà mis à jour dans checkForChanges() avec celui du serveur
         // S'assurer que loading est false
         setLoading(false);
       }
@@ -599,7 +791,7 @@ const ClientsByCity: React.FC = () => {
       // Réinitialiser le flag si le composant est démonté
       hasInitializedRef.current = false;
     };
-  }, [refreshKey, updateClientsIncremental]);
+  }, [refreshKey, updateClientsIncremental, detectAndRemoveDeletedClients]);
 
   const fetchClientsByCityStream = () => {
     // Réinitialiser tous les états pour fermer les menus

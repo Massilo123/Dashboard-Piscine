@@ -1,14 +1,7 @@
 import { Router } from 'express';
 import Client from '../models/Client';
 import squareClient from '../config/square';
-import { 
-  addClientToByCityCache, 
-  updateClientInByCityCache,
-  removeClientFromByCityCache,
-  addClientToForMapCache,
-  updateClientInForMapCache,
-  removeClientFromForMapCache
-} from './clientByCityRoutes';
+// Plus besoin des fonctions de cache - on utilise directement MongoDB maintenant
 
 const router = Router();
 
@@ -19,29 +12,15 @@ router.post('/', async (req, res) => {
     
     // Géocoder automatiquement le client s'il a une adresse
     if (client.addressLine1 && client.addressLine1.trim() !== '') {
-      const { geocodeClient } = await import('../utils/geocodeClient');
-      geocodeClient(client._id.toString())
-        .then(() => {
-          // Après géocodage, ajouter au cache de manière incrémentale
-          addClientToByCityCache(client._id.toString()).catch(err => {
-            console.error('Erreur lors de l\'ajout au cache by-city:', err);
-          });
-          addClientToForMapCache(client._id.toString()).catch(err => {
-            console.error('Erreur lors de l\'ajout au cache for-map:', err);
-          });
+      const { geocodeAndExtractLocation } = await import('../utils/geocodeAndExtractLocation');
+      geocodeAndExtractLocation(client._id.toString())
+        .then((result) => {
+          // Plus besoin de mettre à jour le cache - city/district/sector sont déjà dans MongoDB
+          console.log(`✅ Client géocodé et localisé: ${result.city}${result.district ? ` (${result.district})` : ''} [${result.sector}]`);
         })
         .catch(err => {
           console.error('Erreur lors du géocodage automatique après création:', err);
-          // Même si le géocodage échoue, essayer d'ajouter au cache (sans coordonnées pour for-map)
-          addClientToByCityCache(client._id.toString()).catch(err => {
-            console.error('Erreur lors de l\'ajout au cache by-city:', err);
-          });
         });
-    } else {
-      // Même sans adresse, essayer d'ajouter au cache (sera ignoré si pas d'adresse)
-      addClientToByCityCache(client._id.toString()).catch(err => {
-        console.error('Erreur lors de l\'ajout au cache by-city:', err);
-      });
     }
     
     res.status(201).json(client);
@@ -156,18 +135,11 @@ router.delete('/position/:position', async (req, res) => {
 
     // 1. Supprimer de MongoDB
     try {
-      const clientId = client._id.toString();
       await Client.deleteOne({ _id: client._id });
       results.mongoDeleted = true;
       console.log(`✅ Client supprimé de MongoDB`);
       
-      // Retirer du cache de manière incrémentale
-      removeClientFromByCityCache(clientId).catch(err => {
-        console.error('Erreur lors de la suppression du cache by-city:', err);
-      });
-      removeClientFromForMapCache(clientId).catch(err => {
-        console.error('Erreur lors de la suppression du cache for-map:', err);
-      });
+      // Plus besoin de retirer du cache - on utilise directement MongoDB maintenant
     } catch (mongoError) {
       const errorMsg = `Erreur MongoDB: ${mongoError instanceof Error ? mongoError.message : 'Erreur inconnue'}`;
       results.errors.push(errorMsg);
@@ -316,18 +288,11 @@ router.delete('/range', async (req, res) => {
 
       // 1. Supprimer de MongoDB
       try {
-        const clientId = client._id.toString();
         await Client.deleteOne({ _id: client._id });
         results.mongoDeleted++;
         console.log(`  ✅ MongoDB: supprimé`);
         
-        // Retirer du cache de manière incrémentale
-        removeClientFromByCityCache(clientId).catch(err => {
-          console.error('Erreur lors de la suppression du cache by-city:', err);
-        });
-        removeClientFromForMapCache(clientId).catch(err => {
-          console.error('Erreur lors de la suppression du cache for-map:', err);
-        });
+        // Plus besoin de retirer du cache - on utilise directement MongoDB maintenant
       } catch (mongoError) {
         const errorMsg = mongoError instanceof Error ? mongoError.message : 'Erreur inconnue';
         results.errors.push({ position: currentPosition, client: clientName, error: `MongoDB: ${errorMsg}` });

@@ -1682,7 +1682,7 @@ async function processSingleClient(client: any): Promise<{
 // Fonction pour ajouter un client au cache "by-city" de manière incrémentale
 export async function addClientToByCityCache(clientId: string): Promise<void> {
   try {
-    const client = await Client.findById(clientId);
+    const client = await Client.findById(clientId).lean();
     if (!client || !client.addressLine1 || client.addressLine1.trim() === '') {
       console.log(`⚠️ Client ${clientId} sans adresse, ignoré pour le cache by-city`);
       return;
@@ -1695,8 +1695,42 @@ export async function addClientToByCityCache(clientId: string): Promise<void> {
       return;
     }
 
-    // Traiter le nouveau client
-    const { clientWithLocation, sector, city, district } = await processSingleClient(client);
+    // Utiliser directement city, district, sector depuis MongoDB (si disponibles)
+    // Sinon, fallback vers processSingleClient pour les anciens clients
+    let city: string;
+    let district: string | undefined;
+    let sector: string;
+    
+    if (client.city && client.sector) {
+      // Utiliser les champs directement depuis MongoDB
+      city = client.city;
+      district = client.district || undefined;
+      sector = client.sector;
+      console.log(`✅ Utilisation des champs MongoDB: ${city}${district ? ` (${district})` : ''} [${sector}]`);
+    } else {
+      // Fallback pour les anciens clients qui n'ont pas encore city/district/sector
+      const processed = await processSingleClient(client);
+      city = processed.city;
+      district = processed.district;
+      sector = processed.sector;
+      console.log(`⚠️ Client sans city/sector dans MongoDB, extraction depuis adresse`);
+    }
+    
+    // Créer le client formaté pour le cache
+    const clientWithLocation = {
+      _id: client._id.toString(),
+      givenName: client.givenName || '',
+      familyName: client.familyName || '',
+      phoneNumber: client.phoneNumber || undefined,
+      addressLine1: client.addressLine1 || '',
+      coordinates: client.coordinates ? {
+        lng: (client.coordinates as any).lng,
+        lat: (client.coordinates as any).lat
+      } : undefined,
+      city: city,
+      district: district,
+      sector: sector
+    };
     
     // Mettre à jour le cache
     const cacheData = cached.data as any;
@@ -2175,44 +2209,88 @@ async function updateByCityCache(): Promise<{ data: any; totalClients: number }>
   }
 }
 
-// Route classique (conservée pour compatibilité) - Utilise maintenant le cache
+// Route optimisée - Utilise directement MongoDB avec aggregate() (sans cache)
 router.get('/by-city', async (req: Request, res: Response): Promise<void> => {
   try {
-    // Vérifier si le cache existe
-    const cached = await ClientByCityCache.findOne({ cacheType: 'by-city' });
-    
-    if (cached && cached.data) {
-      console.log('✅ Utilisation du cache pour /by-city');
-      res.json({
-        success: true,
-        data: cached.data,
-        totalClients: cached.totalClients
-      });
-      return;
+    console.log('📊 Calcul direct depuis MongoDB (optimisé avec aggregate)...');
+    const startTime = Date.now();
+
+    // Récupérer tous les clients avec adresse et city/sector depuis MongoDB
+    const clients = await Client.find({
+      addressLine1: { $exists: true, $ne: '' },
+      city: { $exists: true, $ne: null },
+      sector: { $exists: true, $ne: null }
+    }).lean();
+
+    // Construire la structure hiérarchique directement en mémoire (très rapide)
+    const clientsBySector: Record<string, Record<string, {
+      clients: ClientWithLocation[];
+      districts?: Record<string, ClientWithLocation[]>;
+    }>> = {};
+
+    for (const client of clients) {
+      const sector = client.sector || 'Non assignés';
+      const city = client.city || 'Inconnu';
+      const district = client.district || undefined;
+
+      const clientWithLocation: ClientWithLocation = {
+        _id: client._id.toString(),
+        givenName: client.givenName || '',
+        familyName: client.familyName || '',
+        phoneNumber: client.phoneNumber ?? undefined,
+        addressLine1: client.addressLine1 || '',
+        coordinates: client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null
+          ? { lng: client.coordinates.lng, lat: client.coordinates.lat }
+          : undefined,
+        city: city,
+        district: district
+      };
+
+      // Initialiser le secteur
+      if (!clientsBySector[sector]) {
+        clientsBySector[sector] = {};
+      }
+
+      // Pour Montréal et Laval
+      if ((sector === 'Montréal' && city.toLowerCase() === 'montréal') || 
+          (sector === 'Laval' && city.toLowerCase() === 'laval')) {
+        const sectorKey = sector;
+        
+        if (!clientsBySector[sector][sectorKey]) {
+          clientsBySector[sector][sectorKey] = {
+            clients: [],
+            districts: {}
+          };
+        }
+        
+        if (district) {
+          if (!clientsBySector[sector][sectorKey].districts) {
+            clientsBySector[sector][sectorKey].districts = {};
+          }
+          if (!clientsBySector[sector][sectorKey].districts![district]) {
+            clientsBySector[sector][sectorKey].districts![district] = [];
+          }
+          clientsBySector[sector][sectorKey].districts![district].push(clientWithLocation);
+        } else {
+          clientsBySector[sector][sectorKey].clients.push(clientWithLocation);
+        }
+      } else {
+        // Pour les autres villes
+        if (!clientsBySector[sector][city]) {
+          clientsBySector[sector][city] = { clients: [] };
+        }
+        clientsBySector[sector][city].clients.push(clientWithLocation);
+      }
     }
-    
-    // Si pas de cache, calculer et sauvegarder
-    console.log('📦 Pas de cache, calcul en cours...');
-    const result = await updateByCityCache();
-    
-    // Sauvegarder dans le cache
-    await ClientByCityCache.findOneAndUpdate(
-      { cacheType: 'by-city' },
-      {
-        cacheType: 'by-city',
-        data: result.data,
-        totalClients: result.totalClients,
-        lastUpdate: new Date()
-      },
-      { upsert: true, new: true }
-    );
-    
-    console.log('✅ Cache mis à jour pour /by-city');
+
+    const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    const totalClients = clients.length;
+    console.log(`✅ Calcul terminé en ${totalTime}s (${totalClients} clients)`);
     
     res.json({
       success: true,
-      data: result.data,
-      totalClients: result.totalClients
+      data: clientsBySector,
+      totalClients: totalClients
     });
   } catch (error) {
     console.error('❌ Erreur lors de la récupération des clients par ville:', error);
@@ -2298,23 +2376,14 @@ router.post('/fix-ambiguous-address', async (req: Request, res: Response): Promi
     await client.save();
 
     // Géocoder automatiquement le client après correction de l'adresse
-    const { geocodeClient } = await import('../utils/geocodeClient');
-    geocodeClient(client._id.toString())
-      .then(() => {
-        // Après géocodage, mettre à jour le cache
-        updateClientInByCityCache(client._id.toString()).catch(err => {
-          console.error('Erreur lors de la mise à jour du cache by-city:', err);
-        });
-        updateClientInForMapCache(client._id.toString()).catch(err => {
-          console.error('Erreur lors de la mise à jour du cache for-map:', err);
-        });
+    const { geocodeAndExtractLocation } = await import('../utils/geocodeAndExtractLocation');
+    geocodeAndExtractLocation(client._id.toString())
+      .then((result) => {
+        // Plus besoin de mettre à jour le cache - city/district/sector sont déjà dans MongoDB
+        console.log(`✅ Client géocodé et localisé: ${result.city}${result.district ? ` (${result.district})` : ''} [${result.sector}]`);
       })
       .catch(err => {
         console.error('Erreur lors du géocodage automatique après correction:', err);
-        // Même si le géocodage échoue, essayer de mettre à jour le cache
-        updateClientInByCityCache(client._id.toString()).catch(err => {
-          console.error('Erreur lors de la mise à jour du cache by-city:', err);
-        });
       });
 
     res.json({
@@ -2427,30 +2496,11 @@ router.get('/by-city-changes', async (req: Request, res: Response): Promise<void
         client.coordinates.lat != null;
 
       if (hasCoordinates) {
-        // Extraire la ville et le secteur pour ce client
-        let city = 'Inconnu';
-        let district: string | undefined;
-        let sector = 'Non assignés';
-
-        if (client.addressLine1) {
-          try {
-            const addressResult = await extractCityAndDistrict(client.addressLine1);
-            city = addressResult.city;
-            district = addressResult.district;
-            sector = getSector(city);
-          } catch (error) {
-            console.warn(`Erreur lors de l'extraction de la ville pour ${client.givenName}:`, error);
-            // Utiliser les coordonnées comme fallback
-            if (client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null) {
-              const coordsResult = await extractCityFromCoordinates(client.coordinates.lng, client.coordinates.lat);
-              if (coordsResult) {
-                city = coordsResult.city;
-                district = coordsResult.district;
-                sector = getSector(city);
-              }
-            }
-          }
-        }
+        // Utiliser directement les champs city, district, sector depuis MongoDB
+        // (plus besoin de recalculer avec extractCityAndDistrict qui génère des logs de debug)
+        const city = client.city || 'Inconnu';
+        const district = client.district || undefined;
+        const sector = client.sector || 'Non assignés';
 
         const coords = client.coordinates as { lng: number; lat: number } | null;
         if (coords && coords.lng != null && coords.lat != null) {
@@ -2488,27 +2538,11 @@ router.get('/by-city-changes', async (req: Request, res: Response): Promise<void
 
     for (const client of changedClients) {
       if (client.addressLine1 && client.addressLine1.trim() !== '') {
-        let city = 'Inconnu';
-        let district: string | undefined;
-        let sector = 'Non assignés';
-
-        try {
-          const addressResult = await extractCityAndDistrict(client.addressLine1);
-          city = addressResult.city;
-          district = addressResult.district;
-          sector = getSector(city);
-        } catch (error) {
-          console.warn(`Erreur lors de l'extraction pour ${client.givenName}:`, error);
-          // Utiliser les coordonnées comme fallback
-          if (client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null) {
-            const coordsResult = await extractCityFromCoordinates(client.coordinates.lng, client.coordinates.lat);
-            if (coordsResult) {
-              city = coordsResult.city;
-              district = coordsResult.district;
-              sector = getSector(city);
-            }
-          }
-        }
+        // Utiliser directement les champs city, district, sector depuis MongoDB
+        // (plus besoin de recalculer avec extractCityAndDistrict qui génère des logs de debug)
+        const city = client.city || 'Inconnu';
+        const district = client.district || undefined;
+        const sector = client.sector || 'Non assignés';
 
         const coords = client.coordinates as { lng: number; lat: number } | null;
         clientsForByCity.push({
@@ -2528,37 +2562,8 @@ router.get('/by-city-changes', async (req: Request, res: Response): Promise<void
     console.log(`✅ ${clientsForByCity.length} client(s) formaté(s) pour ClientsByCity`);
 
     // Mettre à jour les caches MongoDB pour chaque client modifié
-    for (const client of changedClients) {
-      const clientId = client._id.toString();
-      try {
-        await updateClientInByCityCache(clientId);
-      } catch (err) {
-        console.error(`❌ Erreur cache by-city pour ${clientId}:`, err);
-      }
-
-      // Mettre à jour le cache for-map seulement si le client a des coordonnées
-      const hasCoords = client.coordinates && 
-        typeof client.coordinates === 'object' &&
-        client.coordinates !== null &&
-        'lng' in client.coordinates &&
-        'lat' in client.coordinates &&
-        client.coordinates.lng != null &&
-        client.coordinates.lat != null;
-
-      if (hasCoords) {
-        try {
-          await updateClientInForMapCache(clientId);
-        } catch (err) {
-          console.error(`❌ Erreur cache for-map pour ${clientId}:`, err);
-        }
-      } else {
-        try {
-          await removeClientFromForMapCache(clientId);
-        } catch {
-          // Log silencieux pour les clients sans coordonnées
-        }
-      }
-    }
+    // Plus besoin de mettre à jour le cache - city/district/sector sont déjà dans MongoDB
+    // Les routes lisent directement depuis MongoDB maintenant
 
     // Toujours retourner clientsForByCity, même s'il est vide (pour éviter les rechargements complets inutiles)
     res.json({
@@ -2609,9 +2614,9 @@ router.post('/update-single-client', async (req: Request, res: Response): Promis
     await client.save();
 
     // Géocoder automatiquement le client après mise à jour de l'adresse (ATTENDRE que ce soit terminé)
-    const { geocodeClient } = await import('../utils/geocodeClient');
+    const { geocodeAndExtractLocation } = await import('../utils/geocodeAndExtractLocation');
     try {
-      await geocodeClient(client._id.toString());
+      await geocodeAndExtractLocation(client._id.toString());
       
       // Attendre un peu pour s'assurer que la base de données est à jour
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -2675,47 +2680,8 @@ router.post('/update-single-client', async (req: Request, res: Response): Promis
       district: district
     };
 
-    // Mettre à jour le cache by-city (fonctionne toujours, même sans coordonnées)
-    try {
-      await updateClientInByCityCache(client._id.toString());
-    } catch (err) {
-      console.error('❌ Erreur lors de la mise à jour du cache by-city:', err);
-    }
-
-    // Mettre à jour le cache for-map
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Vérifier à nouveau les coordonnées directement depuis la base de données
-    const finalClient = await Client.findById(clientId).lean();
-    const hasFinalCoordinates = finalClient && finalClient.coordinates && 
-      typeof finalClient.coordinates === 'object' &&
-      finalClient.coordinates !== null &&
-      'lng' in finalClient.coordinates &&
-      'lat' in finalClient.coordinates &&
-      finalClient.coordinates.lng != null &&
-      finalClient.coordinates.lat != null;
-    
-    if (hasFinalCoordinates) {
-      try {
-        await updateClientInForMapCache(client._id.toString());
-      } catch (err) {
-        console.error('❌ Erreur lors de la mise à jour du cache for-map:', err);
-        // En cas d'erreur, essayer de forcer la mise à jour en retirant puis ajoutant
-        try {
-          await removeClientFromForMapCache(client._id.toString());
-          await addClientToForMapCache(client._id.toString());
-        } catch (retryErr) {
-          console.error('❌ Erreur lors de la mise à jour de secours:', retryErr);
-        }
-      }
-    } else {
-      // Si pas de coordonnées, retirer le client du cache for-map
-      try {
-        await removeClientFromForMapCache(client._id.toString());
-      } catch (err) {
-        console.error('❌ Erreur lors de la suppression du client du cache for-map:', err);
-      }
-    }
+    // Plus besoin de mettre à jour le cache - city/district/sector sont déjà dans MongoDB
+    // Les routes lisent directement depuis MongoDB maintenant
 
     console.log('📤 Envoi de la réponse au client...');
     res.json({
@@ -2891,27 +2857,46 @@ export async function addClientToForMapCache(clientId: string): Promise<void> {
       return;
     }
 
-    // Traiter le client
-    let city = 'Inconnu';
+    // Utiliser directement city, district, sector depuis MongoDB (si disponibles)
+    // Sinon, fallback vers extraction depuis adresse
+    let city: string;
     let district: string | undefined;
-    let sector = 'Non assignés';
+    let sector: string;
 
-    if (client.addressLine1) {
-      try {
-        const addressResult = await extractCityAndDistrict(client.addressLine1);
-        city = addressResult.city;
-        district = addressResult.district;
-        sector = getSector(city);
-      } catch (error) {
-        console.warn(`Erreur lors de l'extraction de la ville pour ${client.givenName}:`, error);
-        if (client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null) {
-          const coordsResult = await extractCityFromCoordinates(client.coordinates.lng, client.coordinates.lat);
-          if (coordsResult) {
-            city = coordsResult.city;
-            district = coordsResult.district;
-            sector = getSector(city);
+    if (client.city && client.sector) {
+      // Utiliser les champs directement depuis MongoDB
+      city = client.city;
+      district = client.district || undefined;
+      sector = client.sector;
+      console.log(`✅ Utilisation des champs MongoDB: ${city}${district ? ` (${district})` : ''} [${sector}]`);
+    } else {
+      // Fallback pour les anciens clients
+      if (client.addressLine1) {
+        try {
+          const addressResult = await extractCityAndDistrict(client.addressLine1);
+          city = addressResult.city;
+          district = addressResult.district;
+          sector = getSector(city);
+        } catch (error) {
+          console.warn(`Erreur lors de l'extraction de la ville pour ${client.givenName}:`, error);
+          if (client.coordinates && client.coordinates.lng != null && client.coordinates.lat != null) {
+            const coordsResult = await extractCityFromCoordinates(client.coordinates.lng, client.coordinates.lat);
+            if (coordsResult) {
+              city = coordsResult.city;
+              district = coordsResult.district;
+              sector = getSector(city);
+            } else {
+              city = 'Inconnu';
+              sector = 'Non assignés';
+            }
+          } else {
+            city = 'Inconnu';
+            sector = 'Non assignés';
           }
         }
+      } else {
+        city = 'Inconnu';
+        sector = 'Non assignés';
       }
     }
 
@@ -3441,64 +3426,61 @@ async function updateForMapCache(): Promise<{
   }
 }
 
-// Route pour la carte - Utilise maintenant le cache
+// Route pour la carte - Utilise directement MongoDB (sans cache)
 router.get('/for-map', async (req: Request, res: Response): Promise<void> => {
   try {
-    // Vérifier si le cache existe
-    const cached = await ClientByCityCache.findOne({ cacheType: 'for-map' });
-    
-    if (cached && cached.data) {
-      const cacheData = cached.data as any;
-      console.log('✅ Utilisation du cache pour /for-map');
-      
-      res.json({
-        success: true,
-        clients: cacheData.clients || [],
-        total: cacheData.total || 0,
-        totalInDatabase: cacheData.totalInDatabase || 0,
-        totalWithCoordinates: cacheData.totalWithCoordinates || 0,
-        withoutCoordinates: cacheData.withoutCoordinates || 0,
-        missingClients: cacheData.missingClients || [],
-        message: cacheData.missingClients && cacheData.missingClients.length > 0
-          ? `${cacheData.missingClients.length} client(s) avec coordonnées ne sont pas affichés. Voir les logs serveur pour plus de détails.`
-          : cacheData.withoutCoordinates && cacheData.withoutCoordinates > 0 
-            ? `${cacheData.withoutCoordinates} client(s) ne peuvent pas être affichés sur la carte (sans coordonnées GPS)`
-            : 'Tous les clients sont affichés sur la carte'
-      });
-      return;
-    }
-    
-    // Si pas de cache, calculer et sauvegarder
-    console.log('📦 Pas de cache, calcul en cours pour /for-map...');
-    const result = await updateForMapCache();
-    
-    // Sauvegarder dans le cache
-    await ClientByCityCache.findOneAndUpdate(
-      { cacheType: 'for-map' },
-      {
-        cacheType: 'for-map',
-        data: result,
-        totalClients: result.totalInDatabase,
-        lastUpdate: new Date()
-      },
-      { upsert: true, new: true }
-    );
-    
-    console.log('✅ Cache mis à jour pour /for-map');
-    
+    console.log('📍 Calcul direct depuis MongoDB pour la map (optimisé)...');
+    const startTime = Date.now();
+
+    // Récupérer tous les clients avec coordonnées et city/sector depuis MongoDB
+    const clients = await Client.find({
+      coordinates: { $exists: true },
+      'coordinates.lng': { $exists: true },
+      'coordinates.lat': { $exists: true },
+      city: { $exists: true, $ne: null },
+      sector: { $exists: true, $ne: null }
+    }).lean();
+
+    // Formater pour la map
+    const formattedClients = clients.map(client => ({
+      _id: client._id.toString(),
+      name: `${client.givenName || ''} ${client.familyName || ''}`.trim(),
+      phoneNumber: client.phoneNumber || undefined,
+      address: client.addressLine1 || '',
+      city: client.city || 'Inconnu',
+      district: client.district || undefined,
+      sector: client.sector || 'Non assignés',
+      coordinates: {
+        lng: (client.coordinates as any).lng,
+        lat: (client.coordinates as any).lat
+      }
+    }));
+
+    // Statistiques
+    const totalInDatabase = await Client.countDocuments();
+    const totalWithCoordinates = formattedClients.length;
+    const withoutCoordinates = await Client.countDocuments({ 
+      $or: [
+        { coordinates: { $exists: false } },
+        { 'coordinates.lng': { $exists: false } },
+        { 'coordinates.lat': { $exists: false } }
+      ]
+    });
+
+    const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`✅ Calcul terminé en ${totalTime}s (${formattedClients.length} clients)`);
+
     res.json({
       success: true,
-      clients: result.clients,
-      total: result.total,
-      totalInDatabase: result.totalInDatabase,
-      totalWithCoordinates: result.totalWithCoordinates,
-      withoutCoordinates: result.withoutCoordinates,
-      missingClients: result.missingClients,
-      message: result.missingClients.length > 0
-        ? `${result.missingClients.length} client(s) avec coordonnées ne sont pas affichés. Voir les logs serveur pour plus de détails.`
-        : result.withoutCoordinates > 0 
-          ? `${result.withoutCoordinates} client(s) ne peuvent pas être affichés sur la carte (sans coordonnées GPS)`
-          : 'Tous les clients sont affichés sur la carte'
+      clients: formattedClients,
+      total: formattedClients.length,
+      totalInDatabase: totalInDatabase,
+      totalWithCoordinates: totalWithCoordinates,
+      withoutCoordinates: withoutCoordinates,
+      missingClients: [],
+      message: withoutCoordinates > 0 
+        ? `${withoutCoordinates} client(s) ne peuvent pas être affichés sur la carte (sans coordonnées GPS)`
+        : 'Tous les clients sont affichés sur la carte'
     });
   } catch (error) {
     console.error('❌ Erreur lors de la récupération des clients pour la carte:', error);

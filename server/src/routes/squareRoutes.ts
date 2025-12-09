@@ -64,8 +64,8 @@ router.get('/bookings', async (req: Request, res: Response) => {
                                         updatedClient.coordinates.lat != null;
 
                                     if (!hasCoordinates) {
-                                        const { geocodeClient } = await import('../utils/geocodeClient');
-                                        geocodeClient(updatedClient._id.toString()).catch(err => {
+                                        const { geocodeAndExtractLocation } = await import('../utils/geocodeAndExtractLocation');
+                                        geocodeAndExtractLocation(updatedClient._id.toString()).catch(err => {
                                             console.error(`Erreur lors du géocodage pour ${customer.givenName}:`, err);
                                         });
                                     }

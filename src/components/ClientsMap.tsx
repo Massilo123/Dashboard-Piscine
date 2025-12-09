@@ -187,6 +187,13 @@ const ClientsMap: React.FC = () => {
       
       if (result.success) {
         console.log(`📊 Résultat de la vérification: hasChanges=${result.hasChanges}, message=${result.message || 'N/A'}`);
+        
+        // Toujours mettre à jour le timestamp avec celui retourné par le serveur
+        // pour éviter de redétecter les mêmes clients modifiés précédemment
+        if (result.lastUpdate) {
+          saveTimestamp(result.lastUpdate);
+        }
+        
         if (result.hasChanges && result.clientsForMap) {
           // Convertir les clients formatés pour la carte
           const changedClients: Client[] = result.clientsForMap.map((c: any) => ({
@@ -329,6 +336,7 @@ const ClientsMap: React.FC = () => {
           if (!hasChanges.hasChanges) {
             // Pas de changements, charger depuis l'API (qui utilise le cache MongoDB)
             console.log('✅ Aucun changement détecté, chargement depuis le cache MongoDB');
+            // Le timestamp est déjà mis à jour dans checkForChanges() avec celui du serveur
           }
           // Si hasChanges est true, continuer pour charger depuis l'API
         }
@@ -444,6 +452,7 @@ const ClientsMap: React.FC = () => {
             }
           } else {
             console.log('✅ Aucun changement détecté');
+            // Le timestamp est déjà mis à jour dans checkForChanges() avec celui du serveur
           }
         }).catch((err) => {
           console.error('Erreur lors de la vérification des changements:', err);

@@ -37,7 +37,8 @@ router.post('/sync-square-clients', async (req, res) => {
 
                     if (!hasCoordinates) {
                         // Géocoder en arrière-plan (ne pas attendre)
-                        geocodeClient(updatedClient._id.toString()).catch(err => {
+                        const { geocodeAndExtractLocation } = await import('../utils/geocodeAndExtractLocation');
+                        geocodeAndExtractLocation(updatedClient._id.toString()).catch(err => {
                             console.error(`Erreur lors du géocodage pour ${customer.givenName}:`, err);
                         });
                         
