@@ -585,7 +585,7 @@ const AuthGate = ({ children }: AuthGateProps) => {
             <div 
               className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
               style={{
-                top: 'calc(50% - 60px)',
+                top: 'calc(50% - 100px)',
                 animation: 'slideAndOpen 1s ease-out both',
                 boxShadow: '0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(34, 211, 238, 0.4)'
               }}
@@ -595,7 +595,7 @@ const AuthGate = ({ children }: AuthGateProps) => {
             <div 
               className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
               style={{
-                bottom: 'calc(50% - 60px)',
+                bottom: 'calc(50% - 100px)',
                 animation: 'slideAndOpen 1s ease-out both',
                 boxShadow: '0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(34, 211, 238, 0.4)'
               }}
