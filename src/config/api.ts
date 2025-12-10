@@ -14,6 +14,7 @@ export const API_CONFIG = {
     mapboxClientsNearby: `${API_BASE_URL}/api/mapbox/clients-nearby`,
     mapboxClientsNearbyCoordinates: `${API_BASE_URL}/api/mapbox/clients-nearby-coordinates`,
     clients: `${API_BASE_URL}/api/clienti`,
+    searchClients: `${API_BASE_URL}/api/clients/search`,
   }
 };
 

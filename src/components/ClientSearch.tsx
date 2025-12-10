@@ -269,10 +269,10 @@ const ClientSearch = () => {
                                 className={`px-5 py-2.5 rounded-lg transition-all duration-200 flex items-center ${
                                     loading || geolocating
                                         ? 'bg-gray-600/20 text-gray-400 cursor-not-allowed border border-gray-600/30'
-                                        : 'bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 hover:from-emerald-500/30 hover:to-cyan-500/30 text-emerald-200 border border-emerald-400/40 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5 backdrop-blur-sm'
+                                        : 'bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm'
                                 }`}
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 drop-shadow-[0_0_3px_rgba(16,185,129,0.8)]" viewBox="0 0 20 20" fill="currentColor">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" viewBox="0 0 20 20" fill="currentColor">
                                     <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                                 </svg>
                                 {geolocating ? 'Localisation...' : 'Ma position'}

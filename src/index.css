@@ -34,7 +34,7 @@ button {
 
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: none;
 }
 
 /* Style néon pour les popups Leaflet */
@@ -104,4 +104,188 @@ button:focus-visible {
   text-shadow: 0 0 8px rgba(239, 68, 68, 0.8) !important;
   box-shadow: 0 0 12px rgba(239, 68, 68, 0.4) !important;
   transform: scale(1.1) !important;
+}
+
+/* Animations pour AuthGate */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes text-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes particle-float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-20px) translateX(10px);
+    opacity: 0.8;
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes blurOut {
+  from {
+    filter: blur(0);
+    opacity: 1;
+  }
+  to {
+    filter: blur(10px);
+    opacity: 0;
+  }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-text-reveal {
+  animation: text-reveal 0.5s ease-out;
+}
+
+.animate-particle-float {
+  animation: particle-float 4s ease-in-out infinite;
+}
+
+/* Animations impressionnantes et fluides pour Welcome back BOSS */
+@keyframes textMaterialize {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(50px);
+    filter: blur(20px);
+    text-shadow: 0 0 0 rgba(34, 211, 238, 0);
+  }
+  60% {
+    opacity: 0.8;
+    transform: scale(1.1) translateY(-10px);
+    filter: blur(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+    text-shadow: 0 0 60px rgba(34, 211, 238, 0.8), 0 0 120px rgba(139, 92, 246, 0.6);
+  }
+}
+
+@keyframes textGlowPulse {
+  0%, 100% {
+    text-shadow: 
+      0 0 60px rgba(34, 211, 238, 0.8),
+      0 0 120px rgba(139, 92, 246, 0.6),
+      0 0 180px rgba(168, 85, 247, 0.4);
+  }
+  50% {
+    text-shadow: 
+      0 0 80px rgba(34, 211, 238, 1),
+      0 0 160px rgba(139, 92, 246, 0.8),
+      0 0 240px rgba(168, 85, 247, 0.6);
+  }
+}
+
+@keyframes haloPulseSmooth {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.7;
+  }
+}
+
+@keyframes waveExpand {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 0.8;
+  }
+  100% {
+    width: 200vw;
+    height: 200vh;
+    opacity: 0;
+  }
+}
+
+@keyframes particleExplode {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(0, 0) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(var(--particle-x, 0), var(--particle-y, 0)) scale(1.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--particle-x, 0), var(--particle-y, 0)) scale(0.5);
+  }
+}
+
+@keyframes scanLineSmooth {
+  0% {
+    transform: translateY(-50%) translateX(-150%);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-50%) translateX(150%);
+    opacity: 0;
+  }
+}
+
+@keyframes orbitParticle {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg) translateX(var(--orbit-radius, 180px)) rotate(0deg);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg) translateX(var(--orbit-radius, 180px)) rotate(-360deg);
+    opacity: 0.8;
+  }
 }

@@ -1,4 +1,4 @@
-import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, Filter, X } from 'lucide-react'
+import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, Filter, X, Search } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
@@ -13,6 +13,14 @@ const STARTING_POINT = "1829 rue capitol";
 interface Suggestion {
   place_name: string;
   text: string;
+}
+
+interface SearchClient {
+  id: string;
+  name: string;
+  address: string;
+  phoneNumber: string;
+  coordinates: { lng: number; lat: number } | null;
 }
 
 interface DateRange {
@@ -53,7 +61,7 @@ interface ClientData {
     value: number | null
     unit: string
   }
-  route: any
+  route: unknown
   statistics: {
     clientsOnSameDay: number
     remainingDays: number
@@ -82,7 +90,6 @@ const OptimisationRdvClient = () => {
   const [visitedClients, setVisitedClients] = useState<ClientData[]>([])
   const [currentIndex, setCurrentIndex] = useState<number>(0)
   const [fetchingNew, setFetchingNew] = useState<boolean>(false)
-  const [allProcessedDates, setAllProcessedDates] = useState<string[]>([])
   const [remainingDays, setRemainingDays] = useState<number>(0)
   const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -91,6 +98,13 @@ const OptimisationRdvClient = () => {
   })
   const wrapperRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLDivElement>(null)
+  
+  // États pour la recherche de clients
+  const [clientSearchQuery, setClientSearchQuery] = useState<string>('')
+  const [clientSearchResults, setClientSearchResults] = useState<SearchClient[]>([])
+  const [showClientSearchResults, setShowClientSearchResults] = useState<boolean>(false)
+  const [searchingClients, setSearchingClients] = useState<boolean>(false)
+  const clientSearchRef = useRef<HTMLDivElement>(null)
 
   // Gestion du clic en dehors du composant
   useEffect(() => {
@@ -101,6 +115,10 @@ const OptimisationRdvClient = () => {
       
       if (filterRef.current && !filterRef.current.contains(event.target as Node) && showDateFilter) {
         setShowDateFilter(false);
+      }
+      
+      if (clientSearchRef.current && !clientSearchRef.current.contains(event.target as Node)) {
+        setShowClientSearchResults(false);
       }
     };
 
@@ -138,12 +156,6 @@ const OptimisationRdvClient = () => {
     }
   }, [currentIndex, visitedClients]);
 
-  // Mise à jour des dates traitées
-  useEffect(() => {
-    if (clientData?.navigation?.processedDates) {
-      setAllProcessedDates(clientData.navigation.processedDates);
-    }
-  }, [clientData]);
 
   // Gestion des suggestions d'adresses
   useEffect(() => {
@@ -176,6 +188,49 @@ const OptimisationRdvClient = () => {
       clearTimeout(timeoutId);
     };
   }, [address, isAddressSelected]);
+
+  // Recherche de clients dans la base de données
+  useEffect(() => {
+    const searchClients = async () => {
+      if (clientSearchQuery.length < 2) {
+        setClientSearchResults([]);
+        setShowClientSearchResults(false);
+        return;
+      }
+
+      setSearchingClients(true);
+      try {
+        const response = await fetch(`${API_CONFIG.endpoints.searchClients}?query=${encodeURIComponent(clientSearchQuery)}`);
+        const data = await response.json();
+
+        if (data.success) {
+          setClientSearchResults(data.data);
+          setShowClientSearchResults(data.data.length > 0);
+        } else {
+          setClientSearchResults([]);
+          setShowClientSearchResults(false);
+        }
+      } catch (err) {
+        console.error('Erreur lors de la recherche de clients:', err);
+        setClientSearchResults([]);
+        setShowClientSearchResults(false);
+      } finally {
+        setSearchingClients(false);
+      }
+    };
+
+    const timeoutId = setTimeout(searchClients, 300);
+    return () => clearTimeout(timeoutId);
+  }, [clientSearchQuery]);
+
+  // Fonction pour sélectionner un client et insérer son adresse
+  const handleClientSelect = (client: SearchClient) => {
+    setAddress(client.address);
+    setIsAddressSelected(true);
+    setClientSearchQuery('');
+    setClientSearchResults([]);
+    setShowClientSearchResults(false);
+  };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAddress(e.target.value)
@@ -397,9 +452,61 @@ const OptimisationRdvClient = () => {
           </div>
         )}
         
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <div className="space-y-4">
+          {/* Recherche de clients */}
+          <div className="relative" ref={clientSearchRef}>
+            <div className="flex items-center gap-2 mb-2">
+              <Search className="h-4 w-4 text-cyan-400" />
+              <label className="text-sm text-gray-300">
+                Rechercher un client
+              </label>
+            </div>
+            <input
+              type="text"
+              value={clientSearchQuery}
+              onChange={(e) => setClientSearchQuery(e.target.value)}
+              placeholder="Nom, adresse ou numéro..."
+              className="w-full border bg-gray-900/60 text-white border-cyan-500/30 rounded-lg p-2.5 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 placeholder-gray-500 transition-all duration-200"
+            />
+            {showClientSearchResults && clientSearchResults.length > 0 && (
+              <div className="absolute z-20 w-full bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm mt-1 border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20 max-h-60 overflow-y-auto">
+                {clientSearchResults.map((client) => (
+                  <div
+                    key={client.id}
+                    className="p-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 cursor-pointer text-gray-200 transition-all duration-200 border-b border-indigo-500/20 last:border-b-0"
+                    onClick={() => handleClientSelect(client)}
+                  >
+                    <div className="font-medium text-white">
+                      {client.name}
+                    </div>
+                    {client.address && (
+                      <div className="text-sm text-cyan-300 mt-1">
+                        {client.address}
+                      </div>
+                    )}
+                    {client.phoneNumber && (
+                      <div className="text-xs text-gray-400 mt-1">
+                        {client.phoneNumber}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {searchingClients && (
+              <div className="absolute right-3 top-9 text-cyan-400">
+                <div className="animate-spin h-4 w-4 border-2 border-cyan-400 border-t-transparent rounded-full"></div>
+              </div>
+            )}
+          </div>
+
+          {/* Champ d'adresse */}
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-grow">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="h-4 w-4 text-cyan-400" />
+                <label className="text-sm text-gray-300">Adresse</label>
+              </div>
               <input
                 type="text"
                 value={address}
@@ -421,13 +528,15 @@ const OptimisationRdvClient = () => {
                 </div>
               )}
             </div>
-            <button
-              onClick={findFirstClient}
-              disabled={loading}
-              className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 px-5 py-2 rounded-lg disabled:from-gray-600/20 disabled:to-gray-600/20 disabled:text-gray-400 disabled:cursor-not-allowed transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
-            >
-              {loading ? '...' : 'Trouver'}
-            </button>
+            <div className="flex items-end">
+              <button
+                onClick={findFirstClient}
+                disabled={loading || !address.trim()}
+                className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 px-6 py-2.5 rounded-lg disabled:from-gray-600/20 disabled:to-gray-600/20 disabled:text-gray-400 disabled:cursor-not-allowed transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
+              >
+                {loading ? 'Recherche...' : 'Trouver'}
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -437,167 +546,189 @@ const OptimisationRdvClient = () => {
           )}
 
           {clientData && (
-            <div className="mt-4">
-              {/* Boutons de navigation avec indicateur de position */}
-              <div className="flex justify-between items-center mb-4">
-                <button
-                  onClick={handlePreviousClient}
-                  disabled={loading || !canGoLeft}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-200 ${
-                    canGoLeft && !loading
-                      ? 'bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm' 
-                      : 'bg-gray-700/50 text-gray-500 cursor-not-allowed border border-gray-600/30'
-                  }`}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                
-                {/* Indicateur de position (optionnel) */}
-                <span className="text-xs text-cyan-300 px-3 py-1.5 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-cyan-500/30 shadow-lg shadow-cyan-500/10 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
-                  {currentIndex + 1}/{visitedClients.length}
-                  {clientData.navigation.hasNext && currentIndex === visitedClients.length - 1 ? "+" : ""}
-                </span>
-                
-                <button
-                  onClick={handleNextClient}
-                  disabled={loading || !canGoRight}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-200 ${
-                    canGoRight && !loading
-                      ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm' 
-                      : 'bg-gray-700/50 text-gray-500 cursor-not-allowed border border-gray-600/30'
-                  }`}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Carte client principale */}
-              <div className="border border-indigo-500/20 rounded-xl shadow-xl shadow-indigo-500/5 overflow-hidden bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm">
-                {/* En-tête de la carte avec nom client & distance */}
-                <div className="bg-gradient-to-r from-indigo-500/30 to-purple-500/30 backdrop-blur-sm text-white p-3 flex justify-between items-center border-b border-indigo-400/40">
-                  <div className="flex items-center">
-                    <User className="h-5 w-5 mr-2 text-cyan-300 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-                    <span className="font-bold text-base sm:text-lg bg-gradient-to-r from-indigo-200 to-cyan-200 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.6)]">
-                      {clientData.client.name}
-                    </span>
+            <div className="mt-6 space-y-4">
+              {/* Section principale : Informations client */}
+              <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 border border-indigo-500/20 overflow-hidden">
+                {/* En-tête avec DATE mise en évidence */}
+                <div className="bg-gradient-to-r from-cyan-500/40 via-indigo-500/40 to-purple-500/40 backdrop-blur-sm p-5 border-b border-cyan-400/50">
+                  <div className="flex items-center justify-center mb-4">
+                    <Calendar className="h-8 w-8 text-white mr-3 drop-shadow-[0_0_6px_rgba(34,211,238,0.9)]" />
+                    <div className="text-center">
+                      <div className="text-xs text-white/80 mb-1">Rendez-vous le</div>
+                      <h3 className="text-2xl sm:text-3xl font-bold text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]">
+                        {clientData.booking.date}
+                      </h3>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-cyan-300 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
-                    <span className="font-bold text-cyan-200 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">{clientData.duration.value} min</span>
-                    <span className="text-xs text-gray-300">({clientData.distance.value} km)</span>
+                  
+                  {/* Navigation */}
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={handlePreviousClient}
+                      disabled={loading || !canGoLeft}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                        canGoLeft && !loading
+                          ? 'bg-white/20 hover:bg-white/30 text-white border border-white/30' 
+                          : 'bg-gray-700/30 text-gray-500 cursor-not-allowed border border-gray-600/30'
+                      }`}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    
+                    <span className="text-sm text-white px-3 py-1 bg-white/20 rounded-lg border border-white/30 font-medium">
+                      {currentIndex + 1}/{visitedClients.length}
+                      {clientData.navigation.hasNext && currentIndex === visitedClients.length - 1 ? "+" : ""}
+                    </span>
+                    
+                    <button
+                      onClick={handleNextClient}
+                      disabled={loading || !canGoRight}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-200 ${
+                        canGoRight && !loading
+                          ? 'bg-white/20 hover:bg-white/30 text-white border border-white/30' 
+                          : 'bg-gray-700/30 text-gray-500 cursor-not-allowed border border-gray-600/30'
+                      }`}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
                 
-                {/* Corps de la carte */}
-                <div className="p-3">
-                  {/* Adresse */}
-                  <a 
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clientData.client.address)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-cyan-400 hover:text-cyan-300 hover:underline block mb-3 break-words transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
-                  >
-                    {clientData.client.address}
-                  </a>
+                {/* Informations client */}
+                <div className="p-4 space-y-3">
+                  {/* Nom du client et distance/durée */}
+                  <div className="flex items-center justify-between pb-3 border-b border-indigo-500/20">
+                    <div className="flex items-center gap-2">
+                      <User className="h-5 w-5 text-cyan-400" />
+                      <span className="text-lg font-semibold text-white">
+                        {clientData.client.name}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-4 w-4 text-cyan-400" />
+                        <span className="font-bold text-cyan-300">{clientData.duration.value} min</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{clientData.distance.value} km</div>
+                    </div>
+                  </div>
                   
-                  {/* Numéro de téléphone */}
-                  {clientData.client.phoneNumber && (
+                  {/* Adresse et téléphone */}
+                  <div className="space-y-2">
                     <a 
-                      href={`tel:${clientData.client.phoneNumber}`}
-                      className="text-cyan-400 hover:text-cyan-300 hover:underline block mb-3 flex items-center transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                      </svg>
-                      {clientData.client.phoneNumber}
-                    </a>
-                  )}
-                  
-                  {/* Date mise en évidence, sans l'heure */}
-                  <div className="flex items-center mb-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm p-3 rounded-lg border border-cyan-500/30 shadow-lg shadow-cyan-500/10">
-                    <Calendar className="h-5 w-5 mr-2 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-                    <span className="text-gray-200 font-medium text-lg drop-shadow-[0_0_3px_rgba(139,92,246,0.6)]">{clientData.booking.date}</span>
-                  </div>
-                  
-                  {/* Statistiques condensées avec compteur de jours correct */}
-                  <div className="flex justify-between text-sm text-gray-300 mb-3 p-2.5 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-                    <div className="text-cyan-300 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">{clientData.statistics.clientsOnSameDay} clients ce jour</div>
-                    <div className="text-indigo-300 drop-shadow-[0_0_3px_rgba(139,92,246,0.6)]">
-                      {remainingDays > 0 
-                        ? `${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${remainingDays > 1 ? 's' : ''}`
-                        : "0 jour restant"}
-                    </div>
-                  </div>
-                  
-                  {/* Nouvelle section: Statistiques journalières avec itinéraire optimisé */}
-                  <div className="mb-3 p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-                    <h3 className="font-medium text-cyan-300 mb-2 text-sm flex justify-between items-center drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
-                      <span>Statistiques pour cette journée:</span>
-                      {clientData.statistics.dailyStats.optimizedRoute && 
-                        <span className="text-xs bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 backdrop-blur-sm text-emerald-200 px-2 py-1 rounded-full border border-emerald-500/40 shadow-lg shadow-emerald-500/20">Itinéraire optimisé</span>
-                      }
-                    </h3>
-                    
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm p-2 rounded-lg shadow-md border border-cyan-500/20">
-                        <div className="text-gray-400">Distance</div>
-                        <div className="font-bold text-cyan-300 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
-                          {clientData.statistics.dailyStats.optimizedRoute ? 
-                            `${clientData.statistics.dailyStats.optimizedRoute.totalDistance} km` : 
-                            `${clientData.statistics.dailyStats.totalDistance} km`}
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm p-2 rounded-lg shadow-md border border-cyan-500/20">
-                        <div className="text-gray-400">Durée</div>
-                        <div className="font-bold text-cyan-300 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
-                          {clientData.statistics.dailyStats.optimizedRoute ? 
-                            `${clientData.statistics.dailyStats.optimizedRoute.totalDuration} min` : 
-                            `${clientData.statistics.dailyStats.totalDuration} min`}
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm p-2 rounded-lg shadow-md border border-cyan-500/20">
-                        <div className="text-gray-400">Clients</div>
-                        <div className="font-bold text-cyan-300 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
-                          {clientData.statistics.dailyStats.clientCount}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 0 && (
-                      <div className="mt-2 text-xs text-gray-300">
-                        <div className="font-medium mb-1 text-cyan-300 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Ordre de visite optimisé:</div>
-                        <ol className="list-decimal pl-5 space-y-1">
-                          <li className="mb-1">Point de départ: {STARTING_POINT}</li>
-                          {clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map((wp, index) => (
-                            <li key={index} className="mb-1">{wp.address}</li>
-                          ))}
-                        </ol>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Bouton d'itinéraire */}
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(clientData.client.address)}&travelmode=driving`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 text-center py-2.5 rounded-lg transition-all duration-200 mb-2 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
-                  >
-                    <Navigation className="h-4 w-4 inline-block mr-1 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" /> Itinéraire
-                  </a>
-
-                  {/* Bouton d'itinéraire optimisé (visible uniquement si disponible) */}
-                  {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 0 && (
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(STARTING_POINT)}&destination=${encodeURIComponent(STARTING_POINT)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(clientData.client.address)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-200 text-center py-2.5 rounded-lg transition-all duration-200 border border-purple-400/40 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:-translate-y-0.5 backdrop-blur-sm"
+                      className="flex items-start gap-2 text-cyan-400 hover:text-cyan-300 transition-colors group"
                     >
-                      <Navigation className="h-4 w-4 inline-block mr-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.8)]" /> Itinéraire optimisé (tous les clients)
+                      <MapPin className="h-5 w-5 mt-0.5 text-cyan-400 group-hover:drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
+                      <span className="break-words">{clientData.client.address}</span>
                     </a>
+                    
+                    {clientData.client.phoneNumber && (
+                      <a 
+                        href={`tel:${clientData.client.phoneNumber}`}
+                        className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                        </svg>
+                        <span>{clientData.client.phoneNumber}</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Section : Statistiques quotidiennes */}
+              <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 border border-indigo-500/20 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-cyan-300">Statistiques du jour</h4>
+                  {clientData.statistics.dailyStats.optimizedRoute && (
+                    <span className="text-xs bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-200 px-2 py-1 rounded-full border border-emerald-500/40">
+                      Optimisé
+                    </span>
                   )}
                 </div>
+                
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div className="text-center p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg border border-cyan-500/20">
+                    <div className="text-xs text-gray-400 mb-1">Distance</div>
+                    <div className="text-lg font-bold text-cyan-300">
+                      {clientData.statistics.dailyStats.optimizedRoute ? 
+                        `${clientData.statistics.dailyStats.optimizedRoute.totalDistance} km` : 
+                        `${clientData.statistics.dailyStats.totalDistance} km`}
+                    </div>
+                  </div>
+                  <div className="text-center p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg border border-cyan-500/20">
+                    <div className="text-xs text-gray-400 mb-1">Durée</div>
+                    <div className="text-lg font-bold text-cyan-300">
+                      {clientData.statistics.dailyStats.optimizedRoute ? 
+                        `${clientData.statistics.dailyStats.optimizedRoute.totalDuration} min` : 
+                        `${clientData.statistics.dailyStats.totalDuration} min`}
+                    </div>
+                  </div>
+                  <div className="text-center p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg border border-cyan-500/20">
+                    <div className="text-xs text-gray-400 mb-1">Clients</div>
+                    <div className="text-lg font-bold text-cyan-300">
+                      {clientData.statistics.dailyStats.clientCount}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Info rapide */}
+                <div className="flex items-center justify-between text-sm pt-3 border-t border-indigo-500/20">
+                  <span className="text-cyan-300">{clientData.statistics.clientsOnSameDay} client{clientData.statistics.clientsOnSameDay > 1 ? 's' : ''} ce jour</span>
+                  <span className="text-indigo-300">
+                    {remainingDays > 0 
+                      ? `${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${remainingDays > 1 ? 's' : ''}`
+                      : "0 jour restant"}
+                  </span>
+                </div>
+                
+                {/* Ordre de visite optimisé (si disponible) */}
+                {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
+                  <div className="mt-4 pt-4 border-t border-indigo-500/20">
+                    <div className="text-xs font-medium text-cyan-300 mb-2">Ordre de visite optimisé :</div>
+                    <ol className="space-y-1.5 text-xs text-gray-300">
+                      <li className="flex items-start gap-2">
+                        <span className="text-cyan-400 font-medium">1.</span>
+                        <span>{STARTING_POINT}</span>
+                      </li>
+                      {clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map((wp, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-cyan-400 font-medium">{index + 2}.</span>
+                          <span>{wp.address}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </div>
+
+              {/* Section : Actions */}
+              <div className="space-y-2">
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(clientData.client.address)}&travelmode=driving`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 py-3 rounded-lg transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
+                >
+                  <Navigation className="h-5 w-5" />
+                  <span>Itinéraire vers ce client</span>
+                </a>
+
+                {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(STARTING_POINT)}&destination=${encodeURIComponent(STARTING_POINT)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-200 py-3 rounded-lg transition-all duration-200 border border-purple-400/40 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
+                  >
+                    <Navigation className="h-5 w-5" />
+                    <span>Itinéraire optimisé (tous les clients)</span>
+                  </a>
+                )}
               </div>
             </div>
           )}

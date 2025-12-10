@@ -40,6 +40,60 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Route pour rechercher des clients par nom, adresse ou numéro de téléphone
+router.get('/search', async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'La requête de recherche doit contenir au moins 2 caractères'
+      });
+    }
+
+    const searchQuery = query.trim();
+    
+    // Créer une expression régulière pour la recherche insensible à la casse
+    const regex = new RegExp(searchQuery, 'i');
+
+    // Rechercher dans le nom (givenName + familyName), l'adresse et le numéro de téléphone
+    const clients = await Client.find({
+      $or: [
+        { givenName: { $regex: regex } },
+        { familyName: { $regex: regex } },
+        { addressLine1: { $regex: regex } },
+        { phoneNumber: { $regex: regex } }
+      ]
+    })
+    .select('givenName familyName phoneNumber addressLine1 coordinates _id')
+    .limit(20) // Limiter à 20 résultats
+    .sort({ givenName: 1, familyName: 1 });
+
+    // Formater les résultats pour le frontend
+    const formattedClients = clients.map(client => ({
+      id: client._id.toString(),
+      name: `${client.givenName || ''} ${client.familyName || ''}`.trim(),
+      address: client.addressLine1 || '',
+      phoneNumber: client.phoneNumber || '',
+      coordinates: client.coordinates || null
+    }));
+
+    res.json({
+      success: true,
+      count: formattedClients.length,
+      data: formattedClients
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue';
+    console.error('Erreur lors de la recherche de clients:', error);
+    res.status(500).json({
+      success: false,
+      error: errorMessage
+    });
+  }
+});
+
 // Route pour récupérer les clients dans une plage de positions dans la base de données
 router.get('/range', async (req, res) => {
   try {

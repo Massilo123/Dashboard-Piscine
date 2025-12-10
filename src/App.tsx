@@ -5,7 +5,8 @@ import RouteOptimizerSchedule from './components/RouteOptimizerSchedule';
 import OptimisationRdvClient from './components/OptimisationRdvClient';
 import ClientsByCity from './components/ClientsByCity';
 import ClientsMap from './components/ClientsMap';
-import { Menu, X, PenTool, Search, Calendar, MapPin, Building, Map } from 'lucide-react';
+import AuthGate from './components/AuthGate';
+import { Menu, X, PenTool, Search, Calendar, MapPin, Building, Map, LogOut } from 'lucide-react';
 import logo_mauve from './assets/logo_mauve.png';
 import 'leaflet/dist/leaflet.css'
 
@@ -21,6 +22,11 @@ function App() {
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('aquarius_auth');
+    window.location.href = '/';
   };
 
   // Composant pour les liens de navigation avec style actif
@@ -88,6 +94,13 @@ function App() {
             <PenTool className="h-5 w-5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
             <span>RENDEZ-VOUS</span>
           </a>
+          <button
+            onClick={handleLogout}
+            className="text-rose-200 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2 mt-2 transition-all duration-200 backdrop-blur-sm w-full"
+          >
+            <LogOut className="h-5 w-5 drop-shadow-[0_0_3px_rgba(244,63,94,0.8)]" />
+            <span>Déconnexion</span>
+          </button>
         </div>
       </div>
     );
@@ -149,6 +162,14 @@ function App() {
                   RENDEZ-VOUS
                 </a>
                 
+                <button
+                  onClick={handleLogout}
+                  className="hidden md:inline-flex items-center justify-center px-3 py-2 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 text-rose-200 rounded-md text-sm font-medium border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 hover:-translate-y-0.5 transition-all duration-200 backdrop-blur-sm"
+                  title="Déconnexion"
+                >
+                  <LogOut className="h-4 w-4 drop-shadow-[0_0_3px_rgba(244,63,94,0.8)]" />
+                </button>
+                
                 {/* Mobile menu button */}
                 <button
                   onClick={toggleMobileMenu}
@@ -170,14 +191,16 @@ function App() {
 
         {/* Content Area avec spacing pour le header fixe */}
         <div className="container mx-auto py-4 px-4 relative z-10 mt-20">
-          <Routes>
-            <Route path="/" element={<Navigate to="/client-search" replace />} />
-            <Route path="/client-search" element={<ClientSearch />} />
-            <Route path="/schedule" element={<RouteOptimizerSchedule />} />
-            <Route path="/optimisation-rdv" element={<OptimisationRdvClient />} />
-            <Route path="/clients-by-city" element={<ClientsByCity />} />
-            <Route path="/clients-map" element={<ClientsMap />} />
-          </Routes>
+          <AuthGate>
+            <Routes>
+              <Route path="/" element={<Navigate to="/client-search" replace />} />
+              <Route path="/client-search" element={<ClientSearch />} />
+              <Route path="/schedule" element={<RouteOptimizerSchedule />} />
+              <Route path="/optimisation-rdv" element={<OptimisationRdvClient />} />
+              <Route path="/clients-by-city" element={<ClientsByCity />} />
+              <Route path="/clients-map" element={<ClientsMap />} />
+            </Routes>
+          </AuthGate>
         </div>
       </div>
 

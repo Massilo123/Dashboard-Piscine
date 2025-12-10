@@ -142,8 +142,6 @@ const ClientsMap: React.FC = () => {
   const [missingClients, setMissingClients] = useState<Array<{_id: string, name: string, address: string, reason: string}>>([]);
   const [totalWithCoordinates, setTotalWithCoordinates] = useState<number>(0);
   
-  // Calculer le total de clients affichés
-  const totalClients = clients.length;
   const [clientsWithoutCoordinates, setClientsWithoutCoordinates] = useState<Array<{_id: string, name: string, phoneNumber?: string, address: string, hasAddress?: boolean, reason?: string}>>([]);
   const [showWithoutCoordinates, setShowWithoutCoordinates] = useState(false);
   const [geocodingInProgress, setGeocodingInProgress] = useState(false);
@@ -160,6 +158,8 @@ const ClientsMap: React.FC = () => {
   const highlightedMarkerRef = useRef<L.Marker | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const allClientsRef = useRef<Client[]>([]); // Stocker tous les clients pour le filtrage
 
   // Fonction pour charger depuis le cache
   // Fonction pour sauvegarder seulement le timestamp (les données viennent du cache MongoDB)
@@ -366,6 +366,7 @@ const ClientsMap: React.FC = () => {
         }
         
         setClients(result.clients);
+        allClientsRef.current = result.clients; // Sauvegarder tous les clients
         setMissingClients(result.missingClients || []);
 
         // Calculer les statistiques par secteur
@@ -997,8 +998,25 @@ const ClientsMap: React.FC = () => {
         return true;
       });
       
+      // Filtrer les clients par secteur si un secteur est sélectionné
+      const filteredClients = selectedSector 
+        ? clients.filter(client => (client.sector || 'Non assignés') === selectedSector)
+        : clients;
+
+      // Retirer les marqueurs qui ne correspondent plus au filtre
+      markersRef.current = markersRef.current.filter((marker) => {
+        const clientId = (marker as any).clientId;
+        const clientExists = filteredClients.some(c => c._id === clientId);
+        if (!clientExists && mapRef.current) {
+          mapRef.current.removeLayer(marker);
+          marker.remove();
+          return false;
+        }
+        return true;
+      });
+
       // Ajouter ou mettre à jour les marqueurs pour les nouveaux clients ou ceux qui ont changé
-      clients.forEach((client) => {
+      filteredClients.forEach((client) => {
         if (!client.coordinates?.lat || !client.coordinates?.lng) {
           return; // Ignorer les clients sans coordonnées
         }
@@ -1057,6 +1075,11 @@ const ClientsMap: React.FC = () => {
       return;
     }
 
+    // Filtrer les clients par secteur si un secteur est sélectionné
+    const filteredClients = selectedSector 
+      ? clients.filter(client => (client.sector || 'Non assignés') === selectedSector)
+      : clients;
+
     // Si on arrive ici, c'est qu'on doit créer la carte pour la première fois
     if (mapRef.current) {
       // La carte existe déjà mais on doit la recréer (cas rare)
@@ -1078,9 +1101,9 @@ const ClientsMap: React.FC = () => {
 
     setMapLoading(true);
 
-    // Calculer le centre de la carte (moyenne des coordonnées)
-    const lats = clients.map(c => c.coordinates?.lat).filter(Boolean) as number[];
-    const lngs = clients.map(c => c.coordinates?.lng).filter(Boolean) as number[];
+    // Calculer le centre de la carte (moyenne des coordonnées) avec les clients filtrés
+    const lats = filteredClients.map(c => c.coordinates?.lat).filter(Boolean) as number[];
+    const lngs = filteredClients.map(c => c.coordinates?.lng).filter(Boolean) as number[];
     
     if (lats.length === 0 || lngs.length === 0) {
       setMapLoading(false);
@@ -1102,8 +1125,8 @@ const ClientsMap: React.FC = () => {
       maxZoom: 19,
     }).addTo(map);
 
-    // Créer des marqueurs colorés par secteur
-    clients.forEach((client) => {
+    // Créer des marqueurs colorés par secteur (utiliser les clients filtrés)
+    filteredClients.forEach((client) => {
       if (!client.coordinates?.lat || !client.coordinates?.lng) {
         return; // Ignorer les clients sans coordonnées
       }
@@ -1188,7 +1211,7 @@ const ClientsMap: React.FC = () => {
         delete (mapContainerRef.current as any)._leaflet_id;
       }
     };
-  }, [clients, loading]);
+  }, [clients, loading, selectedSector]);
 
   const sortedSectors = Object.entries(sectorStats)
     .sort((a, b) => b[1] - a[1]);
@@ -1211,10 +1234,15 @@ const ClientsMap: React.FC = () => {
                   <span className="text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Chargement...</span>
                 ) : (
                   <>
-                    <span className="text-gray-300">{totalClients} clients affichés</span>
-                      {totalWithCoordinates > 0 && totalWithCoordinates !== totalClients && (
+                    <span className="text-gray-300">
+                      {selectedSector 
+                        ? clients.filter(client => (client.sector || 'Non assignés') === selectedSector).length 
+                        : clients.length} clients affichés
+                      {selectedSector && ` (${selectedSector})`}
+                    </span>
+                      {totalWithCoordinates > 0 && totalWithCoordinates !== clients.length && !selectedSector && (
                       <span className="text-cyan-400 ml-1 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]">
-                          ({totalWithCoordinates - totalClients} manquants)
+                          ({totalWithCoordinates - clients.length} manquants)
                         </span>
                       )}
                     </>
@@ -1238,13 +1266,25 @@ const ClientsMap: React.FC = () => {
             {sortedSectors.map(([sector, count]) => {
               const color = getSectorColor(sector);
               return (
-                <div
+                <button
                   key={sector}
-                  className="group relative bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5 backdrop-blur-sm"
+                  onClick={() => {
+                    // Toggle: si le secteur est déjà sélectionné, désélectionner
+                    setSelectedSector(selectedSector === sector ? null : sector);
+                  }}
+                  className={`group relative bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 border transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 backdrop-blur-sm cursor-pointer focus:outline-none ${
+                    selectedSector === sector
+                      ? '-translate-y-0.5'
+                      : ''
+                  }`}
                   style={{
-                    borderLeftColor: color + '50',
+                    borderLeftColor: color + (selectedSector === sector ? '80' : '50'),
                     borderLeftWidth: '3px',
-                    boxShadow: `0 0 10px ${color}15`
+                    borderColor: selectedSector === sector ? color + '60' : 'rgba(139, 92, 246, 0.15)',
+                    boxShadow: selectedSector === sector 
+                      ? `0 0 20px ${color}40, 0 0 10px ${color}20` 
+                      : `0 0 10px ${color}15`,
+                    outline: 'none'
                   }}
                 >
                   <div className="flex items-center justify-between gap-2 sm:gap-3 flex-1 min-w-0">
@@ -1271,15 +1311,17 @@ const ClientsMap: React.FC = () => {
                       <div className="text-gray-400 text-[10px] sm:text-xs md:text-sm mt-0.5 leading-none">clients</div>
                     </div>
                   </div>
-                  {/* Effet de brillance au survol */}
+                  {/* Effet de brillance au survol - reste visible si sélectionné */}
                   <div 
-                    className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                    className={`absolute inset-0 rounded-lg transition-opacity duration-200 pointer-events-none ${
+                      selectedSector === sector ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}
                     style={{
                       background: `linear-gradient(135deg, ${color}20 0%, transparent 60%)`,
                       boxShadow: `inset 0 0 30px ${color}30`
                     }}
                   ></div>
-                </div>
+                </button>
               );
             })}
         </div>
