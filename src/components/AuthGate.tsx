@@ -15,11 +15,13 @@ const AuthGate = ({ children }: AuthGateProps) => {
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [lastMousePos, setLastMousePos] = useState<{x: number, y: number} | null>(null);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const pointRadius = 18;
+  const pointRadius = 20; // Taille visuelle du point
+  const hitboxRadius = 40; // Zone de détection agrandie mais plus précise
   const spacing = 85;
   const canvasSize = 250;
   // Centrer la grille 3x3 dans le canvas
@@ -175,7 +177,142 @@ const AuthGate = ({ children }: AuthGateProps) => {
     drawPattern();
   }, [drawPattern]);
 
-  const getPointAt = (x: number, y: number): number | null => {
+  const handleStart = (x: number, y: number) => {
+    const pointIndex = getPointAtMemo(x, y);
+    if (pointIndex !== null) {
+      setSelectedPoints([pointIndex]);
+      setIsDrawing(true);
+      setError('');
+      setLastMousePos({ x, y });
+    }
+  };
+
+  // Fonction pour obtenir les points intermédiaires entre deux points
+  const getIntermediatePoints = (from: number, to: number): number[] => {
+    const fromRow = Math.floor(from / 3);
+    const fromCol = from % 3;
+    const toRow = Math.floor(to / 3);
+    const toCol = to % 3;
+
+    // Si même ligne
+    if (fromRow === toRow) {
+      const minCol = Math.min(fromCol, toCol);
+      const maxCol = Math.max(fromCol, toCol);
+      const intermediate: number[] = [];
+      for (let col = minCol + 1; col < maxCol; col++) {
+        intermediate.push(fromRow * 3 + col);
+      }
+      return intermediate;
+    }
+
+    // Si même colonne
+    if (fromCol === toCol) {
+      const minRow = Math.min(fromRow, toRow);
+      const maxRow = Math.max(fromRow, toRow);
+      const intermediate: number[] = [];
+      for (let row = minRow + 1; row < maxRow; row++) {
+        intermediate.push(row * 3 + fromCol);
+      }
+      return intermediate;
+    }
+
+    // Si diagonale
+    const rowDiff = toRow - fromRow;
+    const colDiff = toCol - fromCol;
+    if (Math.abs(rowDiff) === Math.abs(colDiff)) {
+      const intermediate: number[] = [];
+      const steps = Math.abs(rowDiff);
+      for (let step = 1; step < steps; step++) {
+        const row = fromRow + (rowDiff > 0 ? step : -step);
+        const col = fromCol + (colDiff > 0 ? step : -step);
+        intermediate.push(row * 3 + col);
+      }
+      return intermediate;
+    }
+
+    return [];
+  };
+
+  const handleMove = (x: number, y: number) => {
+    if (!isDrawing) return;
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const scaleX = 250 / rect.width;
+    const scaleY = 250 / rect.height;
+    const canvasX = (x - rect.left) * scaleX;
+    const canvasY = (y - rect.top) * scaleY;
+
+    // Vérifier tous les points pour voir si on passe près d'eux (même en mouvement rapide)
+    let closestPoint: number | null = null;
+    let closestDistance = Infinity;
+
+    for (let i = 0; i < points.length; i++) {
+      if (selectedPoints.includes(i)) continue;
+
+      const point = points[i];
+      const distance = Math.sqrt(
+        Math.pow(canvasX - point.x, 2) + Math.pow(canvasY - point.y, 2)
+      );
+
+      // Si on passe très près d'un point, le sélectionner
+      if (distance <= hitboxRadius && distance < closestDistance) {
+        closestPoint = i;
+        closestDistance = distance;
+      }
+
+      // Si on a une position précédente, vérifier aussi si on traverse la zone du point
+      if (lastMousePos) {
+        const lastCanvasX = (lastMousePos.x - rect.left) * scaleX;
+        const lastCanvasY = (lastMousePos.y - rect.top) * scaleY;
+        
+        // Calculer la distance minimale entre le segment de ligne et le point
+        const dx = canvasX - lastCanvasX;
+        const dy = canvasY - lastCanvasY;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        
+        if (length > 0) {
+          const t = Math.max(0, Math.min(1, 
+            ((point.x - lastCanvasX) * dx + (point.y - lastCanvasY) * dy) / (length * length)
+          ));
+          const projX = lastCanvasX + t * dx;
+          const projY = lastCanvasY + t * dy;
+          const distToSegment = Math.sqrt(
+            Math.pow(point.x - projX, 2) + Math.pow(point.y - projY, 2)
+          );
+          
+          if (distToSegment <= hitboxRadius && distToSegment < closestDistance) {
+            closestPoint = i;
+            closestDistance = distToSegment;
+          }
+        }
+      }
+    }
+
+    // Mettre à jour la position de la souris
+    setLastMousePos({ x, y });
+
+    if (closestPoint !== null) {
+      const lastPointIndex = selectedPoints[selectedPoints.length - 1];
+      const intermediatePoints = getIntermediatePoints(lastPointIndex, closestPoint);
+      
+      // Ajouter les points intermédiaires et le point détecté
+      const newPoints = [...selectedPoints];
+      intermediatePoints.forEach(p => {
+        if (!newPoints.includes(p)) {
+          newPoints.push(p);
+        }
+      });
+      if (!newPoints.includes(closestPoint)) {
+        newPoints.push(closestPoint);
+      }
+      setSelectedPoints(newPoints);
+    }
+  };
+
+  // Fonction de détection améliorée avec hitbox agrandie et détection de ligne
+  const getPointAtMemo = useCallback((x: number, y: number): number | null => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return null;
 
@@ -184,38 +321,60 @@ const AuthGate = ({ children }: AuthGateProps) => {
     const canvasX = (x - rect.left) * scaleX;
     const canvasY = (y - rect.top) * scaleY;
 
+    // D'abord, vérifier si on est proche d'un point (zone de hitbox agrandie)
     for (let i = 0; i < points.length; i++) {
       const point = points[i];
       const distance = Math.sqrt(
         Math.pow(canvasX - point.x, 2) + Math.pow(canvasY - point.y, 2)
       );
-      if (distance <= pointRadius) {
+      if (distance <= hitboxRadius) {
         return i;
       }
     }
+
+    // Si on est en train de dessiner, vérifier aussi si on passe près d'une ligne entre deux points
+    if (isDrawing && selectedPoints.length > 0) {
+      const lastPointIndex = selectedPoints[selectedPoints.length - 1];
+      const lastPoint = points[lastPointIndex];
+      
+      // Vérifier tous les points non sélectionnés pour voir si on passe près d'une ligne
+      for (let i = 0; i < points.length; i++) {
+        if (selectedPoints.includes(i)) continue;
+        
+        const point = points[i];
+        const dx = point.x - lastPoint.x;
+        const dy = point.y - lastPoint.y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        
+        if (length === 0) continue;
+        
+        // Calculer la distance du point (canvasX, canvasY) à la ligne entre lastPoint et point
+        const t = Math.max(0, Math.min(1, 
+          ((canvasX - lastPoint.x) * dx + (canvasY - lastPoint.y) * dy) / (length * length)
+        ));
+        const projX = lastPoint.x + t * dx;
+        const projY = lastPoint.y + t * dy;
+        const distToLine = Math.sqrt(
+          Math.pow(canvasX - projX, 2) + Math.pow(canvasY - projY, 2)
+        );
+        
+        // Si on est proche de la ligne ET proche du point de destination
+        const distToPoint = Math.sqrt(
+          Math.pow(canvasX - point.x, 2) + Math.pow(canvasY - point.y, 2)
+        );
+        
+        if (distToLine <= 25 && distToPoint <= hitboxRadius * 1.5) {
+          return i;
+        }
+      }
+    }
+
     return null;
-  };
-
-  const handleStart = (x: number, y: number) => {
-    const pointIndex = getPointAt(x, y);
-    if (pointIndex !== null) {
-      setSelectedPoints([pointIndex]);
-      setIsDrawing(true);
-      setError('');
-    }
-  };
-
-  const handleMove = (x: number, y: number) => {
-    if (!isDrawing) return;
-
-    const pointIndex = getPointAt(x, y);
-    if (pointIndex !== null && !selectedPoints.includes(pointIndex)) {
-      setSelectedPoints([...selectedPoints, pointIndex]);
-    }
-  };
+  }, [points, hitboxRadius, isDrawing, selectedPoints]);
 
   const handleEnd = () => {
     setIsDrawing(false);
+    setLastMousePos(null);
 
     // Vérifier le pattern
     if (selectedPoints.length === SECRET_PATTERN.length) {
@@ -406,117 +565,69 @@ const AuthGate = ({ children }: AuthGateProps) => {
           </div>
       </div>
 
-      {/* Message de bienvenue avec animation */}
+      {/* Message de bienvenue avec animation style Jarvis */}
       {showWelcome && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl">
-          {/* Vagues de lumière qui se propagent */}
-          <div className="absolute inset-0 pointer-events-none">
-            {[...Array(3)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute inset-0 rounded-full"
-                style={{
-                  border: `2px solid rgba(34, 211, 238, ${0.3 - i * 0.1})`,
-                  animation: `waveExpand ${2 + i * 0.5}s ease-out ${i * 0.3}s`,
-                  left: '50%',
-                  top: '50%',
-                  width: '0',
-                  height: '0',
-                  transform: 'translate(-50%, -50%)',
-                  borderRadius: '50%'
-                }}
-              />
-            ))}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl">
+          {/* Grille holographique subtile */}
+          <div className="absolute inset-0 pointer-events-none opacity-[0.08]">
+            <div className="absolute inset-0" style={{
+              backgroundImage: `
+                linear-gradient(rgba(34, 211, 238, 0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(34, 211, 238, 0.15) 1px, transparent 1px)
+              `,
+              backgroundSize: '60px 60px'
+            }}></div>
           </div>
 
-          {/* Explosion de particules au début */}
-          <div className="absolute inset-0 pointer-events-none">
-            {[...Array(50)].map((_, i) => {
-              const angle = (i / 50) * Math.PI * 2;
-              const distance = 200;
-              const x = Math.cos(angle) * distance;
-              const y = Math.sin(angle) * distance;
-              return (
-                <div
-                  key={i}
-                  className="absolute rounded-full"
-                  style={{
-                    width: '4px',
-                    height: '4px',
-                    left: '50%',
-                    top: '50%',
-                    background: `radial-gradient(circle, rgba(34, 211, 238, 1) 0%, rgba(139, 92, 246, 0.8) 50%, transparent 100%)`,
-                    animation: `particleExplode 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${i * 0.02}s`,
-                    boxShadow: '0 0 12px rgba(34, 211, 238, 1), 0 0 24px rgba(139, 92, 246, 0.8)',
-                    transform: 'translate(-50%, -50%)',
-                    '--particle-x': `${x}px`,
-                    '--particle-y': `${y}px`
-                  } as React.CSSProperties}
-                />
-              );
-            })}
-          </div>
-
-          {/* Halo lumineux qui pulse */}
-          <div className="absolute inset-0 -m-40 flex items-center justify-center pointer-events-none">
-            <div className="w-[600px] h-[600px] rounded-full"
+          {/* 2 lignes qui glissent et s'ouvrent */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
+            {/* Ligne supérieure */}
+            <div 
+              className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
               style={{
-                background: 'radial-gradient(circle, rgba(34, 211, 238, 0.25) 0%, rgba(139, 92, 246, 0.15) 30%, transparent 70%)',
-                animation: 'haloPulseSmooth 2.5s ease-in-out infinite',
-                filter: 'blur(80px)'
+                top: 'calc(50% - 60px)',
+                animation: 'slideAndOpen 1s ease-out both',
+                boxShadow: '0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(34, 211, 238, 0.4)'
+              }}
+            ></div>
+            
+            {/* Ligne inférieure */}
+            <div 
+              className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent"
+              style={{
+                bottom: 'calc(50% - 60px)',
+                animation: 'slideAndOpen 1s ease-out both',
+                boxShadow: '0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(34, 211, 238, 0.4)'
               }}
             ></div>
           </div>
 
-          {/* Texte principal avec effet holographique */}
+          {/* Texte principal style Jarvis */}
           <div className="text-center relative z-10">
-            <h2 
-              className="text-5xl sm:text-6xl md:text-7xl font-bold bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent relative"
-              style={{
-                textShadow: '0 0 60px rgba(34, 211, 238, 0.8), 0 0 120px rgba(139, 92, 246, 0.6), 0 0 180px rgba(168, 85, 247, 0.4)',
-                animation: 'textMaterialize 1.5s cubic-bezier(0.34, 1.56, 0.64, 1), textGlowPulse 2.5s ease-in-out infinite 1.5s',
-                letterSpacing: '0.1em',
-                filter: 'drop-shadow(0 0 20px rgba(34, 211, 238, 0.6))'
-              }}
-            >
-              Welcome back BOSS
-            </h2>
+            <div className="relative inline-block">
+              {/* Texte avec effet de type terminal */}
+              <h2 
+                className="text-4xl sm:text-5xl md:text-6xl font-mono font-light text-cyan-300 relative"
+                style={{
+                  textShadow: '0 0 20px rgba(34, 211, 238, 0.4), 0 0 40px rgba(34, 211, 238, 0.2)',
+                  animation: 'textReveal 0.8s ease-out 1.2s both, textGlowSubtle 3s ease-in-out infinite 2s',
+                  letterSpacing: '0.15em'
+                }}
+              >
+                Welcome back BOSS
+              </h2>
 
-            {/* Effet de scan line qui traverse */}
-            <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80"
-              style={{
-                top: '50%',
-                transform: 'translateY(-50%)',
-                animation: 'scanLineSmooth 2s ease-in-out infinite 1.5s',
-                boxShadow: '0 0 30px rgba(34, 211, 238, 1), 0 0 60px rgba(34, 211, 238, 0.6)'
-              }}
-            ></div>
+            </div>
 
-            {/* Particules qui tournent autour */}
-            <div className="absolute inset-0 -m-32 pointer-events-none overflow-hidden">
-              {[...Array(20)].map((_, i) => {
-                const angle = (i / 20) * Math.PI * 2;
-                const radius = 180;
-                return (
-                  <div
-                    key={i}
-                    className="absolute rounded-full"
-                    style={{
-                      width: '5px',
-                      height: '5px',
-                      left: '50%',
-                      top: '50%',
-                      background: `radial-gradient(circle, rgba(34, 211, 238, 1) 0%, rgba(139, 92, 246, 0.6) 50%, transparent 100%)`,
-                      animation: `orbitParticle 8s linear infinite`,
-                      animationDelay: `${i * 0.4}s`,
-                      boxShadow: '0 0 15px rgba(34, 211, 238, 1), 0 0 30px rgba(139, 92, 246, 0.6)',
-                      transform: `translate(-50%, -50%) translate(${Math.cos(angle) * radius}px, ${Math.sin(angle) * radius}px)`,
-                      '--orbit-angle': `${angle}rad`,
-                      '--orbit-radius': `${radius}px`
-                    } as React.CSSProperties}
-                  />
-                );
-              })}
+            {/* Indicateur de statut discret */}
+            <div className="mt-8 flex items-center justify-center gap-2 opacity-50">
+              <div className="w-1.5 h-1.5 rounded-full bg-cyan-400"
+                style={{
+                  animation: 'statusPulse 2s ease-in-out infinite 1.5s',
+                  boxShadow: '0 0 6px rgba(34, 211, 238, 0.5)'
+                }}
+              ></div>
+              <span className="text-xs font-mono text-cyan-400/60 tracking-wider">SYSTEM READY</span>
             </div>
           </div>
         </div>
