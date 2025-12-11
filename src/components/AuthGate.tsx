@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, ReactNode } from 're
 import { Sparkles } from 'lucide-react';
 import logo_mauve from '../assets/logo_mauve.png';
 
-const SECRET_PATTERN = [0, 1, 2, 4, 6];
+const SECRET_PATTERN = [0, 3, 6, 4, 8, 5, 2];
 
 interface AuthGateProps {
   children: ReactNode;
