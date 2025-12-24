@@ -94,5 +94,95 @@ router.get('/stats', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Route de debug pour vérifier le compteur d'un client spécifique
+ * GET /api/booking-counts/debug/:squareId
+ * ou
+ * GET /api/booking-counts/debug?squareId=XXX ou ?givenName=XXX
+ */
+router.get('/debug/:squareId?', async (req: Request, res: Response) => {
+  try {
+    const squareId = req.params.squareId || req.query.squareId as string;
+    const givenName = req.query.givenName as string;
+    
+    if (!squareId && !givenName) {
+      return res.status(400).json({
+        success: false,
+        error: 'squareId ou givenName requis (paramètre ou query string)'
+      });
+    }
+    
+    // Trouver le client
+    let client;
+    if (squareId) {
+      client = await Client.findOne({ squareId: squareId });
+    } else if (givenName) {
+      client = await Client.findOne({ givenName: givenName });
+    }
+    
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        error: 'Client non trouvé dans MongoDB'
+      });
+    }
+    
+    // Recompter les rendez-vous depuis Square API
+    const { updateClientBookingCount } = await import('../utils/updateBookingCounts');
+    let bookingCountResult;
+    try {
+      bookingCountResult = await updateClientBookingCount(client.squareId!);
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        error: `Erreur lors du comptage: ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+        client: {
+          _id: client._id.toString(),
+          givenName: client.givenName,
+          familyName: client.familyName,
+          squareId: client.squareId,
+          bookingCount: client.bookingCount,
+          isFrequentClient: client.isFrequentClient
+        }
+      });
+    }
+    
+    // Récupérer le client mis à jour
+    const updatedClient = await Client.findOne({ squareId: client.squareId });
+    
+    res.json({
+      success: true,
+      client: {
+        _id: client._id.toString(),
+        givenName: client.givenName,
+        familyName: client.familyName,
+        squareId: client.squareId,
+        phoneNumber: client.phoneNumber,
+        addressLine1: client.addressLine1
+      },
+      before: {
+        bookingCount: client.bookingCount,
+        isFrequentClient: client.isFrequentClient
+      },
+      after: {
+        bookingCount: bookingCountResult.bookingCount,
+        isFrequentClient: bookingCountResult.isFrequentClient
+      },
+      updated: {
+        bookingCount: updatedClient?.bookingCount,
+        isFrequentClient: updatedClient?.isFrequentClient
+      },
+      changed: client.bookingCount !== bookingCountResult.bookingCount || 
+               client.isFrequentClient !== bookingCountResult.isFrequentClient
+    });
+  } catch (error) {
+    console.error('❌ Erreur dans la route de debug:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur inconnue'
+    });
+  }
+});
+
 export default router;
 
