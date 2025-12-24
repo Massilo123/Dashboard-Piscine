@@ -330,6 +330,19 @@ async function processWebhookEvent(type: string, data: any): Promise<{ success: 
                 console.log(`🔍 ID client extrait du booking: ${bookingUpdatedCustomerId || 'NON TROUVÉ'}`);
                 if (bookingUpdatedCustomerId) {
                     try {
+                        // Vérifier le statut du booking pour logger l'information
+                        const booking = data?.object?.booking || data?.booking || data?.object;
+                        const status = booking?.status ? String(booking.status) : 'UNKNOWN';
+                        const isCancelled = status === 'CANCELLED' || 
+                                          status === 'CANCELLED_BY_SELLER' || 
+                                          status === 'CANCELLED_BY_CUSTOMER';
+                        
+                        if (isCancelled) {
+                            console.log(`❌ Rendez-vous annulé (statut: ${status}) - recalcul du compteur...`);
+                        } else {
+                            console.log(`ℹ️ Rendez-vous mis à jour (statut: ${status}) - recalcul du compteur...`);
+                        }
+                        
                         // Utiliser la fonction existante pour recompter tous les bookings
                         const { updateClientBookingCount } = await import('../utils/updateBookingCounts');
                         const result = await updateClientBookingCount(bookingUpdatedCustomerId);

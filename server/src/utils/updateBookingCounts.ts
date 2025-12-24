@@ -67,9 +67,17 @@ export async function updateAllBookingCounts(): Promise<{
           
           // Compter les rendez-vous par client
           for await (const booking of bookingsResponse) {
-            if (booking.customerId && booking.status && String(booking.status) !== 'CANCELLED') {
-              const count = bookingsMap.get(booking.customerId) || 0;
-              bookingsMap.set(booking.customerId, count + 1);
+            if (booking.customerId && booking.status) {
+              const status = String(booking.status);
+              // Exclure tous les statuts d'annulation
+              const isCancelled = status === 'CANCELLED' || 
+                                  status === 'CANCELLED_BY_SELLER' || 
+                                  status === 'CANCELLED_BY_CUSTOMER';
+              
+              if (!isCancelled) {
+                const count = bookingsMap.get(booking.customerId) || 0;
+                bookingsMap.set(booking.customerId, count + 1);
+              }
             }
           }
           
@@ -191,8 +199,16 @@ export async function updateClientBookingCount(squareId: string): Promise<{
         });
         
         for await (const booking of bookingsResponse) {
-          if (booking.customerId === squareId && booking.status && String(booking.status) !== 'CANCELLED') {
-            bookingCount++;
+          if (booking.customerId === squareId && booking.status) {
+            const status = String(booking.status);
+            // Exclure tous les statuts d'annulation
+            const isCancelled = status === 'CANCELLED' || 
+                                status === 'CANCELLED_BY_SELLER' || 
+                                status === 'CANCELLED_BY_CUSTOMER';
+            
+            if (!isCancelled) {
+              bookingCount++;
+            }
           }
         }
         
