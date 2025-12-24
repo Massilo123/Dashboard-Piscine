@@ -620,9 +620,18 @@ router.get('/by-city-stream', async (req: Request, res: Response): Promise<void>
   };
 
   try {
+    // Vérifier si on doit filtrer uniquement les clients fréquents
+    const frequentOnly = req.query.frequentOnly === 'true';
+    const queryFilter: any = {};
+    if (frequentOnly) {
+      // Filtrer uniquement les clients avec isFrequentClient = true (explicitement true, pas undefined)
+      queryFilter.isFrequentClient = { $eq: true };
+      console.log('🔍 Filtre activé: clients fréquents uniquement (3+ rendez-vous)');
+    }
 
     // Récupérer TOUS les clients
-    const allClients = await Client.find({});
+    const allClients = await Client.find(queryFilter);
+    console.log(`📊 ${allClients.length} clients récupérés${frequentOnly ? ' (filtre fréquents activé)' : ''}`);
     const clientsWithAddress = allClients.filter(c => c.addressLine1 && c.addressLine1.trim() !== '');
     const clientsWithoutAddress = allClients.filter(c => !c.addressLine1 || c.addressLine1.trim() === '');
 
@@ -1900,8 +1909,21 @@ router.get('/by-city', async (req: Request, res: Response): Promise<void> => {
     console.log('📊 Calcul direct depuis MongoDB (optimisé avec aggregate)...');
     const startTime = Date.now();
 
+    // Vérifier si on doit filtrer uniquement les clients fréquents
+    const frequentOnly = req.query.frequentOnly === 'true';
+    const queryFilter: any = {};
+    if (frequentOnly) {
+      // Filtrer uniquement les clients avec isFrequentClient = true (explicitement true, pas undefined)
+      queryFilter.isFrequentClient = { $eq: true };
+      console.log('🔍 Filtre activé: clients fréquents uniquement (3+ rendez-vous)');
+    } else {
+      // Quand le filtre est désactivé, on peut aussi exclure explicitement les clients fréquents si nécessaire
+      // Mais ici on veut tous les clients, donc pas de filtre supplémentaire
+    }
+
     // Récupérer TOUS les clients (pas seulement ceux avec ville/secteur)
-    const allClients = await Client.find({}).lean();
+    const allClients = await Client.find(queryFilter).lean();
+    console.log(`📊 ${allClients.length} clients récupérés${frequentOnly ? ' (filtre fréquents activé)' : ''}`);
 
     // Séparer les clients selon leurs caractéristiques
     const clientsWithAddressAndCitySector = allClients.filter(c => 
@@ -3263,14 +3285,23 @@ router.get('/for-map', async (req: Request, res: Response): Promise<void> => {
     console.log('📍 Calcul direct depuis MongoDB pour la map (optimisé)...');
     const startTime = Date.now();
 
-    // Récupérer tous les clients avec coordonnées et city/sector depuis MongoDB
-    const clients = await Client.find({
+    // Vérifier si on doit filtrer uniquement les clients fréquents
+    const frequentOnly = req.query.frequentOnly === 'true';
+    const queryFilter: any = {
       coordinates: { $exists: true },
       'coordinates.lng': { $exists: true },
       'coordinates.lat': { $exists: true },
       city: { $exists: true, $ne: null },
       sector: { $exists: true, $ne: null }
-    }).lean();
+    };
+    if (frequentOnly) {
+      // Filtrer uniquement les clients avec isFrequentClient = true (explicitement true, pas undefined)
+      queryFilter.isFrequentClient = { $eq: true };
+      console.log('🔍 Filtre activé: clients fréquents uniquement (3+ rendez-vous)');
+    }
+
+    // Récupérer tous les clients avec coordonnées et city/sector depuis MongoDB
+    const clients = await Client.find(queryFilter).lean();
 
     // Formater pour la map
     const formattedClients = clients.map(client => ({

@@ -9,6 +9,7 @@ import routeOptimizer from './routes/routeOptimizer';
 import clientRdvOptimizer from './routes/clientRdvOptimizer';
 import webhookRoutes from './routes/webhookRoutes';
 import clientByCityRoutes from './routes/clientByCityRoutes';
+import bookingCountRoutes from './routes/bookingCountRoutes';
 
 
 
@@ -36,6 +37,7 @@ app.use('/api/optimize', routeOptimizer);
 app.use('/api/client-rdv', clientRdvOptimizer);
 app.use('/api', webhookRoutes);
 app.use('/api/clients', clientByCityRoutes);
+app.use('/api/booking-counts', bookingCountRoutes);
 
 
 

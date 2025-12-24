@@ -44,6 +44,7 @@ const ClientsByCity: React.FC = () => {
   const [progress, setProgress] = useState({ processed: 0, total: 0, percentage: 0, currentClient: '', city: '', district: '', elapsed: '0s', estimated: '0s' });
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFrequentOnly, setShowFrequentOnly] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [correctedAddress, setCorrectedAddress] = useState('');
   const [isFixing, setIsFixing] = useState(false);
@@ -233,7 +234,8 @@ const ClientsByCity: React.FC = () => {
       }
       
       // Charger tous les clients depuis l'API pour obtenir la liste complète des IDs
-      const response = await fetch(`${API_CONFIG.baseUrl}/api/clients/by-city`);
+      const url = `${API_CONFIG.baseUrl}/api/clients/by-city${showFrequentOnly ? '?frequentOnly=true' : ''}`;
+      const response = await fetch(url);
       const result = await response.json();
       
       if (!result.success || !result.data) {
@@ -587,7 +589,7 @@ const ClientsByCity: React.FC = () => {
   }, []);
 
   // Fonction pour charger directement depuis MongoDB (route optimisée, pas d'appels API externes)
-  const loadFromAPI = useCallback(async (forceReload: boolean = false) => {
+  const loadFromAPI = useCallback(async (forceReload: boolean = false, frequentOnlyOverride?: boolean) => {
       try {
         setLoading(true);
         setError(null);
@@ -600,8 +602,13 @@ const ClientsByCity: React.FC = () => {
           setExpandedDistricts(new Set());
         }
 
+        // Utiliser la valeur override si fournie, sinon utiliser l'état actuel
+        const shouldFilterFrequent = frequentOnlyOverride !== undefined ? frequentOnlyOverride : showFrequentOnly;
+
         console.log('📦 Chargement depuis MongoDB (route optimisée /by-city)...');
-        const response = await fetch(`${API_CONFIG.baseUrl}/api/clients/by-city`);
+        const url = `${API_CONFIG.baseUrl}/api/clients/by-city${shouldFilterFrequent ? '?frequentOnly=true' : ''}`;
+        console.log(`📦 URL: ${url} (filtre fréquents: ${shouldFilterFrequent})`);
+        const response = await fetch(url);
         const result = await response.json();
 
         if (!result.success) {
@@ -782,7 +789,7 @@ const ClientsByCity: React.FC = () => {
       // Réinitialiser le flag si le composant est démonté
       hasInitializedRef.current = false;
     };
-  }, [refreshKey, updateClientsIncremental, detectAndRemoveDeletedClients, loadFromAPI]);
+  }, [refreshKey, updateClientsIncremental, detectAndRemoveDeletedClients, loadFromAPI, showFrequentOnly]);
 
   const fetchClientsByCityStream = () => {
     // Réinitialiser tous les états pour fermer les menus
@@ -1902,7 +1909,38 @@ const ClientsByCity: React.FC = () => {
                 )}
               </p>
             </div>
-            <button
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              {/* Switch pour filtrer les clients fréquents */}
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={showFrequentOnly}
+                    onChange={(e) => {
+                      const newValue = e.target.checked;
+                      setShowFrequentOnly(newValue);
+                      // Recharger les données avec le nouveau filtre (passer la nouvelle valeur directement)
+                      hasInitializedRef.current = false;
+                      loadFromAPI(true, newValue);
+                    }}
+                    className="sr-only"
+                  />
+                  <div className={`w-11 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                    showFrequentOnly 
+                      ? 'bg-gradient-to-r from-purple-500 to-indigo-500 shadow-lg shadow-purple-500/50' 
+                      : 'bg-gray-700 border border-gray-600'
+                  }`}>
+                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-all duration-300 ease-in-out transform ${
+                      showFrequentOnly ? 'translate-x-5' : 'translate-x-0'
+                    } shadow-md`}></div>
+                  </div>
+                </div>
+                <span className="text-xs sm:text-sm text-gray-300 group-hover:text-cyan-300 transition-colors duration-200 hidden sm:inline">
+                  3+ rendez-vous
+                </span>
+              </label>
+              
+              <button
               onClick={() => {
                 // Forcer un recalcul complet avec streaming (barre de progression)
                 console.log('🔄 Recalcul complet du cache MongoDB by-city avec streaming...');
@@ -1942,7 +1980,8 @@ const ClientsByCity: React.FC = () => {
                   <span className="hidden sm:inline">Reboot</span>
                 </>
               )}
-            </button>
+              </button>
+            </div>
           </div>
 
           {/* Barre de recherche */}

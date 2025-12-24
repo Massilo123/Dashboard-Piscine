@@ -159,6 +159,7 @@ const ClientsMap: React.FC = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const [showFrequentOnly, setShowFrequentOnly] = useState(false);
   const allClientsRef = useRef<Client[]>([]); // Stocker tous les clients pour le filtrage
 
   // Fonction pour charger depuis le cache
@@ -322,9 +323,12 @@ const ClientsMap: React.FC = () => {
   };
 
   // Fonction fetchClients - charge depuis l'API qui utilise le cache MongoDB
-  const fetchClients = async (forceRefresh: boolean = false) => {
+  const fetchClients = async (forceRefresh: boolean = false, frequentOnlyOverride?: boolean) => {
     try {
       setLoading(true);
+      
+      // Utiliser la valeur override si fournie, sinon utiliser l'état actuel
+      const shouldFilterFrequent = frequentOnlyOverride !== undefined ? frequentOnlyOverride : showFrequentOnly;
       
       // Si pas de rechargement forcé, vérifier les changements
       if (!forceRefresh) {
@@ -343,7 +347,9 @@ const ClientsMap: React.FC = () => {
       }
 
       // Charger depuis l'API (qui utilise le cache MongoDB côté serveur)
-      const response = await fetch(`${API_CONFIG.baseUrl}/api/clients/for-map`);
+      const url = `${API_CONFIG.baseUrl}/api/clients/for-map${shouldFilterFrequent ? '?frequentOnly=true' : ''}`;
+      console.log(`📦 Chargement des clients depuis: ${url} (filtre fréquents: ${shouldFilterFrequent})`);
+      const response = await fetch(url);
       const result = await response.json();
 
       if (result.success) {
@@ -1254,13 +1260,44 @@ const ClientsMap: React.FC = () => {
             
         {/* Statistiques par secteur */}
         <div className="mb-3 sm:mb-4 flex-shrink-0 bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-lg p-3 sm:p-4 border border-indigo-500/20 shadow-lg shadow-indigo-500/5 w-full min-w-0">
-          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-sm shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+          <div className="flex items-center justify-between gap-2 sm:gap-3 mb-3 sm:mb-4">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-lg border border-indigo-400/40 shadow-sm shadow-indigo-500/30 backdrop-blur-sm flex-shrink-0">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.8)]" />
+              </div>
+              <h2 className="text-sm sm:text-base md:text-lg font-semibold bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)]">
+                Répartition par Secteur
+              </h2>
             </div>
-            <h2 className="text-sm sm:text-base md:text-lg font-semibold bg-gradient-to-r from-indigo-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(139,92,246,0.4)]">
-              Répartition par Secteur
-            </h2>
+            
+            {/* Switch pour filtrer les clients fréquents */}
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={showFrequentOnly}
+                  onChange={(e) => {
+                    const newValue = e.target.checked;
+                    setShowFrequentOnly(newValue);
+                    // Recharger les données avec le nouveau filtre (passer la nouvelle valeur directement)
+                    fetchClients(true, newValue);
+                  }}
+                  className="sr-only"
+                />
+                <div className={`w-11 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                  showFrequentOnly 
+                    ? 'bg-gradient-to-r from-purple-500 to-indigo-500 shadow-lg shadow-purple-500/50' 
+                    : 'bg-gray-700 border border-gray-600'
+                }`}>
+                  <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-all duration-300 ease-in-out transform ${
+                    showFrequentOnly ? 'translate-x-5' : 'translate-x-0'
+                  } shadow-md`}></div>
+                </div>
+              </div>
+              <span className="text-xs sm:text-sm text-gray-300 group-hover:text-cyan-300 transition-colors duration-200 hidden sm:inline">
+                3+ rendez-vous
+              </span>
+            </label>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
             {sortedSectors.map(([sector, count]) => {
