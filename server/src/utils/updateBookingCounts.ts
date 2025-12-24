@@ -155,8 +155,6 @@ export async function updateClientBookingCount(squareId: string): Promise<{
   isFrequentClient: boolean;
 }> {
   try {
-    console.log(`🔍 Début du comptage des rendez-vous pour le client ${squareId}...`);
-    
     // Date de début : il y a 2 ans
     const startDate = new Date();
     startDate.setFullYear(startDate.getFullYear() - 2);
@@ -165,18 +163,13 @@ export async function updateClientBookingCount(squareId: string): Promise<{
     const endDate = new Date();
     endDate.setFullYear(endDate.getFullYear() + 1);
     
-    console.log(`📅 Période de recherche: ${startDate.toISOString()} à ${endDate.toISOString()}`);
-    
     let bookingCount = 0;
-    const foundBookings: Array<{id: string, status: string, startAt: string}> = [];
     
     try {
       // Square API limite à 31 jours par requête, donc on divise en segments
       const segmentDays = 30; // 30 jours pour être sûr
       const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
       const segments = Math.ceil(totalDays / segmentDays);
-      
-      console.log(`📊 Division en ${segments} segments de ${segmentDays} jours`);
       
       for (let i = 0; i < segments; i++) {
         const segmentStart = new Date(startDate);
@@ -197,28 +190,10 @@ export async function updateClientBookingCount(squareId: string): Promise<{
           limit: 1000
         });
         
-        let segmentCount = 0;
         for await (const booking of bookingsResponse) {
-          if (booking.customerId === squareId) {
-            const bookingStatus = booking.status ? String(booking.status) : 'undefined';
-            const isCancelled = bookingStatus === 'CANCELLED';
-            
-            if (!isCancelled) {
-              bookingCount++;
-              segmentCount++;
-              foundBookings.push({
-                id: booking.id || 'unknown',
-                status: bookingStatus,
-                startAt: booking.startAt || 'unknown'
-              });
-            } else {
-              console.log(`   ⏭️  Booking ${booking.id} ignoré (annulé)`);
-            }
+          if (booking.customerId === squareId && booking.status && String(booking.status) !== 'CANCELLED') {
+            bookingCount++;
           }
-        }
-        
-        if (segmentCount > 0) {
-          console.log(`   📅 Segment ${i + 1}/${segments}: ${segmentCount} rendez-vous trouvés`);
         }
         
         // Petit délai entre les segments pour éviter les rate limits
@@ -226,24 +201,15 @@ export async function updateClientBookingCount(squareId: string): Promise<{
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
-      
-      console.log(`📊 Total de ${bookingCount} rendez-vous trouvés pour le client ${squareId}`);
-      if (foundBookings.length > 0) {
-        console.log(`   Détails des rendez-vous:`);
-        foundBookings.forEach((b, idx) => {
-          console.log(`   ${idx + 1}. Booking ${b.id} - Status: ${b.status} - Date: ${b.startAt}`);
-        });
-      }
     } catch (error) {
       console.error(`❌ Erreur lors de la récupération des rendez-vous pour ${squareId}:`, error);
       throw error;
     }
     
     const isFrequentClient = bookingCount >= 3;
-    console.log(`📈 Résultat: ${bookingCount} rendez-vous → isFrequentClient = ${isFrequentClient}`);
     
     // Mettre à jour le client dans MongoDB
-    const updateResult = await Client.updateOne(
+    await Client.updateOne(
       { squareId: squareId },
       {
         $set: {
@@ -253,8 +219,6 @@ export async function updateClientBookingCount(squareId: string): Promise<{
       }
     );
     
-    console.log(`💾 Mise à jour MongoDB: ${updateResult.matchedCount} document(s) trouvé(s), ${updateResult.modifiedCount} document(s) modifié(s)`);
-    
     return {
       success: true,
       bookingCount,
@@ -262,10 +226,6 @@ export async function updateClientBookingCount(squareId: string): Promise<{
     };
   } catch (error) {
     console.error(`❌ Erreur lors de la mise à jour du compteur pour ${squareId}:`, error);
-    if (error instanceof Error) {
-      console.error(`   Message: ${error.message}`);
-      console.error(`   Stack: ${error.stack}`);
-    }
     throw error;
   }
 }
