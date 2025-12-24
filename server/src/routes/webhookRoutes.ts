@@ -7,72 +7,102 @@ import Client from '../models/Client';
 const router = Router();
 
 // Fonction pour mettre à jour ou créer un client dans MongoDB
-async function upsertClientInMongo(squareCustomerId: string) {
+// Peut utiliser soit les données du webhook directement, soit récupérer depuis Square API
+async function upsertClientInMongo(squareCustomerId: string, webhookCustomerData?: any) {
     try {
-        // Récupérer les informations du client depuis Square
-        const customerResponse = await squareClient.customers.get({
-            customerId: squareCustomerId
-        });
+        let customer;
+        
+        // Si on a les données du webhook, les utiliser directement (plus rapide)
+        if (webhookCustomerData && webhookCustomerData.id === squareCustomerId) {
+            customer = webhookCustomerData;
+            console.log(`📝 Utilisation des données du webhook pour ${squareCustomerId}`);
+        } else if (webhookCustomerData) {
+            // Si les données sont disponibles mais l'ID ne correspond pas, utiliser quand même
+            console.log(`⚠️ ID mismatch: webhook=${webhookCustomerData.id}, expected=${squareCustomerId}, utilisation des données webhook`);
+            customer = webhookCustomerData;
+        } else {
+            // Sinon, récupérer depuis Square API
+            console.log(`📡 Récupération du client ${squareCustomerId} depuis Square API...`);
+            try {
+                const customerResponse = await squareClient.customers.get({
+                    customerId: squareCustomerId
+                });
 
-        if (!customerResponse.customer) {
-            throw new Error('Client non trouvé dans Square');
+                if (!customerResponse.customer) {
+                    throw new Error('Client non trouvé dans Square');
+                }
+
+                customer = customerResponse.customer;
+            } catch (apiError) {
+                console.error(`❌ Erreur lors de la récupération depuis Square API:`, apiError);
+                throw apiError;
+            }
         }
 
-        const customer = customerResponse.customer;
+        // Normaliser les noms de champs (Square peut utiliser given_name ou givenName)
+        const givenName = customer.givenName || customer.given_name || '';
+        const familyName = customer.familyName || customer.family_name || '';
+        const phoneNumber = customer.phoneNumber || customer.phone_number || '';
+        const addressLine1 = customer.address?.addressLine1 || customer.address?.address_line_1 || '';
 
         // Mettre à jour ou créer le client dans MongoDB
         const updatedClient = await Client.findOneAndUpdate(
             { squareId: customer.id },
             {
-                givenName: customer.givenName || '',
-                familyName: customer.familyName || '',
-                phoneNumber: customer.phoneNumber || '',
-                addressLine1: customer.address?.addressLine1 || '',
+                givenName: givenName,
+                familyName: familyName,
+                phoneNumber: phoneNumber,
+                addressLine1: addressLine1,
                 squareId: customer.id
             },
             { upsert: true, new: true }
         );
+
+        console.log(`✅ Client ${updatedClient ? 'mis à jour' : 'créé'} dans MongoDB: ${givenName} ${familyName}`.trim());
 
         // Géocoder automatiquement le client s'il a une adresse
         if (updatedClient && updatedClient.addressLine1 && updatedClient.addressLine1.trim() !== '') {
             const { geocodeAndExtractLocation } = await import('../utils/geocodeAndExtractLocation');
             geocodeAndExtractLocation(updatedClient._id.toString())
                 .then((result) => {
-                    // Plus besoin de mettre à jour le cache - city/district/sector sont déjà dans MongoDB
-                    // Les routes lisent directement depuis MongoDB maintenant
                     console.log(`✅ Client géocodé et localisé: ${result.city}${result.district ? ` (${result.district})` : ''} [${result.sector}]`);
                 })
                 .catch(err => {
-                    console.error(`Erreur lors du géocodage automatique pour ${customer.givenName}:`, err);
+                    console.error(`Erreur lors du géocodage automatique pour ${givenName}:`, err);
                 });
         }
 
     } catch (error) {
-        console.error('Erreur lors de la mise à jour du client:', error);
+        console.error('❌ Erreur lors de la mise à jour du client:', error);
         throw error;
     }
 }
 
 // Fonction pour extraire l'ID du client depuis différents formats de webhook
 function extractCustomerId(data: any): string | null {
-    // Format 1: data.object.customer.id (format standard Square)
+    // Format Square standard: data.object.customer.id
     if (data?.object?.customer?.id) {
         return data.object.customer.id;
     }
     
-    // Format 2: data.id (si l'objet customer est directement dans data)
+    // Format Square: data.id (quand data.type === 'customer')
     if (data?.id && data?.type === 'customer') {
         return data.id;
     }
     
-    // Format 3: data.customer.id
+    // Format alternatif: data.customer.id
     if (data?.customer?.id) {
         return data.customer.id;
     }
     
-    // Format 4: data.object.id (si l'objet est directement le customer)
-    if (data?.object?.id && (data?.object?.givenName || data?.object?.familyName)) {
+    // Format alternatif: data.object.id (si l'objet est directement le customer)
+    if (data?.object?.id && (data?.object?.givenName || data?.object?.familyName || data?.object?.given_name)) {
         return data.object.id;
+    }
+    
+    // Format direct: data.id si c'est un objet customer
+    if (data?.id && (data?.givenName || data?.familyName || data?.given_name)) {
+        return data.id;
     }
     
     return null;
@@ -80,24 +110,34 @@ function extractCustomerId(data: any): string | null {
 
 // Fonction pour extraire l'ID du client depuis un événement de booking
 function extractCustomerIdFromBooking(data: any): string | null {
-    // Format 1: data.object.booking.customerId (format standard Square)
+    // Format Square standard: data.object.booking.customer_id (avec underscore)
+    if (data?.object?.booking?.customer_id) {
+        return data.object.booking.customer_id;
+    }
+    
+    // Format alternatif: data.object.booking.customerId (camelCase)
     if (data?.object?.booking?.customerId) {
         return data.object.booking.customerId;
     }
     
-    // Format 2: data.booking.customerId
+    // Format: data.booking.customer_id
+    if (data?.booking?.customer_id) {
+        return data.booking.customer_id;
+    }
+    
+    // Format: data.booking.customerId
     if (data?.booking?.customerId) {
         return data.booking.customerId;
     }
     
-    // Format 3: data.object.customerId (si l'objet booking est directement dans object)
-    if (data?.object?.customerId && data?.object?.id) {
-        return data.object.customerId;
+    // Format: data.object.customer_id (si l'objet booking est directement dans object)
+    if (data?.object?.customer_id && data?.object?.id) {
+        return data.object.customer_id;
     }
     
-    // Format 4: data.customerId (si l'objet booking est directement dans data)
-    if (data?.customerId && data?.id) {
-        return data.customerId;
+    // Format: data.customer_id (si l'objet booking est directement dans data)
+    if (data?.customer_id && data?.id) {
+        return data.customer_id;
     }
     
     return null;
@@ -108,11 +148,30 @@ async function incrementBookingCount(customerId: string) {
     try {
         const client = await Client.findOne({ squareId: customerId });
         if (!client) {
-            console.warn(`⚠️ Client avec squareId ${customerId} non trouvé pour incrémenter le compteur`);
-            return;
+            console.warn(`⚠️ Client avec squareId ${customerId} non trouvé pour incrémenter le compteur. Création du client...`);
+            // Si le client n'existe pas, essayer de le créer depuis Square
+            try {
+                await upsertClientInMongo(customerId);
+                // Réessayer après création
+                const newClient = await Client.findOne({ squareId: customerId });
+                if (!newClient) {
+                    throw new Error('Impossible de créer le client');
+                }
+                // Continuer avec l'incrémentation
+            } catch (createError) {
+                console.error(`❌ Impossible de créer le client ${customerId}:`, createError);
+                throw createError;
+            }
         }
 
-        const newBookingCount = (client.bookingCount || 0) + 1;
+        // Récupérer le client (soit existant, soit nouvellement créé)
+        const clientToUpdate = await Client.findOne({ squareId: customerId });
+        if (!clientToUpdate) {
+            throw new Error('Client introuvable après création');
+        }
+
+        const currentCount = clientToUpdate.bookingCount || 0;
+        const newBookingCount = currentCount + 1;
         const isFrequentClient = newBookingCount >= 3;
 
         await Client.updateOne(
@@ -125,9 +184,10 @@ async function incrementBookingCount(customerId: string) {
             }
         );
 
-        console.log(`📈 Compteur de rendez-vous incrémenté pour ${customerId}: ${client.bookingCount || 0} → ${newBookingCount}${isFrequentClient ? ' (client fréquent!)' : ''}`);
+        console.log(`📈 Compteur de rendez-vous incrémenté pour ${customerId}: ${currentCount} → ${newBookingCount}${isFrequentClient ? ' (client fréquent!)' : ''}`);
     } catch (error) {
         console.error(`❌ Erreur lors de l'incrémentation du compteur pour ${customerId}:`, error);
+        throw error; // Re-throw pour que l'appelant puisse gérer l'erreur
     }
 }
 
@@ -161,88 +221,130 @@ async function decrementBookingCount(customerId: string) {
 }
 
 // Fonction pour traiter un événement individuel
-async function processWebhookEvent(type: string, data: any) {
+async function processWebhookEvent(type: string, data: any): Promise<{ success: boolean; error?: string }> {
     try {
         // Traiter les différents types d'événements
         switch (type) {
             case 'customer.created':
                 console.log('✅ Nouveau client créé dans Square');
                 const createdId = extractCustomerId(data);
+                console.log(`🔍 ID extrait: ${createdId || 'NON TROUVÉ'}`);
                 if (createdId) {
-                    await upsertClientInMongo(createdId);
-                    console.log(`✅ Client créé/mis à jour dans MongoDB: ${createdId}`);
+                    // Utiliser les données du webhook directement si disponibles
+                    const customerData = data?.object?.customer || data?.customer || null;
+                    console.log(`📦 Données client disponibles: ${customerData ? 'OUI' : 'NON'}`);
+                    try {
+                        await upsertClientInMongo(createdId, customerData);
+                        console.log(`✅ Client créé/mis à jour dans MongoDB: ${createdId}`);
+                        return { success: true };
+                    } catch (error) {
+                        const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
+                        console.error(`❌ Erreur lors de la création du client ${createdId}:`, error);
+                        return { success: false, error: errorMsg };
+                    }
                 } else {
-                    console.warn('⚠️ customer.created reçu mais pas d\'ID client trouvé. Structure data:', JSON.stringify(data, null, 2));
+                    const errorMsg = 'customer.created reçu mais pas d\'ID client trouvé';
+                    console.warn(`⚠️ ${errorMsg}. Structure data:`, JSON.stringify(data, null, 2));
+                    return { success: false, error: errorMsg };
                 }
-                break;
 
             case 'customer.updated':
                 console.log('✅ Client mis à jour dans Square');
                 const updatedId = extractCustomerId(data);
+                console.log(`🔍 ID extrait: ${updatedId || 'NON TROUVÉ'}`);
                 if (updatedId) {
-                    await upsertClientInMongo(updatedId);
-                    console.log(`✅ Client mis à jour dans MongoDB: ${updatedId}`);
+                    // Utiliser les données du webhook directement si disponibles
+                    const customerData = data?.object?.customer || data?.customer || null;
+                    console.log(`📦 Données client disponibles: ${customerData ? 'OUI' : 'NON'}`);
+                    try {
+                        await upsertClientInMongo(updatedId, customerData);
+                        console.log(`✅ Client mis à jour dans MongoDB: ${updatedId}`);
+                        return { success: true };
+                    } catch (error) {
+                        const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
+                        console.error(`❌ Erreur lors de la mise à jour du client ${updatedId}:`, error);
+                        return { success: false, error: errorMsg };
+                    }
                 } else {
-                    console.warn('⚠️ customer.updated reçu mais pas d\'ID client trouvé. Structure data:', JSON.stringify(data, null, 2));
+                    const errorMsg = 'customer.updated reçu mais pas d\'ID client trouvé';
+                    console.warn(`⚠️ ${errorMsg}. Structure data:`, JSON.stringify(data, null, 2));
+                    return { success: false, error: errorMsg };
                 }
-                break;
 
             case 'customer.deleted':
                 console.log('🗑️ Client supprimé dans Square');
                 const deletedId = extractCustomerId(data);
+                console.log(`🔍 ID client extrait: ${deletedId || 'NON TROUVÉ'}`);
                 if (deletedId) {
-                    const client = await Client.findOne({ squareId: deletedId });
-                    if (client) {
-                        const clientId = client._id.toString();
-                        const clientName = `${client.givenName || ''} ${client.familyName || ''}`.trim();
-                        console.log(`🗑️ Suppression du client ${clientId} (${clientName})`);
-                        
-                        // Supprimer directement de MongoDB
-                        await Client.deleteOne({ squareId: deletedId });
-                        console.log(`✅ Client supprimé de MongoDB`);
-                    } else {
-                        console.log(`⚠️ Client avec squareId ${deletedId} non trouvé dans MongoDB`);
+                    try {
+                        const client = await Client.findOne({ squareId: deletedId });
+                        if (client) {
+                            const clientId = client._id.toString();
+                            const clientName = `${client.givenName || ''} ${client.familyName || ''}`.trim();
+                            console.log(`🗑️ Suppression du client ${clientId} (${clientName})`);
+                            
+                            // Supprimer directement de MongoDB
+                            await Client.deleteOne({ squareId: deletedId });
+                            console.log(`✅ Client supprimé de MongoDB`);
+                            return { success: true };
+                        } else {
+                            console.log(`⚠️ Client avec squareId ${deletedId} non trouvé dans MongoDB (déjà supprimé?)`);
+                            // Retourner success même si le client n'existe pas (peut-être déjà supprimé)
+                            return { success: true };
+                        }
+                    } catch (error) {
+                        const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
+                        console.error(`❌ Erreur lors de la suppression du client ${deletedId}:`, error);
+                        return { success: false, error: errorMsg };
                     }
                 } else {
-                    console.warn('⚠️ customer.deleted reçu mais pas d\'ID client trouvé. Structure data:', JSON.stringify(data, null, 2));
+                    const errorMsg = 'customer.deleted reçu mais pas d\'ID client trouvé';
+                    console.warn(`⚠️ ${errorMsg}. Structure data:`, JSON.stringify(data, null, 2));
+                    return { success: false, error: errorMsg };
                 }
-                break;
 
             case 'booking.created':
                 console.log('📅 Nouveau rendez-vous créé dans Square');
                 const bookingCreatedCustomerId = extractCustomerIdFromBooking(data);
+                console.log(`🔍 ID client extrait du booking: ${bookingCreatedCustomerId || 'NON TROUVÉ'}`);
                 if (bookingCreatedCustomerId) {
-                    await incrementBookingCount(bookingCreatedCustomerId);
+                    try {
+                        await incrementBookingCount(bookingCreatedCustomerId);
+                        return { success: true };
+                    } catch (error) {
+                        const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
+                        console.error(`❌ Erreur lors de l'incrémentation du compteur pour ${bookingCreatedCustomerId}:`, error);
+                        return { success: false, error: errorMsg };
+                    }
                 } else {
-                    console.warn('⚠️ booking.created reçu mais pas d\'ID client trouvé. Structure data:', JSON.stringify(data, null, 2));
+                    const errorMsg = 'booking.created reçu mais pas d\'ID client trouvé';
+                    console.warn(`⚠️ ${errorMsg}. Structure data:`, JSON.stringify(data, null, 2));
+                    return { success: false, error: errorMsg };
                 }
-                break;
 
             case 'booking.updated':
-                // Pour booking.updated, on vérifie si le statut a changé
-                // Si le booking passe de CANCELLED à un autre statut, on incrémente
-                // Si le booking passe à CANCELLED, on décrémente
+                // Pour booking.updated, on recompte tous les bookings du client
+                // car Square n'envoie pas toujours les valeurs précédentes
                 console.log('📅 Rendez-vous mis à jour dans Square');
                 const bookingUpdatedCustomerId = extractCustomerIdFromBooking(data);
+                console.log(`🔍 ID client extrait du booking: ${bookingUpdatedCustomerId || 'NON TROUVÉ'}`);
                 if (bookingUpdatedCustomerId) {
-                    const booking = data?.object?.booking || data?.booking || data?.object;
-                    const status = booking?.status;
-                    const previousStatus = booking?.previousStatus || data?.previousValues?.status;
-                    
-                    // Si le booking était annulé et maintenant ne l'est plus, incrémenter
-                    if (previousStatus === 'CANCELLED' && status && status !== 'CANCELLED') {
-                        await incrementBookingCount(bookingUpdatedCustomerId);
-                    }
-                    // Si le booking devient annulé, décrémenter
-                    else if (status === 'CANCELLED' && previousStatus && previousStatus !== 'CANCELLED') {
-                        await decrementBookingCount(bookingUpdatedCustomerId);
-                    } else {
-                        console.log(`ℹ️ booking.updated sans changement de statut significatif (${previousStatus} → ${status})`);
+                    try {
+                        // Utiliser la fonction existante pour recompter tous les bookings
+                        const { updateClientBookingCount } = await import('../utils/updateBookingCounts');
+                        const result = await updateClientBookingCount(bookingUpdatedCustomerId);
+                        console.log(`✅ Compteur de rendez-vous recalculé pour ${bookingUpdatedCustomerId}: ${result.bookingCount} (fréquent: ${result.isFrequentClient})`);
+                        return { success: true };
+                    } catch (error) {
+                        const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
+                        console.error(`❌ Erreur lors du recalcul du compteur pour ${bookingUpdatedCustomerId}:`, error);
+                        return { success: false, error: errorMsg };
                     }
                 } else {
-                    console.warn('⚠️ booking.updated reçu mais pas d\'ID client trouvé. Structure data:', JSON.stringify(data, null, 2));
+                    const errorMsg = 'booking.updated reçu mais pas d\'ID client trouvé';
+                    console.warn(`⚠️ ${errorMsg}. Structure data:`, JSON.stringify(data, null, 2));
+                    return { success: false, error: errorMsg };
                 }
-                break;
 
             case 'booking.cancelled':
             case 'booking.canceled':
@@ -263,9 +365,14 @@ async function processWebhookEvent(type: string, data: any) {
                     console.log(`⚠️ Événement non géré: ${type}`);
                 }
         }
+        
+        // Si on arrive ici, l'événement n'a pas été traité (pas de return dans le switch)
+        return { success: true };
     } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
         console.error(`❌ Erreur lors du traitement de l'événement ${type}:`, error);
         // Ne pas throw pour éviter de bloquer les autres événements
+        return { success: false, error: errorMsg };
     }
 }
 
@@ -314,17 +421,38 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
         // Traiter chaque événement
         let processedCount = 0;
+        let successCount = 0;
+        let errorCount = 0;
+        
         for (const event of events) {
             if (event.type) {
-                await processWebhookEvent(event.type, event.data);
-                processedCount++;
+                try {
+                    const result = await processWebhookEvent(event.type, event.data);
+                    processedCount++;
+                    if (result.success) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        console.warn(`⚠️ Événement ${event.type} traité avec erreur: ${result.error}`);
+                    }
+                } catch (error) {
+                    errorCount++;
+                    processedCount++;
+                    console.error(`❌ Erreur non catchée lors du traitement de ${event.type}:`, error);
+                }
             } else {
                 console.warn('⚠️ Événement sans type ignoré:', event);
             }
         }
 
-        console.log(`✅ Webhook traité: ${processedCount}/${events.length} événement(s) traité(s)`);
-        res.status(200).json({ success: true, processed: processedCount, total: events.length });
+        console.log(`✅ Webhook traité: ${successCount} succès, ${errorCount} erreurs sur ${processedCount}/${events.length} événement(s)`);
+        res.status(200).json({ 
+            success: errorCount === 0, 
+            processed: processedCount, 
+            successCount,
+            errorCount,
+            total: events.length 
+        });
 
     } catch (error) {
         console.error('❌ Erreur dans le webhook:', error);
