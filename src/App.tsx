@@ -5,8 +5,10 @@ import RouteOptimizerSchedule from './components/RouteOptimizerSchedule';
 import OptimisationRdvClient from './components/OptimisationRdvClient';
 import ClientsByCity from './components/ClientsByCity';
 import ClientsMap from './components/ClientsMap';
+import Appointments from './components/Appointments';
+import AppointmentNotification from './components/AppointmentNotification';
 import AuthGate from './components/AuthGate';
-import { Menu, X, PenTool, Search, Calendar, MapPin, Building, Map, LogOut } from 'lucide-react';
+import { Menu, X, Search, Calendar, MapPin, Building, Map, LogOut, Bell } from 'lucide-react';
 import logo_mauve from './assets/logo_mauve.png';
 import 'leaflet/dist/leaflet.css'
 
@@ -87,13 +89,7 @@ function App() {
           <MobileNavLink to="/optimisation-rdv" icon={MapPin}>RDV Proche</MobileNavLink>
           <MobileNavLink to="/clients-by-city" icon={Building}>Clients par Ville</MobileNavLink>
           <MobileNavLink to="/clients-map" icon={Map}>Carte des Clients</MobileNavLink>
-          <a
-            href="https://app.squareup.com/login"
-            className="text-indigo-200 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2 mt-4 transition-all duration-200 backdrop-blur-sm"
-          >
-            <PenTool className="h-5 w-5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
-            <span>RENDEZ-VOUS</span>
-          </a>
+          <MobileNavLink to="/appointments" icon={Bell}>Rendez-vous</MobileNavLink>
           <button
             onClick={handleLogout}
             className="text-rose-200 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2 mt-2 transition-all duration-200 backdrop-blur-sm w-full"
@@ -150,17 +146,12 @@ function App() {
                 <NavLink to="/optimisation-rdv" icon={MapPin}>RDV Proche</NavLink>
                 <NavLink to="/clients-by-city" icon={Building}>Clients par Ville</NavLink>
                 <NavLink to="/clients-map" icon={Map}>Carte des Clients</NavLink>
+                <NavLink to="/appointments" icon={Bell}>Rendez-vous</NavLink>
               </nav>
               
               {/* Bouton RDV et menu mobile */}
               <div className="flex items-center space-x-3">
-                <a
-                  href="https://app.squareup.com/login"
-                  className="hidden md:inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 rounded-md text-sm font-medium border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-200 backdrop-blur-sm"
-                >
-                  <PenTool className="h-4 w-4 mr-1.5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
-                  RENDEZ-VOUS
-                </a>
+                <AppointmentNotification />
                 
                 <button
                   onClick={handleLogout}
@@ -199,6 +190,7 @@ function App() {
               <Route path="/optimisation-rdv" element={<OptimisationRdvClient />} />
               <Route path="/clients-by-city" element={<ClientsByCity />} />
               <Route path="/clients-map" element={<ClientsMap />} />
+              <Route path="/appointments" element={<Appointments />} />
             </Routes>
           </AuthGate>
         </div>
