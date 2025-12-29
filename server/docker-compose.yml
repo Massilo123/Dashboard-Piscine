@@ -17,13 +17,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    env_file:
-      - .env
     environment:
-      - MAPBOX_TOKEN=${MAPBOX_TOKEN:-pk.eyJ1IjoibWFzc2lsbzEyMyIsImEiOiJjbTcxbHp5ZnAwMHlkMnJvY3YwNG1sMHVmIn0.XdRskUpVX3PF5dOqbmIyzQ}
-      - SQUARE_ACCESS_TOKEN=${SQUARE_ACCESS_TOKEN:-EAAAl5gSQK3Asi-npLm22-80r3X0nm-Z_eWj7sFydjnRT5QJaF14TmaV9YnYdBcx}
-      - MONGODB_URI=${MONGODB_URI:-mongodb+srv://massilseba:Massilo123@piscine.zpig8.mongodb.net/clients?retryWrites=true&w=majority&appName=piscine}
-      - HERE_API_KEY=${HERE_API_KEY:-3SzQggURCzw4M5E-_RG-dOjY-ZsvaGAIdLjMGL6Vr9c}
+      - MAPBOX_TOKEN=${MAPBOX_TOKEN}
+      - SQUARE_ACCESS_TOKEN=${SQUARE_ACCESS_TOKEN}
+      - MONGODB_URI=${MONGODB_URI}
+      - HERE_API_KEY=${HERE_API_KEY}
     networks:
       - cloudflared
     depends_on:
