@@ -8,9 +8,9 @@ COPY vite.config.ts ./
 COPY tsconfig*.json ./
 COPY patches ./patches
 
-# Installer explicitement mapbox-gl
+# Installer toutes les dépendances
 RUN npm install 
-RUN npm install mapbox-gl @types/mapbox-gl
+RUN npm install mapbox-gl @types/mapbox-gl leaflet @types/leaflet
 
 COPY . .
 

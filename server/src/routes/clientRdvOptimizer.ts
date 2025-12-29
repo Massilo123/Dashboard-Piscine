@@ -185,12 +185,52 @@ router.post('/', async (req: Request, res: Response) => {
             endDate.setDate(endDate.getDate() + 30);
         }
 
-        // 3. Récupérer tous les rendez-vous futurs
-        const bookingsResponse = await squareClient.bookings.list({
-            startAtMin: startDate.toISOString(),
-            startAtMax: endDate.toISOString(),
-            locationId: "L24K8X13MB1A7"
-        });
+        // 3. Récupérer tous les rendez-vous futurs avec gestion d'erreur Square API
+        let bookingsResponse;
+        try {
+            bookingsResponse = await squareClient.bookings.list({
+                startAtMin: startDate.toISOString(),
+                startAtMax: endDate.toISOString(),
+                locationId: "L24K8X13MB1A7"
+            });
+        } catch (squareError: any) {
+            console.error('❌ Erreur Square API:', squareError);
+            
+            // Vérifier si c'est une erreur d'authentification
+            if (squareError?.errors && Array.isArray(squareError.errors)) {
+                const authError = squareError.errors.find((e: any) => 
+                    e.category === 'AUTHENTICATION_ERROR' || e.code === 'UNAUTHORIZED'
+                );
+                
+                if (authError) {
+                    return res.status(401).json({
+                        success: false,
+                        error: 'Erreur d\'authentification Square API. Vérifiez votre token d\'accès.',
+                        details: squareError.errors
+                    });
+                }
+                
+                // Vérifier si c'est une erreur de rate limiting
+                const rateLimitError = squareError.errors.find((e: any) => 
+                    e.category === 'RATE_LIMIT_ERROR' || e.code === 'RATE_LIMITED'
+                );
+                
+                if (rateLimitError) {
+                    return res.status(429).json({
+                        success: false,
+                        error: 'Limite de requêtes Square API atteinte. Veuillez réessayer dans quelques instants.',
+                        details: squareError.errors
+                    });
+                }
+            }
+            
+            // Autre erreur Square API
+            return res.status(500).json({
+                success: false,
+                error: 'Erreur lors de la récupération des rendez-vous depuis Square API.',
+                details: squareError?.errors || squareError?.message || 'Erreur inconnue'
+            });
+        }
 
         // 4. OPTIMISATION: Récupérer tous les clients de MongoDB avec leurs coordonnées en une seule requête
         const bookingCustomerIds: string[] = [];
@@ -351,8 +391,19 @@ router.post('/', async (req: Request, res: Response) => {
                     };
                 }
                 return null;
-            } catch (error) {
-                console.error(`Erreur pour ${clientData.customerName}:`, error);
+            } catch (error: any) {
+                console.error(`❌ Erreur Mapbox pour ${clientData.customerName}:`, error);
+                
+                // Si c'est une erreur d'authentification Mapbox
+                if (error?.response?.statusCode === 401 || error?.message?.includes('Unauthorized')) {
+                    console.error('🔐 Erreur d\'authentification Mapbox API');
+                }
+                
+                // Si c'est une erreur de rate limiting
+                if (error?.response?.statusCode === 429 || error?.message?.includes('rate limit')) {
+                    console.error('⏱️ Rate limit Mapbox API atteint');
+                }
+                
                 return null;
             }
         });
@@ -543,10 +594,30 @@ router.post('/', async (req: Request, res: Response) => {
             }
         });
 
-    } catch (error) {
+    } catch (error: any) {
+        console.error('❌ Erreur globale dans clientRdvOptimizer:', error);
+        console.error('Stack:', error?.stack);
+        
+        // Si c'est une erreur Square API qui n'a pas été capturée
+        if (error?.errors && Array.isArray(error.errors)) {
+            const authError = error.errors.find((e: any) => 
+                e.category === 'AUTHENTICATION_ERROR' || e.code === 'UNAUTHORIZED'
+            );
+            
+            if (authError) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Erreur d\'authentification Square API. Vérifiez votre token d\'accès.',
+                    details: error.errors
+                });
+            }
+        }
+        
+        // Erreur générique
         res.status(500).json({
             success: false,
-            error: error instanceof Error ? error.message : 'Erreur inconnue'
+            error: error instanceof Error ? error.message : 'Erreur inconnue',
+            details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
         });
     }
 });

@@ -57,11 +57,52 @@ router.post('/bookings', async (req: Request, res: Response) => {
             3, 59, 59, 999
         ));
 
-        const bookingsResponse = await squareClient.bookings.list({
-            startAtMin: startDate.toISOString(),
-            startAtMax: endDate.toISOString(),
-            locationId: "L24K8X13MB1A7",
-        });
+        // Récupérer les rendez-vous avec gestion d'erreur Square API
+        let bookingsResponse;
+        try {
+            bookingsResponse = await squareClient.bookings.list({
+                startAtMin: startDate.toISOString(),
+                startAtMax: endDate.toISOString(),
+                locationId: "L24K8X13MB1A7",
+            });
+        } catch (squareError: any) {
+            console.error('❌ Erreur Square API dans routeOptimizer:', squareError);
+            
+            // Vérifier si c'est une erreur d'authentification
+            if (squareError?.errors && Array.isArray(squareError.errors)) {
+                const authError = squareError.errors.find((e: any) => 
+                    e.category === 'AUTHENTICATION_ERROR' || e.code === 'UNAUTHORIZED'
+                );
+                
+                if (authError) {
+                    return res.status(401).json({
+                        success: false,
+                        error: 'Erreur d\'authentification Square API. Vérifiez votre token d\'accès.',
+                        details: squareError.errors
+                    });
+                }
+                
+                // Vérifier si c'est une erreur de rate limiting
+                const rateLimitError = squareError.errors.find((e: any) => 
+                    e.category === 'RATE_LIMIT_ERROR' || e.code === 'RATE_LIMITED'
+                );
+                
+                if (rateLimitError) {
+                    return res.status(429).json({
+                        success: false,
+                        error: 'Limite de requêtes Square API atteinte. Veuillez réessayer dans quelques instants.',
+                        details: squareError.errors
+                    });
+                }
+            }
+            
+            // Autre erreur Square API
+            return res.status(500).json({
+                success: false,
+                error: 'Erreur lors de la récupération des rendez-vous depuis Square API.',
+                details: squareError?.errors || squareError?.message || 'Erreur inconnue'
+            });
+        }
 
         const bookingDetails: BookingDetail[] = [];
         
@@ -133,8 +174,18 @@ router.post('/bookings', async (req: Request, res: Response) => {
                         
                         bookingDetails.push(bookingDetail);
                     }
-                } catch (error) {
-                    console.error(`Erreur récupération client ${booking.customerId}:`, error);
+                } catch (error: any) {
+                    console.error(`❌ Erreur récupération client ${booking.customerId}:`, error);
+                    
+                    // Si c'est une erreur d'authentification Square
+                    if (error?.errors && Array.isArray(error.errors)) {
+                        const authError = error.errors.find((e: any) => 
+                            e.category === 'AUTHENTICATION_ERROR' || e.code === 'UNAUTHORIZED'
+                        );
+                        if (authError) {
+                            console.error('🔐 Erreur d\'authentification Square API lors de la récupération du client');
+                        }
+                    }
                 }
             }
         }
@@ -231,10 +282,29 @@ router.post('/bookings', async (req: Request, res: Response) => {
             data: routeWithBookings
         });
 
-    } catch (error) {
+    } catch (error: any) {
+        console.error('❌ Erreur globale dans /bookings:', error);
+        console.error('Stack:', error?.stack);
+        
+        // Si c'est une erreur Square API qui n'a pas été capturée
+        if (error?.errors && Array.isArray(error.errors)) {
+            const authError = error.errors.find((e: any) => 
+                e.category === 'AUTHENTICATION_ERROR' || e.code === 'UNAUTHORIZED'
+            );
+            
+            if (authError) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'Erreur d\'authentification Square API. Vérifiez votre token d\'accès.',
+                    details: error.errors
+                });
+            }
+        }
+        
         res.status(500).json({
             success: false,
-            error: error instanceof Error ? error.message : 'Erreur inconnue'
+            error: error instanceof Error ? error.message : 'Erreur inconnue',
+            details: process.env.NODE_ENV === 'development' ? error?.stack : undefined
         });
     }
 });
