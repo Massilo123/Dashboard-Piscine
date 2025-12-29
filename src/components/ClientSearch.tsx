@@ -128,11 +128,69 @@ const ClientSearch = () => {
                 return;
             }
 
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            });
+            // Essayer d'abord avec une précision standard (plus rapide)
+            navigator.geolocation.getCurrentPosition(
+                resolve,
+                (error) => {
+                    // Si l'erreur est un timeout ou position unavailable, réessayer avec high accuracy
+                    // Codes d'erreur: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
+                    if (error.code === 3 || error.code === 2) {
+                        console.log('Tentative avec précision élevée...');
+                        navigator.geolocation.getCurrentPosition(
+                            resolve,
+                            (retryError) => {
+                                // Gérer les erreurs avec des messages spécifiques
+                                let errorMessage = 'Une erreur est survenue lors de la géolocalisation';
+                                
+                                switch (retryError.code) {
+                                    case 1: // PERMISSION_DENIED
+                                        errorMessage = 'Permission de géolocalisation refusée. Veuillez autoriser l\'accès à votre position dans les paramètres du navigateur.';
+                                        break;
+                                    case 2: // POSITION_UNAVAILABLE
+                                        errorMessage = 'Impossible de déterminer votre position. Vérifiez que votre GPS est activé.';
+                                        break;
+                                    case 3: // TIMEOUT
+                                        errorMessage = 'Le délai d\'attente a expiré. Vérifiez votre connexion et réessayez.';
+                                        break;
+                                    default:
+                                        errorMessage = retryError.message || 'Une erreur est survenue lors de la géolocalisation';
+                                }
+                                
+                                reject(new Error(errorMessage));
+                            },
+                            {
+                                enableHighAccuracy: true,
+                                timeout: 20000, // Augmenté à 20 secondes
+                                maximumAge: 60000 // Accepter une position en cache de moins d'1 minute
+                            }
+                        );
+                    } else {
+                        // Pour les autres erreurs (permission denied), rejeter immédiatement
+                        let errorMessage = 'Une erreur est survenue lors de la géolocalisation';
+                        
+                        switch (error.code) {
+                            case 1: // PERMISSION_DENIED
+                                errorMessage = 'Permission de géolocalisation refusée. Veuillez autoriser l\'accès à votre position dans les paramètres du navigateur.';
+                                break;
+                            case 2: // POSITION_UNAVAILABLE
+                                errorMessage = 'Impossible de déterminer votre position. Vérifiez que votre GPS est activé.';
+                                break;
+                            case 3: // TIMEOUT
+                                errorMessage = 'Le délai d\'attente a expiré. Vérifiez votre connexion et réessayez.';
+                                break;
+                            default:
+                                errorMessage = error.message || 'Une erreur est survenue lors de la géolocalisation';
+                        }
+                        
+                        reject(new Error(errorMessage));
+                    }
+                },
+                {
+                    enableHighAccuracy: false, // Commencer avec précision standard (plus rapide)
+                    timeout: 15000, // 15 secondes pour la première tentative
+                    maximumAge: 60000 // Accepter une position en cache de moins d'1 minute
+                }
+            );
         });
     };
 
