@@ -529,10 +529,10 @@ const RouteOptimizerSchedule = () => {
                               <div className="flex-grow min-w-0">
                                 <span className="font-medium text-cyan-300 text-xs drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Départ:</span>
                                 <a 
-                                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
+                                  href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-cyan-400 hover:text-cyan-300 hover:underline ml-1 text-xs block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)] break-words"
+                                  className="text-cyan-400 hover:text-cyan-300 hover:underline ml-1 text-xs block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)] break-words cursor-pointer"
                                 >
                                   {waypoint.address}
                                 </a>
@@ -548,10 +548,10 @@ const RouteOptimizerSchedule = () => {
                                   {waypoint.customerName}
                                 </div>
                                 <a 
-                                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
+                                  href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="text-cyan-400 hover:text-cyan-300 hover:underline text-xs break-words block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
+                                  className="text-cyan-400 hover:text-cyan-300 hover:underline text-xs break-words block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)] cursor-pointer"
                                 >
                                   {waypoint.address}
                                 </a>
@@ -690,7 +690,14 @@ const RouteOptimizerSchedule = () => {
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="text-xs text-cyan-300 font-medium truncate">Départ</div>
-                              <div className="text-xs text-white truncate">{waypoint.address}</div>
+                              <a 
+                                href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-white hover:text-cyan-300 hover:underline truncate block transition-colors cursor-pointer"
+                              >
+                                {waypoint.address}
+                              </a>
                             </div>
                           </div>
                         ) : (
@@ -702,9 +709,14 @@ const RouteOptimizerSchedule = () => {
                               <div className="text-xs font-medium text-white truncate mb-1">
                                 {waypoint.customerName}
                               </div>
-                              <div className="text-xs text-cyan-400 truncate">
+                              <a 
+                                href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-cyan-400 hover:text-cyan-300 hover:underline truncate block transition-colors cursor-pointer"
+                              >
                                 {waypoint.address}
-                              </div>
+                              </a>
                               {waypoint.phoneNumber && (
                                 <a 
                                   href={`tel:${waypoint.phoneNumber}`}

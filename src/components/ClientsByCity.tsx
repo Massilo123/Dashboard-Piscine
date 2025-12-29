@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { MapPin, Users, ChevronDown, ChevronRight, Phone, Home, Search, X, Building, Edit2, Check, Loader2 } from 'lucide-react';
 import API_CONFIG from '../config/api';
 
@@ -49,6 +50,12 @@ const ClientsByCity: React.FC = () => {
   const [correctedAddress, setCorrectedAddress] = useState('');
   const [isFixing, setIsFixing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [searchSuggestions, setSearchSuggestions] = useState<Client[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [highlightedClientId, setHighlightedClientId] = useState<string | null>(null);
+  const [suggestionsStyle, setSuggestionsStyle] = useState<React.CSSProperties>({});
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
   const hasInitializedRef = useRef<boolean>(false); // Pour éviter les initialisations multiples
 
   // Fonction pour charger depuis le cache
@@ -1124,6 +1131,200 @@ const ClientsByCity: React.FC = () => {
     return filtered;
   };
 
+  // Fonction pour collecter tous les clients depuis les données
+  const getAllClients = useCallback((): Client[] => {
+    const allClients: Client[] = [];
+    
+    // Collecter depuis clientsBySector
+    Object.entries(clientsBySector).forEach(([sector, sectorData]) => {
+      if ((sector === 'Montréal' || sector === 'Laval') && 'districts' in sectorData) {
+        // Pour Montréal et Laval
+        if (sectorData.districts) {
+          Object.values(sectorData.districts).forEach(clients => {
+            allClients.push(...clients);
+          });
+        }
+        if (sectorData.clients) {
+          allClients.push(...sectorData.clients);
+        }
+      } else {
+        // Pour les autres secteurs
+        Object.entries(sectorData as ClientsByCityData).forEach(([city, cityData]) => {
+          if (cityData.districts) {
+            Object.values(cityData.districts).forEach(clients => {
+              allClients.push(...clients);
+            });
+          }
+          if (cityData.clients) {
+            allClients.push(...cityData.clients);
+          }
+        });
+      }
+    });
+    
+    // Collecter depuis clientsData (fallback)
+    Object.values(clientsData).forEach(cityData => {
+      if (cityData.districts) {
+        Object.values(cityData.districts).forEach(clients => {
+          allClients.push(...clients);
+        });
+      }
+      if (cityData.clients) {
+        allClients.push(...cityData.clients);
+      }
+    });
+    
+    return allClients;
+  }, [clientsBySector, clientsData]);
+
+  // Fonction pour filtrer les clients en temps réel et afficher les suggestions
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchTerm(value);
+    
+    if (!value.trim()) {
+      setSearchSuggestions([]);
+      setShowSuggestions(false);
+      setHighlightedClientId(null);
+      return;
+    }
+    
+    const searchLower = value.toLowerCase().trim();
+    const allClients = getAllClients();
+    
+    // Filtrer les clients qui correspondent
+    const matchingClients = allClients.filter(client => {
+      const fullName = `${client.givenName} ${client.familyName}`.toLowerCase();
+      const phoneMatch = client.phoneNumber?.toLowerCase().includes(searchLower);
+      const addressMatch = client.addressLine1?.toLowerCase().includes(searchLower);
+      
+      return fullName.includes(searchLower) || phoneMatch || addressMatch;
+    }).slice(0, 10); // Limiter à 10 résultats
+    
+    setSearchSuggestions(matchingClients);
+    setShowSuggestions(matchingClients.length > 0);
+  }, [getAllClients]);
+
+  // Fonction pour trouver le client dans la structure de données et ouvrir les sections nécessaires
+  const findClientLocation = useCallback((clientId: string): { sector?: string; city?: string; district?: string } | null => {
+    // Chercher dans clientsBySector
+    for (const [sector, sectorData] of Object.entries(clientsBySector)) {
+      if ((sector === 'Montréal' || sector === 'Laval') && 'districts' in sectorData) {
+        // Pour Montréal et Laval
+        if (sectorData.districts) {
+          for (const [district, clients] of Object.entries(sectorData.districts)) {
+            if (clients.some(c => c._id === clientId)) {
+              return { sector, district };
+            }
+          }
+        }
+        if (sectorData.clients && sectorData.clients.some(c => c._id === clientId)) {
+          return { sector };
+        }
+      } else {
+        // Pour les autres secteurs
+        for (const [city, cityData] of Object.entries(sectorData as ClientsByCityData)) {
+          if (cityData.districts) {
+            for (const [district, clients] of Object.entries(cityData.districts)) {
+              if (clients.some(c => c._id === clientId)) {
+                return { sector, city, district };
+              }
+            }
+          }
+          if (cityData.clients && cityData.clients.some(c => c._id === clientId)) {
+            return { sector, city };
+          }
+        }
+      }
+    }
+    
+    // Chercher dans clientsData (fallback)
+    for (const [city, cityData] of Object.entries(clientsData)) {
+      if (cityData.districts) {
+        for (const [district, clients] of Object.entries(cityData.districts)) {
+          if (clients.some(c => c._id === clientId)) {
+            return { city, district };
+          }
+        }
+      }
+      if (cityData.clients && cityData.clients.some(c => c._id === clientId)) {
+        return { city };
+      }
+    }
+    
+    return null;
+  }, [clientsBySector, clientsData]);
+
+  // Fonction pour sélectionner un client depuis les suggestions
+  const handleSelectClient = useCallback((client: Client) => {
+    // Fermer les suggestions
+    setShowSuggestions(false);
+    setSearchTerm(`${client.givenName} ${client.familyName}`);
+    setHighlightedClientId(client._id);
+    
+    // Trouver la location du client et ouvrir les sections nécessaires
+    const location = findClientLocation(client._id);
+    if (location) {
+      // Ouvrir le secteur si nécessaire
+      if (location.sector) {
+        setExpandedSectors(prev => new Set([...prev, location.sector!]));
+      }
+      
+      // Ouvrir la ville si nécessaire
+      if (location.city) {
+        const cityKey = location.sector ? `${location.sector}-${location.city}` : location.city;
+        setExpandedCities(prev => new Set([...prev, cityKey]));
+      }
+      
+      // Ouvrir le district si nécessaire
+      if (location.district) {
+        const districtKey = location.sector ? `${location.sector}-${location.district}` : location.district;
+        setExpandedDistricts(prev => new Set([...prev, districtKey]));
+      }
+    }
+    
+    // Trouver et scroller vers le client dans la liste
+    setTimeout(() => {
+      const clientElement = document.getElementById(`client-${client._id}`);
+      if (clientElement) {
+        clientElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+        // Mettre en évidence temporairement
+        clientElement.classList.add('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+        setTimeout(() => {
+          clientElement.classList.remove('ring-2', 'ring-cyan-400', 'ring-opacity-50');
+          setHighlightedClientId(null);
+        }, 3000);
+      }
+    }, 500); // Augmenter le délai pour laisser le temps aux sections de s'ouvrir
+  }, [findClientLocation]);
+
+  // Fermer les suggestions quand on clique en dehors ou lors du scroll
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    const handleScroll = () => {
+      setShowSuggestions(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, []);
+
   // Données filtrées selon le terme de recherche
   const filteredClientsBySector = useMemo(() => {
     if (Object.keys(clientsBySector).length > 0) {
@@ -1374,7 +1575,10 @@ const ClientsByCity: React.FC = () => {
                                             {clients.map((client) => (
                                               <div
                                                 key={client._id}
-                                                className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                                id={`client-${client._id}`}
+                                                className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm ${
+                                                  highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                                                }`}
                                               >
                                                 <div className="flex flex-col gap-2">
                                                   <div className="flex items-start justify-between gap-2">
@@ -1437,7 +1641,10 @@ const ClientsByCity: React.FC = () => {
                                       {sectorData.clients.map((client) => (
                                         <div
                                           key={client._id}
-                                          className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                          id={`client-${client._id}`}
+                                          className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm ${
+                                            highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                                          }`}
                                         >
                                           <div className="flex flex-col gap-2">
                                             <div className="flex items-start justify-between gap-2">
@@ -1575,7 +1782,10 @@ const ClientsByCity: React.FC = () => {
                                                             {clients.map((client) => (
                                                   <div
                                                     key={client._id}
-                                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                                    id={`client-${client._id}`}
+                                                    className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm ${
+                                                      highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                                                    }`}
                                                   >
                                                     <div className="flex flex-col gap-2">
                                                       <div className="flex items-start justify-between gap-2">
@@ -1620,7 +1830,10 @@ const ClientsByCity: React.FC = () => {
                                                   cityData.clients.map((client) => (
                                                   <div
                                                     key={client._id}
-                                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                                    id={`client-${client._id}`}
+                                                    className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm ${
+                                                      highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                                                    }`}
                                                   >
                                                     <div className="flex flex-col gap-2">
                                                       <div className="flex items-start justify-between gap-2">
@@ -1768,7 +1981,10 @@ const ClientsByCity: React.FC = () => {
                                     {typedClients.map((client) => (
                                       <div
                                         key={client._id}
-                                        className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                        id={`client-${client._id}`}
+                                        className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm ${
+                                          highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                                        }`}
                                       >
                                         <div className="flex items-start justify-between">
                                           <div className="flex-1">
@@ -1811,7 +2027,10 @@ const ClientsByCity: React.FC = () => {
                             typedCityData.clients.map((client) => (
                             <div
                               key={client._id}
-                              className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                              id={`client-${client._id}`}
+                              className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm ${
+                                highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                              }`}
                             >
                               <div className="flex flex-col gap-2">
                                 <div className="flex items-start justify-between gap-2">
@@ -1985,22 +2204,124 @@ const ClientsByCity: React.FC = () => {
           </div>
 
           {/* Barre de recherche */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher..."
-              className="w-full pl-9 sm:pl-11 pr-9 sm:pr-11 py-2.5 sm:py-3 bg-gray-900/60 border border-indigo-500/30 rounded-lg text-sm sm:text-base text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/20 transition-all duration-200"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] p-1"
+          <div className="relative" style={{ zIndex: 999999 }}>
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] z-10 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onFocus={() => {
+                  if (searchSuggestions.length > 0) {
+                    setShowSuggestions(true);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchSuggestions.length > 0) {
+                    handleSelectClient(searchSuggestions[0]);
+                  } else if (e.key === 'Escape') {
+                    setShowSuggestions(false);
+                  }
+                }}
+                placeholder="Rechercher..."
+                className="w-full pl-9 sm:pl-11 pr-9 sm:pr-11 py-2.5 sm:py-3 bg-gray-900/60 border border-indigo-500/30 rounded-lg text-sm sm:text-base text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/20 transition-all duration-200 relative z-10"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSearchSuggestions([]);
+                    setShowSuggestions(false);
+                    setHighlightedClientId(null);
+                  }}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-rose-400 transition-colors hover:drop-shadow-[0_0_4px_rgba(244,63,94,0.8)] p-1 z-20"
+                >
+                  <X className="h-4 w-4 sm:h-5 sm:w-5" />
+                </button>
+              )}
+            </div>
+            
+            {/* Liste des suggestions - Utiliser Portal pour éviter les problèmes de z-index */}
+            {showSuggestions && searchSuggestions.length > 0 && searchInputRef.current && createPortal(
+              <div
+                ref={suggestionsRef}
+                className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20 max-h-80 sm:max-h-96 overflow-y-auto"
+                style={(() => {
+                  if (searchInputRef.current) {
+                    const rect = searchInputRef.current.getBoundingClientRect();
+                    return {
+                      position: 'fixed',
+                      zIndex: 999999,
+                      top: rect.bottom + 4,
+                      left: rect.left,
+                      width: rect.width,
+                      minWidth: rect.width
+                    };
+                  }
+                  return suggestionsStyle;
+                })()}
               >
-                <X className="h-4 w-4 sm:h-5 sm:w-5" />
-              </button>
+                {searchSuggestions.map((client) => (
+                  <button
+                    key={client._id}
+                    onClick={() => handleSelectClient(client)}
+                    className="w-full text-left px-3 sm:px-4 py-2 sm:py-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 border-b border-indigo-500/20 last:border-b-0 transition-all duration-200"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm sm:text-base font-semibold text-gray-100 mb-1 drop-shadow-[0_0_2px_rgba(139,92,246,0.4)] truncate">
+                          {client.givenName} {client.familyName}
+                        </div>
+                        {client.phoneNumber && (
+                          <div className="text-xs sm:text-sm text-gray-400 flex items-center gap-1 mb-1">
+                            <Phone className="h-3 w-3 text-cyan-400 drop-shadow-[0_0_2px_rgba(34,211,238,0.6)] flex-shrink-0" />
+                            <span className="truncate">{client.phoneNumber}</span>
+                          </div>
+                        )}
+                        {client.addressLine1 && (
+                          <div className="text-xs sm:text-sm text-gray-400 truncate">{client.addressLine1}</div>
+                        )}
+                      </div>
+                      {client.city && (
+                        <div
+                          className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-xs font-medium border backdrop-blur-sm flex-shrink-0 self-start sm:ml-2"
+                          style={{
+                            backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                            color: '#a78bfa',
+                            borderColor: 'rgba(139, 92, 246, 0.5)',
+                            boxShadow: '0 0 8px rgba(139, 92, 246, 0.5)'
+                          }}
+                        >
+                          {client.city}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>,
+              document.body
+            )}
+            
+            {searchTerm && searchSuggestions.length === 0 && searchInputRef.current && createPortal(
+              <div className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm border border-rose-500/30 rounded-lg shadow-xl shadow-rose-500/20 p-4 text-center text-gray-400"
+                   style={(() => {
+                     if (searchInputRef.current) {
+                       const rect = searchInputRef.current.getBoundingClientRect();
+                       return {
+                         position: 'fixed',
+                         zIndex: 999999,
+                         top: rect.bottom + 4,
+                         left: rect.left,
+                         width: rect.width,
+                         minWidth: rect.width
+                       };
+                     }
+                     return suggestionsStyle;
+                   })()}>
+                Aucun client trouvé
+              </div>,
+              document.body
             )}
           </div>
         </div>
@@ -2186,7 +2507,10 @@ const ClientsByCity: React.FC = () => {
                                       cityData.clients.map((client) => (
                                       <div
                                         key={client._id}
-                                        className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-yellow-500/15 hover:border-yellow-500/30 transition-all duration-200 shadow-sm"
+                                        id={`client-${client._id}`}
+                                        className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-2.5 sm:p-3 border border-yellow-500/15 hover:border-yellow-500/30 transition-all duration-200 shadow-sm ${
+                                          highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                                        }`}
                                       >
                                         <div className="flex flex-col gap-2">
                                           <div className="flex items-start justify-between gap-2">
@@ -2294,7 +2618,10 @@ const ClientsByCity: React.FC = () => {
                                         {clients.map((client: Client) => (
                                           <div
                                             key={client._id}
-                                            className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                            id={`client-${client._id}`}
+                                            className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm ${
+                                              highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                                            }`}
                                           >
                                             <div className="flex items-start justify-between">
                                               <div className="flex-1">
@@ -2347,7 +2674,10 @@ const ClientsByCity: React.FC = () => {
                               {sectorData.clients.map((client: Client) => (
                                 <div
                                   key={client._id}
-                                  className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                                  id={`client-${client._id}`}
+                                  className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm ${
+                                    highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                                  }`}
                                 >
                                   <div className="flex items-start justify-between">
                                     <div className="flex-1">
@@ -2493,7 +2823,10 @@ const ClientsByCity: React.FC = () => {
                                 {clients.map((client) => (
                                   <div
                                     key={client._id}
-                                    className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-purple-500/15 hover:border-purple-500/30 transition-all duration-200 shadow-sm"
+                                    id={`client-${client._id}`}
+                                    className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-purple-500/15 hover:border-purple-500/30 transition-all duration-200 shadow-sm ${
+                                      highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                                    }`}
                                   >
                                     <div className="flex items-start justify-between">
                                       <div className="flex-1">
@@ -2536,7 +2869,10 @@ const ClientsByCity: React.FC = () => {
                                           cityData.clients.map((client) => (
                         <div
                           key={client._id}
-                          className="bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm"
+                          id={`client-${client._id}`}
+                          className={`bg-gradient-to-br from-gray-900/60 to-gray-800/50 backdrop-blur-sm rounded p-3 border border-indigo-500/15 hover:border-indigo-500/30 transition-all duration-200 shadow-sm ${
+                            highlightedClientId === client._id ? 'ring-2 ring-cyan-400 ring-opacity-50' : ''
+                          }`}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
