@@ -237,7 +237,7 @@ router.post('/', async (req: Request, res: Response) => {
             'coordinates.lng': { $exists: true, $ne: null },
             'coordinates.lat': { $exists: true, $ne: null },
             addressLine1: { $exists: true, $ne: '' }
-        }).select('squareId givenName familyName phoneNumber addressLine1 coordinates');
+        }).select('squareId givenName familyName phoneNumber addressLine1 coordinates city district');
 
         // Créer un map pour accéder rapidement aux clients par squareId
         const clientsMap = new Map<string, typeof clientsFromMongo[0]>();
@@ -261,6 +261,8 @@ router.post('/', async (req: Request, res: Response) => {
             distance: number | null;
             duration: number | null;
             phoneNumber?: string;
+            city?: string;
+            district?: string;
             haversineDistance: number; // Pour le tri initial
         }[] = [];
 
@@ -308,6 +310,8 @@ router.post('/', async (req: Request, res: Response) => {
                     distance: null, // Sera calculé plus tard
                     duration: null, // Sera calculé plus tard
                     phoneNumber: client.phoneNumber || undefined,
+                    city: client.city || undefined,
+                    district: client.district || undefined,
                     haversineDistance
                 });
             }
@@ -394,11 +398,22 @@ router.post('/', async (req: Request, res: Response) => {
 
         // 10. NOUVEAU: Calculer l'itinéraire optimisé pour tous les clients de cette journée
         let optimizedRoute = null;
+        // Créer un map pour associer les adresses aux informations client (défini en dehors du try pour être accessible après)
+        const clientInfoMap = new Map<string, { city?: string; district?: string }>();
+        
         try {
             // Récupérer tous les clients de la même journée (avec leurs coordonnées déjà disponibles)
             const clientsOnSameDayList = clientsWithRealDistances.filter(
                 client => client.bookingDate === nearestClient.bookingDate
             );
+            
+            // Remplir le map avec les informations des clients
+            clientsOnSameDayList.forEach(client => {
+                clientInfoMap.set(client.address, {
+                    city: client.city,
+                    district: client.district
+                });
+            });
             
             // Si nous avons des clients ce jour-là, calculer un itinéraire optimisé
             if (clientsOnSameDayList.length > 0) {
@@ -416,6 +431,7 @@ router.post('/', async (req: Request, res: Response) => {
                 const startPointCoordinates = startPointResponse.body.features[0].geometry.coordinates;
                 
                 // Construire la liste des locations avec coordonnées (déjà disponibles!)
+                
                 const coordinates = [
                     {
                         address: STARTING_POINT,
@@ -467,7 +483,9 @@ router.post('/', async (req: Request, res: Response) => {
                     id: nearestClient.customerId,
                     name: nearestClient.customerName,
                     address: nearestClient.address,
-                    phoneNumber: nearestClient.phoneNumber || undefined
+                    phoneNumber: nearestClient.phoneNumber || undefined,
+                    city: nearestClient.city || undefined,
+                    district: nearestClient.district || undefined
                 },
                 booking: {
                     id: nearestClient.bookingId,
@@ -495,9 +513,21 @@ router.post('/', async (req: Request, res: Response) => {
                         optimizedRoute: optimizedRoute ? {
                             totalDistance: optimizedRoute.totalDistance,
                             totalDuration: optimizedRoute.totalDuration,
-                            waypoints: optimizedRoute.waypoints.map(wp => ({
-                                address: wp.address
-                            }))
+                            waypoints: optimizedRoute.waypoints.map((wp, index) => {
+                                // Pour le point de départ, pas de ville/district
+                                if (index === 0) {
+                                    return {
+                                        address: wp.address
+                                    };
+                                }
+                                // Pour les autres waypoints, récupérer les infos depuis le map
+                                const clientInfo = clientInfoMap.get(wp.address);
+                                return {
+                                    address: wp.address,
+                                    city: clientInfo?.city || undefined,
+                                    district: clientInfo?.district || undefined
+                                };
+                            })
                         } : null
                     }
                 },

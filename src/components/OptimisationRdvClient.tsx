@@ -1,4 +1,4 @@
-import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, Filter, X, Search } from 'lucide-react'
+import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Filter, X, Search } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
@@ -31,6 +31,8 @@ interface DateRange {
 interface Waypoint {
   address: string;
   coordinates?: [number, number];
+  city?: string;
+  district?: string;
 }
 
 interface OptimizedRoute {
@@ -45,6 +47,8 @@ interface ClientData {
     name: string
     address: string
     phoneNumber?: string
+    city?: string
+    district?: string
   }
   booking: {
     id: string
@@ -92,6 +96,7 @@ const OptimisationRdvClient = () => {
   const [fetchingNew, setFetchingNew] = useState<boolean>(false)
   const [remainingDays, setRemainingDays] = useState<number>(0)
   const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
+  const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(false)
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
@@ -622,7 +627,23 @@ const OptimisationRdvClient = () => {
                       className="flex items-start gap-2 text-cyan-400 hover:text-cyan-300 transition-colors group"
                     >
                       <MapPin className="h-5 w-5 mt-0.5 text-cyan-400 group-hover:drop-shadow-[0_0_4px_rgba(34,211,238,0.8)] flex-shrink-0" />
-                      <span className="break-words">{clientData.client.address}</span>
+                      <div className="flex-1 flex items-center justify-between gap-2 flex-wrap">
+                        <span className="break-words">{clientData.client.address}</span>
+                        {(clientData.client.city || clientData.client.district) && (
+                          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                            {clientData.client.city && (
+                              <span className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 bg-indigo-500/30 text-indigo-200 rounded-md border border-indigo-400/50 font-medium">
+                                {clientData.client.city}
+                              </span>
+                            )}
+                            {clientData.client.district && (
+                              <span className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 bg-purple-500/30 text-purple-200 rounded-md border border-purple-400/50 font-medium">
+                                {clientData.client.district}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </a>
                     
                     {clientData.client.phoneNumber && (
@@ -641,17 +662,29 @@ const OptimisationRdvClient = () => {
               </div>
 
               {/* Section : Statistiques quotidiennes */}
-              <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 border border-indigo-500/20 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-cyan-300">Statistiques du jour</h4>
-                  {clientData.statistics.dailyStats.optimizedRoute && (
-                    <span className="text-xs bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-200 px-2 py-1 rounded-full border border-emerald-500/40">
-                      Optimisé
-                    </span>
+              <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 border border-indigo-500/20 p-2.5">
+                <button
+                  onClick={() => setIsStatsExpanded(!isStatsExpanded)}
+                  className="w-full flex items-center justify-between hover:opacity-80 transition-opacity py-1"
+                >
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-semibold text-cyan-300">Statistiques du jour</h4>
+                    {clientData.statistics.dailyStats.optimizedRoute && (
+                      <span className="text-xs bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-200 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
+                        Optimisé
+                      </span>
+                    )}
+                  </div>
+                  {isStatsExpanded ? (
+                    <ChevronUp className="h-3.5 w-3.5 text-cyan-400" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5 text-cyan-400" />
                   )}
-                </div>
+                </button>
                 
-                <div className="grid grid-cols-3 gap-3 mb-3">
+                {isStatsExpanded && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-3 mb-3">
                   <div className="text-center p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg border border-cyan-500/20">
                     <div className="text-xs text-gray-400 mb-1">Distance</div>
                     <div className="text-lg font-bold text-cyan-300">
@@ -674,62 +707,82 @@ const OptimisationRdvClient = () => {
                       {clientData.statistics.dailyStats.clientCount}
                     </div>
                   </div>
-                </div>
-                
-                {/* Info rapide */}
-                <div className="flex items-center justify-between text-sm pt-3 border-t border-indigo-500/20">
-                  <span className="text-cyan-300">{clientData.statistics.clientsOnSameDay} client{clientData.statistics.clientsOnSameDay > 1 ? 's' : ''} ce jour</span>
-                  <span className="text-indigo-300">
-                    {remainingDays > 0 
-                      ? `${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${remainingDays > 1 ? 's' : ''}`
-                      : "0 jour restant"}
-                  </span>
-                </div>
-                
-                {/* Ordre de visite optimisé (si disponible) */}
-                {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
-                  <div className="mt-4 pt-4 border-t border-indigo-500/20">
-                    <div className="text-xs font-medium text-cyan-300 mb-2">Ordre de visite optimisé :</div>
-                    <ol className="space-y-1.5 text-xs text-gray-300">
-                      <li className="flex items-start gap-2">
-                        <span className="text-cyan-400 font-medium">1.</span>
-                        <span>{STARTING_POINT}</span>
-                      </li>
-                      {clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map((wp, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <span className="text-cyan-400 font-medium">{index + 2}.</span>
-                          <span>{wp.address}</span>
-                        </li>
-                      ))}
-                    </ol>
+                    </div>
+                    
+                    {/* Info rapide */}
+                    <div className="flex items-center justify-between text-sm pt-3 border-t border-indigo-500/20">
+                      <span className="text-cyan-300">{clientData.statistics.clientsOnSameDay} client{clientData.statistics.clientsOnSameDay > 1 ? 's' : ''} ce jour</span>
+                      <span className="text-indigo-300">
+                        {remainingDays > 0 
+                          ? `${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${remainingDays > 1 ? 's' : ''}`
+                          : "0 jour restant"}
+                      </span>
+                    </div>
+                    
+                    {/* Ordre de visite optimisé (si disponible) */}
+                    {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
+                      <div className="mt-4 pt-4 border-t border-indigo-500/20">
+                        <div className="text-xs font-medium text-cyan-300 mb-2">Ordre de visite optimisé :</div>
+                        <ol className="space-y-1.5 text-xs text-gray-300">
+                          <li className="flex items-start gap-2">
+                            <span className="text-cyan-400 font-medium">1.</span>
+                            <span>{STARTING_POINT}</span>
+                          </li>
+                          {clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map((wp, index) => (
+                            <li key={index} className="flex items-center gap-2">
+                              <span className="text-cyan-400 font-medium flex-shrink-0">{index + 2}.</span>
+                              <div className="flex-1 flex items-center justify-between gap-1.5 sm:gap-2 flex-wrap">
+                                <span className="text-gray-300">{wp.address}</span>
+                                {(wp.city || wp.district) && (
+                                  <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                                    {wp.city && (
+                                      <span className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 bg-indigo-500/30 text-indigo-200 rounded-md border border-indigo-400/50 font-medium">
+                                        {wp.city}
+                                      </span>
+                                    )}
+                                    {wp.district && (
+                                      <span className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 bg-purple-500/30 text-purple-200 rounded-md border border-purple-400/50 font-medium">
+                                        {wp.district}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* Section : Actions */}
-              <div className="space-y-2">
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(clientData.client.address)}&travelmode=driving`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 py-3 rounded-lg transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
-                >
-                  <Navigation className="h-5 w-5" />
-                  <span>Itinéraire vers ce client</span>
-                </a>
-
-                {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
+              {isStatsExpanded && (
+                <div className="space-y-2">
                   <a
-                    href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(STARTING_POINT)}&destination=${encodeURIComponent(STARTING_POINT)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
+                    href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(clientData.client.address)}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-200 py-3 rounded-lg transition-all duration-200 border border-purple-400/40 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
+                    className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 py-3 rounded-lg transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
                   >
                     <Navigation className="h-5 w-5" />
-                    <span>Itinéraire optimisé (tous les clients)</span>
+                    <span>Itinéraire vers ce client</span>
                   </a>
-                )}
-              </div>
+
+                  {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(STARTING_POINT)}&destination=${encodeURIComponent(STARTING_POINT)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-200 py-3 rounded-lg transition-all duration-200 border border-purple-400/40 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
+                    >
+                      <Navigation className="h-5 w-5" />
+                      <span>Itinéraire optimisé (tous les clients)</span>
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 import API_CONFIG from '../config/api';
+import { Search, MapPin } from 'lucide-react';
 
 const baseClient = mbxClient({ 
     accessToken: import.meta.env.VITE_MAPBOX_TOKEN || '' 
@@ -30,6 +31,14 @@ interface Coordinates {
     lat: number;
 }
 
+interface SearchClient {
+    id: string;
+    name: string;
+    address: string;
+    phoneNumber: string;
+    coordinates: { lng: number; lat: number } | null;
+}
+
 const ClientSearch = () => {
     const [address, setAddress] = useState('');
     const [isAddressSelected, setIsAddressSelected] = useState(false);
@@ -39,11 +48,22 @@ const ClientSearch = () => {
     const [error, setError] = useState('');
     const [geolocating, setGeolocating] = useState(false);
     const wrapperRef = React.useRef<HTMLDivElement>(null);
+    
+    // États pour la recherche de clients
+    const [clientSearchQuery, setClientSearchQuery] = useState<string>('');
+    const [clientSearchResults, setClientSearchResults] = useState<SearchClient[]>([]);
+    const [showClientSearchResults, setShowClientSearchResults] = useState<boolean>(false);
+    const [searchingClients, setSearchingClients] = useState<boolean>(false);
+    const clientSearchRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
                 setSuggestions([]);
+            }
+            
+            if (clientSearchRef.current && !clientSearchRef.current.contains(event.target as Node)) {
+                setShowClientSearchResults(false);
             }
         };
 
@@ -206,6 +226,49 @@ const ClientSearch = () => {
         }
     };
 
+    // Recherche de clients dans la base de données
+    useEffect(() => {
+        const searchClients = async () => {
+            if (clientSearchQuery.length < 2) {
+                setClientSearchResults([]);
+                setShowClientSearchResults(false);
+                return;
+            }
+
+            setSearchingClients(true);
+            try {
+                const response = await fetch(`${API_CONFIG.endpoints.searchClients}?query=${encodeURIComponent(clientSearchQuery)}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    setClientSearchResults(data.data);
+                    setShowClientSearchResults(data.data.length > 0);
+                } else {
+                    setClientSearchResults([]);
+                    setShowClientSearchResults(false);
+                }
+            } catch (err) {
+                console.error('Erreur lors de la recherche de clients:', err);
+                setClientSearchResults([]);
+                setShowClientSearchResults(false);
+            } finally {
+                setSearchingClients(false);
+            }
+        };
+
+        const timeoutId = setTimeout(searchClients, 300);
+        return () => clearTimeout(timeoutId);
+    }, [clientSearchQuery]);
+
+    // Fonction pour sélectionner un client et insérer son adresse
+    const handleClientSelect = (client: SearchClient) => {
+        setAddress(client.address);
+        setIsAddressSelected(true);
+        setClientSearchQuery('');
+        setClientSearchResults([]);
+        setShowClientSearchResults(false);
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && !loading && address.trim()) {
             searchClients();
@@ -219,64 +282,119 @@ const ClientSearch = () => {
                     <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
                         Rechercher des clients à proximité
                     </h2>
-                    <div className="relative">
-                        <div className="flex gap-4 flex-wrap">
-                            <div className="flex-1 relative min-w-[200px]">
-                                <input
-                                    type="text"
-                                    value={address}
-                                    onChange={(e) => {
-                                        setAddress(e.target.value);
-                                        setIsAddressSelected(false);
-                                    }}
-                                    onKeyDown={handleKeyDown}
-                                    placeholder="Entrez une adresse..."
-                                    className="w-full p-2.5 border border-cyan-500/30 rounded-lg bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 placeholder-gray-500 backdrop-blur-sm shadow-md transition-all duration-200"
-                                />
-                                
-                                {suggestions.length > 0 && (
-                                    <div className="absolute z-10 w-full bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm mt-1 border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20">
-                                        {suggestions.map((suggestion, index) => (
-                                            <div
-                                                key={index}
-                                                className="p-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 cursor-pointer text-gray-200 transition-all duration-200 border-b border-indigo-500/20 last:border-b-0"
-                                                onClick={() => {
-                                                    setAddress(suggestion.place_name);
-                                                    setSuggestions([]);
-                                                    setIsAddressSelected(true);
-                                                }}
-                                            >
-                                                {suggestion.place_name}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                    
+                    <div className="space-y-4">
+                        {/* Recherche de clients */}
+                        <div className="relative" ref={clientSearchRef}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <Search className="h-4 w-4 text-cyan-400" />
+                                <label className="text-sm text-gray-300">
+                                    Rechercher un client
+                                </label>
                             </div>
-                            <button
-                                onClick={searchClients}
-                                disabled={loading || geolocating || !address.trim()}
-                                className={`px-5 py-2.5 rounded-lg transition-all duration-200 ${
-                                    loading || geolocating || !address.trim()
-                                        ? 'bg-gray-600/20 text-gray-400 cursor-not-allowed border border-gray-600/30'
-                                        : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm'
-                                }`}
-                            >
-                                {loading ? 'Recherche...' : 'Rechercher'}
-                            </button>
-                            <button
-                                onClick={searchWithCurrentLocation}
-                                disabled={loading || geolocating}
-                                className={`px-5 py-2.5 rounded-lg transition-all duration-200 flex items-center ${
-                                    loading || geolocating
-                                        ? 'bg-gray-600/20 text-gray-400 cursor-not-allowed border border-gray-600/30'
-                                        : 'bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm'
-                                }`}
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                                </svg>
-                                {geolocating ? 'Localisation...' : 'Ma position'}
-                            </button>
+                            <input
+                                type="text"
+                                value={clientSearchQuery}
+                                onChange={(e) => setClientSearchQuery(e.target.value)}
+                                placeholder="Nom, adresse ou numéro..."
+                                className="w-full border bg-gray-900/60 text-white border-cyan-500/30 rounded-lg p-2.5 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 placeholder-gray-500 transition-all duration-200"
+                            />
+                            {showClientSearchResults && clientSearchResults.length > 0 && (
+                                <div className="absolute z-20 w-full bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm mt-1 border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20 max-h-60 overflow-y-auto">
+                                    {clientSearchResults.map((client) => (
+                                        <div
+                                            key={client.id}
+                                            className="p-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 cursor-pointer text-gray-200 transition-all duration-200 border-b border-indigo-500/20 last:border-b-0"
+                                            onClick={() => handleClientSelect(client)}
+                                        >
+                                            <div className="font-medium text-white">
+                                                {client.name}
+                                            </div>
+                                            {client.address && (
+                                                <div className="text-sm text-cyan-300 mt-1">
+                                                    {client.address}
+                                                </div>
+                                            )}
+                                            {client.phoneNumber && (
+                                                <div className="text-xs text-gray-400 mt-1">
+                                                    {client.phoneNumber}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {searchingClients && (
+                                <div className="absolute right-3 top-9 text-cyan-400">
+                                    <div className="animate-spin h-4 w-4 border-2 border-cyan-400 border-t-transparent rounded-full"></div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Champ d'adresse */}
+                        <div className="relative">
+                            <div className="flex items-center gap-2 mb-2">
+                                <MapPin className="h-4 w-4 text-cyan-400" />
+                                <label className="text-sm text-gray-300">Adresse</label>
+                            </div>
+                            <div className="flex gap-4 flex-wrap">
+                                <div className="flex-1 relative min-w-[200px]">
+                                    <input
+                                        type="text"
+                                        value={address}
+                                        onChange={(e) => {
+                                            setAddress(e.target.value);
+                                            setIsAddressSelected(false);
+                                        }}
+                                        onKeyDown={handleKeyDown}
+                                        placeholder="Entrez une adresse..."
+                                        className="w-full p-2.5 border border-indigo-500/30 rounded-lg bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 placeholder-gray-500 backdrop-blur-sm shadow-md transition-all duration-200"
+                                    />
+                                    
+                                    {suggestions.length > 0 && (
+                                        <div className="absolute z-10 w-full bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm mt-1 border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20">
+                                            {suggestions.map((suggestion, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="p-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 cursor-pointer text-gray-200 transition-all duration-200 border-b border-indigo-500/20 last:border-b-0"
+                                                    onClick={() => {
+                                                        setAddress(suggestion.place_name);
+                                                        setSuggestions([]);
+                                                        setIsAddressSelected(true);
+                                                    }}
+                                                >
+                                                    {suggestion.place_name}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={searchClients}
+                                    disabled={loading || geolocating || !address.trim()}
+                                    className={`px-5 py-2.5 rounded-lg transition-all duration-200 ${
+                                        loading || geolocating || !address.trim()
+                                            ? 'bg-gray-600/20 text-gray-400 cursor-not-allowed border border-gray-600/30'
+                                            : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm'
+                                    }`}
+                                >
+                                    {loading ? 'Recherche...' : 'Rechercher'}
+                                </button>
+                                <button
+                                    onClick={searchWithCurrentLocation}
+                                    disabled={loading || geolocating}
+                                    className={`px-5 py-2.5 rounded-lg transition-all duration-200 flex items-center ${
+                                        loading || geolocating
+                                            ? 'bg-gray-600/20 text-gray-400 cursor-not-allowed border border-gray-600/30'
+                                            : 'bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 backdrop-blur-sm'
+                                    }`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                    </svg>
+                                    {geolocating ? 'Localisation...' : 'Ma position'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                     {error && (
