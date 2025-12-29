@@ -3,6 +3,7 @@ import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 import mbxDirections from '@mapbox/mapbox-sdk/services/directions';
 import squareClient from '../config/square';
+import Client from '../models/Client';
 
 const router = Router();
 const baseClient = mbxClient({ accessToken: process.env.MAPBOX_TOKEN! });
@@ -11,6 +12,24 @@ const directionsService = mbxDirections(baseClient);
 
 // Définir l'adresse fixe du point de départ
 const STARTING_POINT = "1829 rue capitol";
+
+// Fonction utilitaire pour calculer la distance à vol d'oiseau (Haversine)
+function calculateHaversineDistance(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+): number {
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance en km
+}
 
 // Interface pour les statistiques journalières
 interface DailyStats {
@@ -145,6 +164,7 @@ router.post('/', async (req: Request, res: Response) => {
         }
 
         const sourceCoordinates = geocodeResponse.body.features[0].geometry.coordinates;
+        const [sourceLng, sourceLat] = sourceCoordinates;
 
         // 2. Configurer la plage de dates pour la recherche
         const currentDate = new Date();
@@ -165,13 +185,71 @@ router.post('/', async (req: Request, res: Response) => {
             endDate.setDate(endDate.getDate() + 30);
         }
 
+        // 3. Récupérer tous les rendez-vous futurs
         const bookingsResponse = await squareClient.bookings.list({
             startAtMin: startDate.toISOString(),
             startAtMax: endDate.toISOString(),
             locationId: "L24K8X13MB1A7"
         });
 
-        // 3. Récupérer les informations des clients avec adresses pour tous les rendez-vous futurs
+        // 4. OPTIMISATION: Récupérer tous les clients de MongoDB avec leurs coordonnées en une seule requête
+        const bookingCustomerIds: string[] = [];
+        const bookingsMap = new Map<string, any[]>();
+        
+        for await (const booking of bookingsResponse) {
+            if (booking.customerId && booking.startAt) {
+                const bookingDate = new Date(booking.startAt);
+                const dateString = bookingDate.toISOString().split('T')[0];
+                
+                // Si on cherche une date spécifique et que ce n'est pas celle-ci, sauter
+                if (specificDate && dateString !== specificDate) {
+                    continue;
+                }
+                
+                // Vérifier si cette date est exclue
+                if (excludeDates.includes(dateString) && !specificDate) {
+                    continue;
+                }
+                
+                bookingCustomerIds.push(booking.customerId);
+                
+                if (!bookingsMap.has(booking.customerId)) {
+                    bookingsMap.set(booking.customerId, []);
+                }
+                bookingsMap.get(booking.customerId)!.push({
+                    id: booking.id,
+                    startAt: booking.startAt,
+                    bookingDate: dateString
+                });
+            }
+        }
+
+        if (bookingCustomerIds.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Aucun rendez-vous trouvé dans cet intervalle de dates'
+            });
+        }
+
+        // Récupérer tous les clients de MongoDB avec leurs coordonnées en une seule requête
+        const clientsFromMongo = await Client.find({
+            squareId: { $in: bookingCustomerIds },
+            'coordinates.lng': { $exists: true, $ne: null },
+            'coordinates.lat': { $exists: true, $ne: null },
+            addressLine1: { $exists: true, $ne: '' }
+        }).select('squareId givenName familyName phoneNumber addressLine1 coordinates');
+
+        // Créer un map pour accéder rapidement aux clients par squareId
+        const clientsMap = new Map<string, typeof clientsFromMongo[0]>();
+        clientsFromMongo.forEach(client => {
+            if (client.squareId) {
+                clientsMap.set(client.squareId, client);
+            }
+        });
+
+        // 5. OPTIMISATION: Pré-filtrer avec distance Haversine avant les appels API
+        const MAX_STRAIGHT_DISTANCE_KM = 50; // Marge de sécurité pour pré-filtrage (50 km)
+        
         const clientsWithBookings: {
             bookingId: string;
             customerId: string;
@@ -179,105 +257,59 @@ router.post('/', async (req: Request, res: Response) => {
             address: string;
             coordinates: number[];
             startAt: string;
-            bookingDate: string; // Date du rendez-vous (YYYY-MM-DD)
+            bookingDate: string;
             distance: number | null;
             duration: number | null;
             phoneNumber?: string;
+            haversineDistance: number; // Pour le tri initial
         }[] = [];
-
-        // Map pour suivre les dates de rendez-vous déjà traitées
-        const processedDates = new Map<string, boolean>();
-        excludeDates.forEach((date: string) => {
-            processedDates.set(date, true);
-        });
 
         // Map pour compter les clients par date
         const clientsByDate = new Map<string, number>();
 
-        for await (const booking of bookingsResponse) {
-            if (booking.customerId && booking.startAt) {
-                // Extraire la date du rendez-vous
-                const bookingDate = new Date(booking.startAt);
-                const dateString = bookingDate.toISOString().split('T')[0]; // Format YYYY-MM-DD
-                
-                // Incrémenter le compteur pour cette date
+        for (const [squareId, client] of clientsMap.entries()) {
+            const bookings = bookingsMap.get(squareId) || [];
+            
+            if (!client.coordinates?.lng || !client.coordinates?.lat) {
+                continue;
+            }
+
+            // Calculer la distance Haversine (rapide)
+            const haversineDistance = calculateHaversineDistance(
+                sourceLat,
+                sourceLng,
+                client.coordinates.lat,
+                client.coordinates.lng
+            );
+
+            // Pré-filtrer: seulement les clients à moins de 50 km
+            if (haversineDistance > MAX_STRAIGHT_DISTANCE_KM) {
+                continue;
+            }
+
+            // Traiter tous les rendez-vous de ce client
+            for (const booking of bookings) {
+                // Compter les clients par date
+                const dateString = booking.bookingDate;
                 if (clientsByDate.has(dateString)) {
                     clientsByDate.set(dateString, clientsByDate.get(dateString)! + 1);
                 } else {
                     clientsByDate.set(dateString, 1);
                 }
-                
-                // Si on cherche une date spécifique et que ce n'est pas celle-ci, sauter ce rendez-vous
-                if (specificDate && dateString !== specificDate) {
-                    continue;
-                }
-                
-                // Vérifier si cette date a déjà été exclue
-                if (processedDates.has(dateString) && !specificDate) {
-                    continue; // Sauter ce rendez-vous car sa date est exclue
-                }
 
-                try {
-                    const customerResponse = await squareClient.customers.get({
-                        customerId: booking.customerId
-                    });
-
-                    if (customerResponse.customer && customerResponse.customer.address?.addressLine1) {
-                        // Obtenir les coordonnées du client
-                        const clientGeocodeResponse = await geocodingService.forwardGeocode({
-                            query: customerResponse.customer.address.addressLine1,
-                            countries: ['ca'],
-                            limit: 1
-                        }).send();
-
-                        if (clientGeocodeResponse.body.features.length) {
-                            const clientCoordinates = clientGeocodeResponse.body.features[0].geometry.coordinates;
-                            
-                            // Calculer la distance et la durée entre l'adresse source et l'adresse du client
-                            const directionsResponse = await directionsService.getDirections({
-                                profile: 'driving-traffic',
-                                waypoints: [
-                                    { coordinates: sourceCoordinates as [number, number] },
-                                    { coordinates: clientCoordinates as [number, number] }
-                                ],
-                                // exclude: ['toll'] // Removed due to TypeScript type issues
-                            }).send();
-
-                            let distance = null;
-                            let duration = null;
-
-                            if (directionsResponse.body.routes.length) {
-                                distance = Math.round(directionsResponse.body.routes[0].distance / 100) / 10; // km
-                                duration = Math.round(directionsResponse.body.routes[0].duration / 60); // minutes
-                            }
-
-                            // Récupérer le numéro de téléphone
-                            let phoneNumber = customerResponse.customer.phoneNumber || '';
-                            
-                            // Si phoneNumber est vide, essayer de récupérer depuis phones array
-                            const customer = customerResponse.customer as any;
-                            if (!phoneNumber && customer.phones && Array.isArray(customer.phones) && customer.phones.length > 0) {
-                                const firstPhone = customer.phones[0];
-                                phoneNumber = firstPhone?.phoneNumber || firstPhone?.number || firstPhone?.phone_number || firstPhone?.value || '';
-                            }
-
-                            clientsWithBookings.push({
-                                bookingId: booking.id || '',
-                                customerId: booking.customerId,
-                                customerName: `${customerResponse.customer.givenName || ''} ${customerResponse.customer.familyName || ''}`.trim(),
-                                address: customerResponse.customer.address.addressLine1,
-                                coordinates: clientCoordinates,
-                                startAt: booking.startAt,
-                                bookingDate: dateString,
-                                distance,
-                                duration,
-                                phoneNumber: phoneNumber || undefined
-                            });
-                        }
-                    }
-                } catch (error) {
-                    console.error(`Erreur récupération client ${booking.customerId}:`, error);
-                }
+                clientsWithBookings.push({
+                    bookingId: booking.id || '',
+                    customerId: squareId,
+                    customerName: `${client.givenName || ''} ${client.familyName || ''}`.trim(),
+                    address: client.addressLine1 || '',
+                    coordinates: [client.coordinates.lng, client.coordinates.lat],
+                    startAt: booking.startAt,
+                    bookingDate: dateString,
+                    distance: null, // Sera calculé plus tard
+                    duration: null, // Sera calculé plus tard
+                    phoneNumber: client.phoneNumber || undefined,
+                    haversineDistance
+                });
             }
         }
 
@@ -288,23 +320,66 @@ router.post('/', async (req: Request, res: Response) => {
             });
         }
 
-        // 4. Trier les clients par distance et trouver le plus proche
-        clientsWithBookings.sort((a, b) => {
+        // 6. OPTIMISATION: Trier par distance Haversine et limiter à 100 clients les plus proches
+        clientsWithBookings.sort((a, b) => a.haversineDistance - b.haversineDistance);
+        const topClients = clientsWithBookings.slice(0, 100); // Limiter à 100 pour éviter trop d'appels API
+
+        // 7. OPTIMISATION: Calculer les distances réelles seulement pour les clients pré-filtrés
+        const clientPromises = topClients.map(async (clientData) => {
+            try {
+                const directionsResponse = await directionsService.getDirections({
+                    profile: 'driving-traffic',
+                    waypoints: [
+                        { coordinates: sourceCoordinates as [number, number] },
+                        { coordinates: clientData.coordinates as [number, number] }
+                    ],
+                    // exclude: ['toll'] // Removed due to TypeScript type issues
+                }).send();
+
+                if (directionsResponse.body.routes.length) {
+                    const distance = Math.round(directionsResponse.body.routes[0].distance / 100) / 10; // km
+                    const duration = Math.round(directionsResponse.body.routes[0].duration / 60); // minutes
+                    
+                    return {
+                        ...clientData,
+                        distance,
+                        duration
+                    };
+                }
+                return null;
+            } catch (error) {
+                console.error(`Erreur pour ${clientData.customerName}:`, error);
+                return null;
+            }
+        });
+
+        const clientsWithRealDistances = (await Promise.all(clientPromises))
+            .filter((client): client is NonNullable<typeof client> => client !== null);
+
+        if (clientsWithRealDistances.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Aucun client avec rendez-vous trouvé dans cet intervalle de dates'
+            });
+        }
+
+        // 8. Trier par distance réelle et trouver le plus proche
+        clientsWithRealDistances.sort((a, b) => {
             if (a.distance === null) return 1;
             if (b.distance === null) return -1;
             return a.distance - b.distance;
         });
 
-        const nearestClient = clientsWithBookings[0];
+        const nearestClient = clientsWithRealDistances[0];
 
         // Obtenir les dates uniques disponibles (pour le compteur de jours restants)
-        const uniqueDates = [...new Set(clientsWithBookings.map(c => c.bookingDate))];
+        const uniqueDates = [...new Set(clientsWithRealDistances.map(c => c.bookingDate))];
         const remainingDays = uniqueDates.length;
 
         // Nombre de clients à la date du client le plus proche
         const clientsOnSameDay = clientsByDate.get(nearestClient.bookingDate) || 0;
 
-        // 5. Obtenir l'itinéraire détaillé vers ce client
+        // 9. Obtenir l'itinéraire détaillé vers ce client (déjà calculé, mais on le garde pour compatibilité)
         const directionResponse = await directionsService.getDirections({
             profile: 'driving-traffic',
             waypoints: [
@@ -315,21 +390,18 @@ router.post('/', async (req: Request, res: Response) => {
         }).send();
 
         // Calculer les statistiques pour la journée du client sélectionné
-        const dailyStats = calculateDailyStats(clientsWithBookings, nearestClient.bookingDate);
+        const dailyStats = calculateDailyStats(clientsWithRealDistances, nearestClient.bookingDate);
 
-        // 6. NOUVEAU: Calculer l'itinéraire optimisé pour tous les clients de cette journée
+        // 10. NOUVEAU: Calculer l'itinéraire optimisé pour tous les clients de cette journée
         let optimizedRoute = null;
         try {
-            // Récupérer tous les clients de la même journée
-            const clientsOnSameDay = clientsWithBookings.filter(
+            // Récupérer tous les clients de la même journée (avec leurs coordonnées déjà disponibles)
+            const clientsOnSameDayList = clientsWithRealDistances.filter(
                 client => client.bookingDate === nearestClient.bookingDate
             );
             
             // Si nous avons des clients ce jour-là, calculer un itinéraire optimisé
-            if (clientsOnSameDay.length > 0) {
-                // Récupérer uniquement les adresses des clients
-                const clientAddresses = clientsOnSameDay.map(client => client.address);
-                
+            if (clientsOnSameDayList.length > 0) {
                 // Obtenir les coordonnées du point de départ fixe
                 const startPointResponse = await geocodingService.forwardGeocode({
                     query: STARTING_POINT,
@@ -343,37 +415,17 @@ router.post('/', async (req: Request, res: Response) => {
 
                 const startPointCoordinates = startPointResponse.body.features[0].geometry.coordinates;
                 
-                // Ajouter le point de départ fixe au début de la liste
-                const allAddresses = [STARTING_POINT, ...clientAddresses];
-                
-                // Convertir toutes les adresses en coordonnées
-                const coordinates = await Promise.all(
-                    allAddresses.map(async (addr, index) => {
-                        // Pour l'adresse de départ, utiliser les coordonnées déjà obtenues
-                        if (index === 0) {
-                            return {
-                                address: addr,
-                                coordinates: startPointCoordinates
-                            };
-                        }
-                        
-                        // Pour les adresses clients, obtenir les coordonnées
-                        const response = await geocodingService.forwardGeocode({
-                            query: addr,
-                            countries: ['ca'],
-                            limit: 1
-                        }).send();
-
-                        if (!response.body.features.length) {
-                            throw new Error(`Adresse non trouvée : ${addr}`);
-                        }
-
-                        return {
-                            address: addr,
-                            coordinates: response.body.features[0].geometry.coordinates
-                        };
-                    })
-                );
+                // Construire la liste des locations avec coordonnées (déjà disponibles!)
+                const coordinates = [
+                    {
+                        address: STARTING_POINT,
+                        coordinates: startPointCoordinates
+                    },
+                    ...clientsOnSameDayList.map(client => ({
+                        address: client.address,
+                        coordinates: client.coordinates
+                    }))
+                ];
 
                 // Calculer la matrice des distances
                 const matrix = await calculateDistanceMatrix(coordinates);
@@ -451,7 +503,7 @@ router.post('/', async (req: Request, res: Response) => {
                 },
                 navigation: {
                     hasNext: remainingDays > 1,
-                    processedDates: [...processedDates.keys(), nearestClient.bookingDate],
+                    processedDates: [...excludeDates, nearestClient.bookingDate],
                     allDates: Array.from(clientsByDate.keys()).sort(),
                     dateRange: dateRange ? {
                         startDate: dateRange.startDate,

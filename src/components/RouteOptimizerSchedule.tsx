@@ -50,11 +50,11 @@ const RouteOptimizerSchedule = () => {
     const [routeData, setRouteData] = useState<RouteData | null>(null)
     const [error, setError] = useState<string>('')
     const [shouldFetch, setShouldFetch] = useState<boolean>(false)
-    const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
     
     // Référence pour la carte Leaflet
     const mapRef = useRef<L.Map | null>(null)
-    const mapContainer = useRef<HTMLDivElement>(null)
+    const mapContainerDesktop = useRef<HTMLDivElement>(null)
+    const mapContainerMobile = useRef<HTMLDivElement>(null)
   
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setDate(e.target.value)
@@ -112,36 +112,79 @@ const RouteOptimizerSchedule = () => {
     }, [routeData]);
     useEffect(() => {
         // Ne rien faire si les conditions ne sont pas remplies
-        if (!routeData || !routeData.waypoints || routeData.waypoints.length === 0 || viewMode !== 'map' || !mapContainer.current) {
+        if (!routeData || !routeData.waypoints || routeData.waypoints.length === 0) {
             return;
         }
 
-        // Nettoyer la carte précédente si elle existe
-        if (mapRef.current) {
-            mapRef.current.remove();
-            mapRef.current = null;
-        }
+        // Attendre que le conteneur soit disponible dans le DOM
+        const initMap = () => {
+            // Trouver le conteneur visible (desktop ou mobile) en vérifiant la largeur de l'écran
+            let container: HTMLDivElement | null = null;
+            
+            // Utiliser la largeur de l'écran pour déterminer quel conteneur utiliser
+            const isDesktop = window.innerWidth >= 1024; // lg breakpoint de Tailwind
+            
+            if (isDesktop) {
+                // Sur desktop, utiliser le conteneur desktop
+                container = mapContainerDesktop.current;
+            } else {
+                // Sur mobile, utiliser le conteneur mobile
+                container = mapContainerMobile.current;
+            }
+            
+            // Vérifier que le conteneur est bien visible et a une taille
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                // Vérifier si le conteneur a une taille (largeur et hauteur > 0)
+                if (rect.width === 0 || rect.height === 0) {
+                    container = null;
+                }
+            }
+            
+            if (!container) {
+                // Réessayer après un court délai si le conteneur n'est pas encore disponible
+                // Limiter à 10 tentatives pour éviter une boucle infinie
+                if (initMap.retryCount === undefined) {
+                    initMap.retryCount = 0;
+                }
+                initMap.retryCount++;
+                if (initMap.retryCount < 10) {
+                    setTimeout(initMap, 100);
+                }
+                return;
+            }
+            
+            // Réinitialiser le compteur
+            if (initMap.retryCount !== undefined) {
+                initMap.retryCount = 0;
+            }
 
-        // Calculer le centre approximatif de tous les points
-        const lats = routeData.waypoints.map(wp => wp.coordinates[1]);
-        const lngs = routeData.waypoints.map(wp => wp.coordinates[0]);
-        const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
-        const centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
+            // Nettoyer la carte précédente si elle existe
+            if (mapRef.current) {
+                mapRef.current.remove();
+                mapRef.current = null;
+            }
 
-        // Créer une nouvelle carte
-        const newMap = L.map(mapContainer.current).setView([centerLat, centerLng], 11);
-        
-        // Ajouter des tuiles (fond de carte)
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            maxZoom: 19,
-        }).addTo(newMap);
+            // Calculer le centre approximatif de tous les points
+            const lats = routeData.waypoints.map(wp => wp.coordinates[1]);
+            const lngs = routeData.waypoints.map(wp => wp.coordinates[0]);
+            const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
+            const centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
 
-        // Créer un tableau pour stocker les coordonnées des points
-        const routePoints: L.LatLngExpression[] = [];
+            // Créer une nouvelle carte (container déjà défini plus haut)
+            const newMap = L.map(container).setView([centerLat, centerLng], 11);
+            
+            // Ajouter des tuiles (fond de carte)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                maxZoom: 19,
+            }).addTo(newMap);
 
-        // Ajouter des marqueurs pour chaque waypoint
-        routeData.waypoints.forEach((waypoint, index) => {
+            // Créer un tableau pour stocker les coordonnées des points
+            const routePoints: L.LatLngExpression[] = [];
+
+            // Ajouter des marqueurs pour chaque waypoint
+            routeData.waypoints.forEach((waypoint, index) => {
             try {
                 
                 // Inverser les coordonnées pour Leaflet [lat, lng]
@@ -229,88 +272,101 @@ const RouteOptimizerSchedule = () => {
             }
         });
 
-        // Ajouter des polylines pour représenter l'itinéraire avec les temps de trajet entre chaque point
-        if (routePoints.length > 1) {
-            // Ajouter un effet de glow à la ligne en créant une ligne plus large en arrière-plan
-            L.polyline(routePoints, {
-                color: '#a78bfa',
-                weight: 4,
-                opacity: 0.25,
-                lineJoin: 'round',
-                lineCap: 'round'
-            }).addTo(newMap);
-            
-            // Créer une polyline pour l'itinéraire complet (en avant-plan)
-            const mainRoute = L.polyline(routePoints, {
-                color: '#8b5cf6',
-                weight: 2.5,
-                opacity: 0.85,
-                lineJoin: 'round',
-                lineCap: 'round'
-            }).addTo(newMap);
+            // Ajouter des polylines pour représenter l'itinéraire avec les temps de trajet entre chaque point
+            if (routePoints.length > 1) {
+                // Ajouter un effet de glow à la ligne en créant une ligne plus large en arrière-plan
+                L.polyline(routePoints, {
+                    color: '#a78bfa',
+                    weight: 4,
+                    opacity: 0.25,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(newMap);
+                
+                // Créer une polyline pour l'itinéraire complet (en avant-plan)
+                const mainRoute = L.polyline(routePoints, {
+                    color: '#8b5cf6',
+                    weight: 2.5,
+                    opacity: 0.85,
+                    lineJoin: 'round',
+                    lineCap: 'round'
+                }).addTo(newMap);
 
-            // Ajouter des indicateurs de temps entre chaque segment
-            for (let i = 0; i < routePoints.length - 1; i++) {
-                const startPoint = routePoints[i];
-                const endPoint = routePoints[i + 1];
-                
-                // Calculer le point milieu pour placer l'étiquette
-                const midLat = (startPoint[0] + endPoint[0]) / 2;
-                const midLng = (startPoint[1] + endPoint[1]) / 2;
-                
-                // Estimer le temps de trajet (si disponible dans les données)
-                let estimatedDuration = "";
-                
-                if (i < travelTimes.length) {
-                    estimatedDuration = String(travelTimes[i]);
-                }
-                
-                // Créer une étiquette de temps
-                if (estimatedDuration !== "") {
-                    // Créer une icône personnalisée pour l'étiquette de temps
-                    const timeIcon = L.divIcon({
-                        className: 'time-label',
-                        html: `<div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(99, 102, 241, 0.9)); color: white; 
-                                font-size: 9px; font-weight: 600; padding: 2px 5px; border-radius: 4px; 
-                                border: 1px solid rgba(255, 255, 255, 0.25);
-                                box-shadow: 0 0 4px rgba(139, 92, 246, 0.4), 0 0 8px rgba(139, 92, 246, 0.2); 
-                                white-space: nowrap; width: fit-content;
-                                max-width: 50px; overflow: hidden; text-overflow: ellipsis; text-align: center;
-                                text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);">
-                                ${estimatedDuration} min</div>`,
-                        iconSize: [0, 0], // Taille nulle pour que le contenu HTML définisse la taille
-                        iconAnchor: [12, 6]
-                    });
+                // Ajouter des indicateurs de temps entre chaque segment
+                for (let i = 0; i < routePoints.length - 1; i++) {
+                    const startPoint = routePoints[i];
+                    const endPoint = routePoints[i + 1];
                     
-                    // Ajouter l'étiquette à la carte
-                    L.marker([midLat, midLng], { 
-                        icon: timeIcon,
-                        interactive: false,  // Désactiver les interactions pour éviter les clics
-                        zIndexOffset: -1000  // Placer derrière les autres marqueurs
-                    }).addTo(newMap);
+                    // Calculer le point milieu pour placer l'étiquette
+                    const midLat = (startPoint[0] + endPoint[0]) / 2;
+                    const midLng = (startPoint[1] + endPoint[1]) / 2;
+                    
+                    // Estimer le temps de trajet (si disponible dans les données)
+                    let estimatedDuration = "";
+                    
+                    if (i < travelTimes.length) {
+                        estimatedDuration = String(travelTimes[i]);
+                    }
+                    
+                    // Créer une étiquette de temps
+                    if (estimatedDuration !== "") {
+                        // Créer une icône personnalisée pour l'étiquette de temps
+                        const timeIcon = L.divIcon({
+                            className: 'time-label',
+                            html: `<div style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(99, 102, 241, 0.9)); color: white; 
+                                    font-size: 9px; font-weight: 600; padding: 2px 5px; border-radius: 4px; 
+                                    border: 1px solid rgba(255, 255, 255, 0.25);
+                                    box-shadow: 0 0 4px rgba(139, 92, 246, 0.4), 0 0 8px rgba(139, 92, 246, 0.2); 
+                                    white-space: nowrap; width: fit-content;
+                                    max-width: 50px; overflow: hidden; text-overflow: ellipsis; text-align: center;
+                                    text-shadow: 0 0 2px rgba(255, 255, 255, 0.6);">
+                                    ${estimatedDuration} min</div>`,
+                            iconSize: [0, 0], // Taille nulle pour que le contenu HTML définisse la taille
+                            iconAnchor: [12, 6]
+                        });
+                        
+                        // Ajouter l'étiquette à la carte
+                        L.marker([midLat, midLng], { 
+                            icon: timeIcon,
+                            interactive: false,  // Désactiver les interactions pour éviter les clics
+                            zIndexOffset: -1000  // Placer derrière les autres marqueurs
+                        }).addTo(newMap);
+                    }
                 }
             }
-        }
 
-        // Ajuster la vue pour inclure tous les waypoints
-        if (routePoints.length > 0) {
-            const bounds = L.latLngBounds(routePoints);
-            newMap.fitBounds(bounds, {
-                padding: [50, 50]
+            // Ajuster la vue pour inclure tous les waypoints
+            if (routePoints.length > 0) {
+                const bounds = L.latLngBounds(routePoints);
+                newMap.fitBounds(bounds, {
+                    padding: [50, 50]
+                });
+            }
+
+            // Enregistrer la référence de la carte
+            mapRef.current = newMap;
+        };
+
+        // Initialiser la carte avec un petit délai pour s'assurer que le DOM est prêt
+        // Utiliser requestAnimationFrame pour s'assurer que le DOM est complètement rendu
+        const timeoutId = setTimeout(() => {
+            requestAnimationFrame(() => {
+                // Réessayer une fois de plus pour s'assurer que les styles sont appliqués
+                requestAnimationFrame(() => {
+                    initMap();
+                });
             });
-        }
-
-        // Enregistrer la référence de la carte
-        mapRef.current = newMap;
+        }, 200);
 
         // Nettoyer la carte lors du nettoyage de l'effet
         return () => {
-            if (viewMode !== 'map' && mapRef.current) {
+            clearTimeout(timeoutId);
+            if (mapRef.current) {
                 mapRef.current.remove();
                 mapRef.current = null;
             }
         };
-    }, [routeData, viewMode]);
+    }, [routeData]);
 
     // Nettoyer la carte lors du démontage du composant
     useEffect(() => {
@@ -365,17 +421,199 @@ const RouteOptimizerSchedule = () => {
     }
   
     return (
-      <div className="w-full max-w-4xl mx-auto p-2 sm:p-4 space-y-4">
+      <div className="w-full max-w-7xl mx-auto p-2 sm:p-4 space-y-4">
         <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 p-4 sm:p-6 border border-indigo-500/20">
-          <div className="mb-4 flex items-center gap-2">
-            <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-            <h2 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
-              Optimisation des rendez-vous
-            </h2>
+          {/* Layout desktop : 2 colonnes - gauche (titre+boutons+carte), droite (liste) */}
+          <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4">
+            {/* Colonne gauche : Titre + Boutons + Carte */}
+            <div className="lg:col-span-2 flex flex-col gap-4">
+              {/* Header */}
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                <h2 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
+                  Optimisation des rendez-vous
+                </h2>
+              </div>
+
+              {/* Contrôles de date et boutons */}
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                <input
+                  type="date"
+                  value={date}
+                  onChange={handleDateChange}
+                  className="border border-cyan-500/30 rounded-lg p-2.5 bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 w-full sm:w-auto backdrop-blur-sm shadow-md transition-all duration-200"
+                />
+                <div className="flex gap-2 sm:gap-4">
+                  <button
+                    onClick={() => {
+                      const today = new Date();
+                      const formattedDate = today.toISOString().split('T')[0];
+                      setDate(formattedDate);
+                      setShouldFetch(true);
+                    }}
+                    className="flex-1 sm:flex-none bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 backdrop-blur-sm text-cyan-200 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm sm:text-base border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 flex items-center justify-center"
+                  >
+                    <Calendar className="h-4 w-4 mr-1.5 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
+                    Aujourd'hui
+                  </button>
+                 
+                  <button
+                    onClick={fetchOptimizedRoute}
+                    disabled={loading}
+                    className="flex-1 sm:flex-none bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 disabled:from-gray-600/20 disabled:to-gray-600/20 backdrop-blur-sm text-indigo-200 px-4 py-2.5 rounded-lg disabled:text-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-sm sm:text-base border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Optimisation...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-1.5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
+                        Optimiser
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div className="text-rose-300 p-3 bg-gradient-to-br from-rose-900/40 to-pink-900/40 backdrop-blur-sm rounded-lg text-sm border border-rose-500/50 shadow-lg shadow-rose-500/20 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-rose-300 drop-shadow-[0_0_3px_rgba(239,68,68,0.8)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  {error}
+                </div>
+              )}
+
+              {/* Carte desktop */}
+              {routeData && (
+                <>
+                  <h3 className="text-base sm:text-lg font-semibold mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] flex items-center">
+                    <MapPin className="h-5 w-5 mr-2 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                    Visualisation de l'itinéraire
+                  </h3>
+                  <div 
+                    ref={mapContainerDesktop} 
+                    className="w-full h-[600px] rounded-lg overflow-hidden shadow-lg border border-indigo-500/20"
+                  />
+                </>
+              )}
+            </div>
+
+            {/* Colonne droite : Liste - commence tout en haut */}
+            {routeData && (
+              <div className="lg:col-span-1 flex flex-col">
+                <h3 className="text-base sm:text-lg font-semibold mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] flex items-center">
+                  <Navigation className="h-5 w-5 mr-2 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                  Itinéraire optimisé
+                </h3>
+                <div className="flex-1 overflow-y-auto pr-2 space-y-1" style={{
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'rgba(99, 102, 241, 0.3) rgba(31, 41, 55, 0.5)'
+                }}>
+                  {routeData.waypoints.map((waypoint, index) => (
+                    <React.Fragment key={index}>
+                      <div className="p-3 border border-indigo-500/20 rounded-lg bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5 transition-all duration-200 shadow-md">
+                        <div>
+                          {waypoint.type === 'starting_point' ? (
+                            <div className="break-words flex items-start">
+                              <div className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-xs font-bold mr-2 border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
+                                <MapPin className="h-3.5 w-3.5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
+                              </div>
+                              <div className="flex-grow min-w-0">
+                                <span className="font-medium text-cyan-300 text-xs drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Départ:</span>
+                                <a 
+                                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-cyan-400 hover:text-cyan-300 hover:underline ml-1 text-xs block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)] break-words"
+                                >
+                                  {waypoint.address}
+                                </a>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start">
+                              <div className="flex-shrink-0 w-7 h-7 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-xs font-bold mr-2 border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
+                                {index}
+                              </div>
+                              <div className="flex-grow min-w-0">
+                                <div className="font-medium text-xs text-white mb-1 drop-shadow-[0_0_3px_rgba(139,92,246,0.6)] break-words">
+                                  {waypoint.customerName}
+                                </div>
+                                <a 
+                                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-cyan-400 hover:text-cyan-300 hover:underline text-xs break-words block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
+                                >
+                                  {waypoint.address}
+                                </a>
+                                {waypoint.phoneNumber && (
+                                  <a 
+                                    href={`tel:${waypoint.phoneNumber}`}
+                                    className="text-cyan-400 hover:text-cyan-300 hover:underline text-xs block mt-1 flex items-center transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                                    </svg>
+                                    {waypoint.phoneNumber}
+                                  </a>
+                                )}
+                                {waypoint.startAt && (
+                                  <div className="text-gray-300 text-xs mt-1 flex items-center">
+                                    <Clock className="h-3 w-3 mr-1 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
+                                    {
+                                      new Date(waypoint.startAt).getHours() === 0 
+                                      ? "Toute la journée" 
+                                      : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })
+                                    }
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Afficher le temps de trajet entre les waypoints - version discrète */}
+                      {index < routeData.waypoints.length - 1 && travelTimes[index] !== undefined && (
+                        <div className="flex justify-center items-center py-0.5">
+                          <div className="flex items-center text-cyan-300 px-2 py-0.5 text-xs bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded border border-cyan-500/20 shadow-lg shadow-cyan-500/10 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 drop-shadow-[0_0_2px_rgba(34,211,238,0.8)]">
+                              <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                            <span>{travelTimes[index]} min</span>
+                          </div>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          
-          <div className="flex flex-col gap-4">
-            {/* Contrôles de date et boutons - responsives */}
+
+          {/* Version mobile */}
+          <div className="lg:hidden flex flex-col gap-4">
+            {/* Header */}
+            <div className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+              <h2 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
+                Optimisation des rendez-vous
+              </h2>
+            </div>
+
+            {/* Contrôles de date et boutons */}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
               <input
                 type="date"
@@ -430,165 +668,81 @@ const RouteOptimizerSchedule = () => {
                 {error}
               </div>
             )}
-  
+
             {routeData && (
               <>
-                {/* Sélecteur de mode d'affichage */}
-                <div className="flex border border-indigo-500/30 rounded-lg overflow-hidden bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm shadow-lg shadow-indigo-500/5">
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`flex-1 py-2.5 px-4 flex items-center justify-center transition-all duration-200 ${
-                      viewMode === 'list'
-                        ? 'bg-gradient-to-r from-indigo-500/30 to-purple-500/30 text-indigo-200 border-r border-indigo-400/40 shadow-lg shadow-indigo-500/20'
-                        : 'bg-transparent text-gray-300 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10'
-                    }`}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-1.5 ${viewMode === 'list' ? 'drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="8" y1="6" x2="21" y2="6"></line>
-                      <line x1="8" y1="12" x2="21" y2="12"></line>
-                      <line x1="8" y1="18" x2="21" y2="18"></line>
-                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                    </svg>
-                    Liste
-                  </button>
-                  <button
-                    onClick={() => setViewMode('map')}
-                    className={`flex-1 py-2.5 px-4 flex items-center justify-center transition-all duration-200 ${
-                      viewMode === 'map'
-                        ? 'bg-gradient-to-r from-indigo-500/30 to-purple-500/30 text-indigo-200 shadow-lg shadow-indigo-500/20'
-                        : 'bg-transparent text-gray-300 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10'
-                    }`}
-                  >
-                    <MapPin className={`h-4 w-4 mr-1.5 ${viewMode === 'map' ? 'drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]' : ''}`} />
-                    Carte
-                  </button>
-                </div>
-
-                {/* Affichage de la liste */}
-                {viewMode === 'list' && (
-                  <div className="mt-4">
-                    <h3 className="text-base sm:text-lg font-semibold mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] flex items-center">
-                      <Navigation className="h-5 w-5 mr-2 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-                      Itinéraire optimisé
-                    </h3>
-                    <div className="space-y-1">
-                      {routeData.waypoints.map((waypoint, index) => (
-                        <React.Fragment key={index}>
-                          <div className="p-3 sm:p-4 border border-indigo-500/20 rounded-lg bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm hover:border-indigo-500/40 hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-0.5 transition-all duration-200 shadow-md">
-                            <div>
-                              {waypoint.type === 'starting_point' ? (
-                                <div className="break-words flex items-start">
-                                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-sm font-bold mr-3 border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
-                                    <MapPin className="h-4 w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
-                                  </div>
-                                  <div className="flex-grow">
-                                    <span className="font-medium text-cyan-300 text-sm sm:text-base drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">Point de départ:</span>
-                                    <a 
-                                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-cyan-400 hover:text-cyan-300 hover:underline ml-1 text-sm sm:text-base block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
-                                    >
-                                      {waypoint.address}
-                                    </a>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-start">
-                                  <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-sm font-bold mr-3 border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
-                                    {index}
-                                  </div>
-                                  <div className="flex-grow">
-                                    <div className="font-medium text-sm sm:text-base text-white mb-1 drop-shadow-[0_0_3px_rgba(139,92,246,0.6)]">
-                                      {waypoint.customerName}
-                                    </div>
-                                    <a 
-                                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(waypoint.address)}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-cyan-400 hover:text-cyan-300 hover:underline text-xs sm:text-sm break-words block transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
-                                    >
-                                      {waypoint.address}
-                                    </a>
-                                    {waypoint.phoneNumber && (
-                                      <a 
-                                        href={`tel:${waypoint.phoneNumber}`}
-                                        className="text-cyan-400 hover:text-cyan-300 hover:underline text-xs sm:text-sm block mt-1 flex items-center transition-colors drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]"
-                                      >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                        </svg>
-                                        {waypoint.phoneNumber}
-                                      </a>
-                                    )}
-                                    {waypoint.startAt && (
-                                      <div className="text-gray-300 text-xs sm:text-sm mt-1 flex items-center">
-                                        <Clock className="h-3.5 w-3.5 mr-1 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
-                                        Heure: {
-                                          new Date(waypoint.startAt).getHours() === 0 
-                                          ? "Toute la journée" 
-                                          : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', {
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                          })
-                                        }
-                                      </div>
-                                    )}
-                                  </div>
+                {/* Version mobile : barre horizontale scrollable au-dessus de la carte */}
+                <div className="mt-4 mb-4">
+                  <div className="text-sm font-semibold mb-2 text-cyan-300 flex items-center">
+                    <Navigation className="h-4 w-4 mr-1.5 text-cyan-400" />
+                    Clients
+                  </div>
+                  <div className="flex overflow-x-auto pb-2 gap-3" style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'rgba(99, 102, 241, 0.3) rgba(31, 41, 55, 0.5)'
+                  }}>
+                    {routeData.waypoints.map((waypoint, index) => (
+                      <div key={index} className="flex-shrink-0 w-64 p-3 border border-indigo-500/20 rounded-lg bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm shadow-md">
+                        {waypoint.type === 'starting_point' ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-xs font-bold border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
+                              <MapPin className="h-3 w-3 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs text-cyan-300 font-medium truncate">Départ</div>
+                              <div className="text-xs text-white truncate">{waypoint.address}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-2">
+                            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-xs font-bold border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
+                              {index}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-medium text-white truncate mb-1">
+                                {waypoint.customerName}
+                              </div>
+                              <div className="text-xs text-cyan-400 truncate">
+                                {waypoint.address}
+                              </div>
+                              {waypoint.phoneNumber && (
+                                <a 
+                                  href={`tel:${waypoint.phoneNumber}`}
+                                  className="text-xs text-cyan-400 mt-1 block truncate"
+                                >
+                                  {waypoint.phoneNumber}
+                                </a>
+                              )}
+                              {waypoint.startAt && (
+                                <div className="text-xs text-gray-400 mt-1 flex items-center">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  {new Date(waypoint.startAt).getHours() === 0 
+                                    ? "Toute la journée" 
+                                    : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })
+                                  }
                                 </div>
                               )}
                             </div>
                           </div>
-                          
-                          {/* Afficher le temps de trajet entre les waypoints - version discrète */}
-                          {index < routeData.waypoints.length - 1 && travelTimes[index] !== undefined && (
-                            <div className="flex justify-center items-center py-1">
-                              <div className="flex items-center text-cyan-300 px-2 py-0.5 text-xs bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded border border-cyan-500/20 shadow-lg shadow-cyan-500/10 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1 drop-shadow-[0_0_2px_rgba(34,211,238,0.8)]">
-                                  <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
-                                <span>{travelTimes[index]} min</span>
-                              </div>
-                            </div>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Affichage de la carte */}
-                {viewMode === 'map' && (
-                  <div className="mt-4">
-                    <h3 className="text-base sm:text-lg font-semibold mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] flex items-center">
-                      <MapPin className="h-5 w-5 mr-2 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-                      Visualisation de l'itinéraire
-                    </h3>
-                    <div 
-                      ref={mapContainer} 
-                      className="w-full h-96 rounded-lg overflow-hidden shadow-lg border border-indigo-500/20"
-                    />
-                  </div>
-                )}
-
-                {/* Résumé de l'itinéraire (toujours visible) */}
-                <div className="mt-4 p-4 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-cyan-500/20 shadow-md">
-                      <div className="font-medium text-cyan-300 text-sm sm:text-base flex items-center drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
-                        <Clock className="h-4 w-4 mr-1.5 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
-                        Durée totale: <span className="text-white ml-1">{routeData.totalDuration} minutes</span>
+                        )}
                       </div>
-                    </div>
-                    <div className="p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded-lg border border-cyan-500/20 shadow-md">
-                      <div className="font-medium text-cyan-300 text-sm sm:text-base flex items-center drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
-                        <Navigation className="h-4 w-4 mr-1.5 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
-                        Distance totale: <span className="text-white ml-1">{routeData.totalDistance} km</span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
+                </div>
+
+                {/* Carte mobile */}
+                <div className="mt-4">
+                  <h3 className="text-base sm:text-lg font-semibold mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] flex items-center">
+                    <MapPin className="h-5 w-5 mr-2 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
+                    Visualisation de l'itinéraire
+                  </h3>
+                  <div 
+                    ref={mapContainerMobile} 
+                    className="w-full h-96 rounded-lg overflow-hidden shadow-lg border border-indigo-500/20"
+                  />
                 </div>
               </>
             )}
