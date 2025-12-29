@@ -184,7 +184,7 @@ function App() {
         <div className="container mx-auto py-4 px-4 relative z-10 mt-20">
           <AuthGate>
             <Routes>
-              <Route path="/" element={<Navigate to="/client-search" replace />} />
+              <Route path="/" element={<Navigate to="/schedule" replace />} />
               <Route path="/client-search" element={<ClientSearch />} />
               <Route path="/schedule" element={<RouteOptimizerSchedule />} />
               <Route path="/optimisation-rdv" element={<OptimisationRdvClient />} />

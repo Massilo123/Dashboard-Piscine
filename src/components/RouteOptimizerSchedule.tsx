@@ -424,7 +424,7 @@ const RouteOptimizerSchedule = () => {
       <div className="w-full max-w-7xl mx-auto p-2 sm:p-4 space-y-4">
         <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 p-4 sm:p-6 border border-indigo-500/20">
           {/* Layout desktop : 2 colonnes - gauche (titre+boutons+carte), droite (liste) */}
-          <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4">
+          <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4 lg:items-stretch">
             {/* Colonne gauche : Titre + Boutons + Carte */}
             <div className="lg:col-span-2 flex flex-col gap-4">
               {/* Header */}
@@ -508,12 +508,13 @@ const RouteOptimizerSchedule = () => {
 
             {/* Colonne droite : Liste - commence tout en haut */}
             {routeData && (
-              <div className="lg:col-span-1 flex flex-col">
-                <h3 className="text-base sm:text-lg font-semibold mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] flex items-center">
+              <div className="lg:col-span-1 flex flex-col gap-4">
+                <h3 className="text-base sm:text-lg font-semibold bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] flex items-center flex-shrink-0">
                   <Navigation className="h-5 w-5 mr-2 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
                   Itinéraire optimisé
                 </h3>
-                <div className="flex-1 overflow-y-auto pr-2 space-y-1" style={{
+                <div className="overflow-y-auto pr-2 space-y-1 flex-shrink-0" style={{
+                  maxHeight: '725px',
                   scrollbarWidth: 'thin',
                   scrollbarColor: 'rgba(99, 102, 241, 0.3) rgba(31, 41, 55, 0.5)'
                 }}>
@@ -682,52 +683,52 @@ const RouteOptimizerSchedule = () => {
                     scrollbarColor: 'rgba(99, 102, 241, 0.3) rgba(31, 41, 55, 0.5)'
                   }}>
                     {routeData.waypoints.map((waypoint, index) => (
-                      <div key={index} className="flex-shrink-0 w-64 p-3 border border-indigo-500/20 rounded-lg bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm shadow-md">
+                      <div key={index} className="flex-shrink-0 w-64 py-1 px-2.5 border border-indigo-500/20 rounded-lg bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm shadow-md">
                         {waypoint.type === 'starting_point' ? (
-                          <div className="flex items-center gap-2">
-                            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-xs font-bold border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
-                              <MapPin className="h-3 w-3 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
+                          <div className="flex items-center gap-1">
+                            <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-[9px] font-bold border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
+                              <MapPin className="h-2 w-2 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-xs text-cyan-300 font-medium truncate">Départ</div>
+                              <div className="text-[9px] text-cyan-300 font-medium truncate leading-tight">Départ</div>
                               <a 
                                 href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-white hover:text-cyan-300 hover:underline truncate block transition-colors cursor-pointer"
+                                className="text-[9px] text-white hover:text-cyan-300 hover:underline truncate block transition-colors cursor-pointer leading-tight"
                               >
                                 {waypoint.address}
                               </a>
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-start gap-2">
-                            <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-xs font-bold border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
+                          <div className="flex items-start gap-1">
+                            <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center bg-gradient-to-br from-indigo-500/30 to-purple-500/30 rounded-full text-white text-[9px] font-bold border border-indigo-400/40 shadow-lg shadow-indigo-500/20">
                               {index}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-xs font-medium text-white truncate mb-1">
+                              <div className="text-[9px] font-medium text-white truncate leading-tight">
                                 {waypoint.customerName}
                               </div>
                               <a 
                                 href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-cyan-400 hover:text-cyan-300 hover:underline truncate block transition-colors cursor-pointer"
+                                className="text-[9px] text-cyan-400 hover:text-cyan-300 hover:underline truncate block transition-colors cursor-pointer leading-tight"
                               >
                                 {waypoint.address}
                               </a>
                               {waypoint.phoneNumber && (
                                 <a 
                                   href={`tel:${waypoint.phoneNumber}`}
-                                  className="text-xs text-cyan-400 mt-1 block truncate"
+                                  className="text-[9px] text-cyan-400 block truncate leading-tight"
                                 >
                                   {waypoint.phoneNumber}
                                 </a>
                               )}
                               {waypoint.startAt && (
-                                <div className="text-xs text-gray-400 mt-1 flex items-center">
-                                  <Clock className="h-3 w-3 mr-1" />
+                                <div className="text-[9px] text-gray-400 flex items-center leading-tight">
+                                  <Clock className="h-2 w-2 mr-0.5" />
                                   {new Date(waypoint.startAt).getHours() === 0 
                                     ? "Toute la journée" 
                                     : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', {
