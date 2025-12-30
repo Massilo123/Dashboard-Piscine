@@ -350,3 +350,85 @@ export function getLavalDistrictFromPostalCode(postalCode: string): string | und
   return undefined;
 }
 
+/**
+ * Normalise un nom de secteur/district pour correspondre au format stocké en base de données
+ * Gère les variations de noms (accents, tirets, majuscules/minuscules)
+ */
+export function normalizeDistrictName(districtName: string): string | null {
+  if (!districtName || districtName.trim() === '') {
+    return null;
+  }
+
+  const normalized = districtName.trim();
+  const normalizedLower = normalized.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, ''); // Enlève les accents
+
+  // Vérifier d'abord dans les variations de Laval
+  const lavalVariationsLower = Object.keys(LAVAL_DISTRICT_VARIATIONS).reduce((acc, key) => {
+    const keyLower = key.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    acc[keyLower] = LAVAL_DISTRICT_VARIATIONS[key];
+    return acc;
+  }, {} as Record<string, string>);
+  
+  if (lavalVariationsLower[normalizedLower]) {
+    return lavalVariationsLower[normalizedLower];
+  }
+
+  // Vérifier si c'est directement un district valide de Laval (insensible à la casse)
+  const lavalDistricts = Array.from(VALID_LAVAL_DISTRICTS);
+  const exactMatch = lavalDistricts.find(d => {
+    const dLower = d.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return dLower === normalizedLower;
+  });
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  // Pour Montréal, chercher dans la liste des districts de Montréal
+  // Essayer de trouver une correspondance exacte ou partielle (le texte saisi doit être contenu dans le district)
+  // Ignorer les espaces et tirets pour les comparaisons
+  const normalizedLowerNoSeparators = normalizedLower.replace(/[- ]/g, '');
+  const montrealDistrict = MONTREAL_DISTRICTS_SEARCH_LIST.find(d => {
+    const dLower = d.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const dLowerNoSeparators = dLower.replace(/[- ]/g, '');
+    
+    // Correspondance exacte (avec ou sans séparateurs)
+    if (dLower === normalizedLower || dLowerNoSeparators === normalizedLowerNoSeparators) {
+      return true;
+    }
+    // Le texte saisi est contenu dans le district (sans séparateurs)
+    if (dLowerNoSeparators.includes(normalizedLowerNoSeparators)) {
+      return true;
+    }
+    // Le district est contenu dans le texte saisi (si l'utilisateur tape le nom complet)
+    if (normalizedLowerNoSeparators.includes(dLowerNoSeparators) && normalizedLowerNoSeparators.length > dLowerNoSeparators.length * 0.7) {
+      return true;
+    }
+    return false;
+  });
+
+  if (montrealDistrict) {
+    // Pour les noms avec tirets, capitaliser la première lettre de chaque mot
+    // Ex: "pointe-aux-trembles" -> "Pointe-aux-Trembles"
+    return montrealDistrict
+      .split(/[- ]/)
+      .map(word => {
+        // Préserver certaines abréviations
+        if (word.toLowerCase() === 'mc' || word.toLowerCase() === "o'" || word.toLowerCase() === "st" || word.toLowerCase() === "ste") {
+          return word;
+        }
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join('-');
+  }
+
+  // Si pas trouvé, essayer de normaliser en capitalisant chaque mot
+  const capitalized = normalized
+    .split(/[- ]/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join('-');
+
+  return capitalized;
+}
+

@@ -206,4 +206,80 @@ router.post('/clients-nearby-coordinates', async (req: Request, res: Response): 
     }
 });
 
+// Route pour rechercher des clients par district
+router.post('/clients-by-district', async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { district } = req.body;
+
+        if (!district?.trim()) {
+            res.status(400).json({
+                success: false,
+                error: 'District non fourni'
+            });
+            return;
+        }
+
+        // Normaliser le nom du district
+        const { normalizeDistrictName } = await import('../config/districts');
+        const normalizedDistrict = normalizeDistrictName(district);
+
+        if (!normalizedDistrict) {
+            res.status(400).json({
+                success: false,
+                error: `District non reconnu: ${district}`
+            });
+            return;
+        }
+
+        // Rechercher tous les clients avec ce district et des coordonnées
+        // Utiliser une regex pour une recherche insensible à la casse et aux variations
+        const districtRegex = new RegExp(`^${normalizedDistrict.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        const clients = await Client.find({
+            district: districtRegex,
+            coordinates: { $exists: true },
+            'coordinates.lng': { $exists: true },
+            'coordinates.lat': { $exists: true }
+        });
+
+        if (clients.length === 0) {
+            res.json({
+                success: true,
+                data: {
+                    message: `Aucun client trouvé dans le district: ${normalizedDistrict}`,
+                    clients: []
+                }
+            });
+            return;
+        }
+
+        // Retourner les clients avec leurs informations
+        const clientsData = clients.map(client => ({
+            id: client._id.toString(),
+            name: `${client.givenName} ${client.familyName || ''}`.trim(),
+            address: client.addressLine1 || '',
+            phoneNumber: client.phoneNumber || '',
+            coordinates: {
+                lng: client.coordinates!.lng,
+                lat: client.coordinates!.lat
+            },
+            district: client.district,
+            city: client.city
+        }));
+
+        res.json({
+            success: true,
+            data: {
+                clients: clientsData
+            }
+        });
+
+    } catch (error) {
+        console.error('Erreur:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Erreur inconnue'
+        });
+    }
+});
+
 export default router;

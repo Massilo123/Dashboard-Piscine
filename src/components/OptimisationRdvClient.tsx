@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 import API_CONFIG from '../config/api';
+import { filterLocations } from '../config/sectorsFilter';
 
 const baseClient = mbxClient({ accessToken: import.meta.env.VITE_MAPBOX_TOKEN || '' });
 const geocodingService = mbxGeocoding(baseClient);
@@ -97,6 +98,7 @@ const OptimisationRdvClient = () => {
   const [remainingDays, setRemainingDays] = useState<number>(0)
   const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
   const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(false)
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([])
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
@@ -116,6 +118,7 @@ const OptimisationRdvClient = () => {
     const handleClickOutside = (event: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         setSuggestions([]);
+        setLocationSuggestions([]);
       }
       
       if (filterRef.current && !filterRef.current.contains(event.target as Node) && showDateFilter) {
@@ -162,8 +165,16 @@ const OptimisationRdvClient = () => {
   }, [currentIndex, visitedClients]);
 
 
-  // Gestion des suggestions d'adresses
+  // Gestion des suggestions d'adresses et secteurs
   useEffect(() => {
+    // Rechercher les secteurs/villes qui correspondent
+    if (address.length >= 1 && !isAddressSelected) {
+      const locations = filterLocations(address);
+      setLocationSuggestions(locations);
+    } else {
+      setLocationSuggestions([]);
+    }
+
     const getSuggestions = async (searchAddress: string) => {
       if (searchAddress.length < 3 || isAddressSelected) {
         setSuggestions([]);
@@ -259,6 +270,13 @@ const OptimisationRdvClient = () => {
     setAddress(suggestion.place_name);
     setSuggestions([]);
     setIsAddressSelected(true);
+  };
+
+  // Fonction pour gérer la sélection d'une ville/district depuis les suggestions
+  const handleLocationSelect = (location: string) => {
+    setAddress(location);
+    setIsAddressSelected(false);
+    setLocationSuggestions([]);
   };
 
   const fetchClient = async (excludeDates: string[] = []) => {
@@ -516,14 +534,42 @@ const OptimisationRdvClient = () => {
                 type="text"
                 value={address}
                 onChange={handleAddressChange}
-                placeholder="Entrez une adresse"
+                placeholder="Entrez une adresse ou un secteur"
                 className="w-full border bg-gray-900/60 text-white border-indigo-500/30 rounded-lg p-2.5 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 placeholder-gray-500 transition-all duration-200"
               />
-              {suggestions.length > 0 && (
+              {(locationSuggestions.length > 0 || suggestions.length > 0) && (
                 <div className="absolute z-10 w-full bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm mt-1 border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20 max-h-60 overflow-y-auto">
+                  {/* Suggestions de secteurs/villes */}
+                  {locationSuggestions.length > 0 && (
+                    <>
+                      {locationSuggestions.map((location, index) => (
+                        <div
+                          key={`location-${index}`}
+                          className="p-3 hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-indigo-500/10 cursor-pointer text-gray-200 transition-all duration-200 border-b border-indigo-500/20"
+                          onClick={() => handleLocationSelect(location)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-purple-400" />
+                            <div>
+                              <div className="font-medium text-white">
+                                {location}
+                              </div>
+                              <div className="text-xs text-purple-300 mt-0.5">
+                                Secteur/Ville
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {suggestions.length > 0 && (
+                        <div className="border-t border-indigo-500/30 my-1"></div>
+                      )}
+                    </>
+                  )}
+                  {/* Suggestions d'adresses Mapbox */}
                   {suggestions.map((suggestion, index) => (
                     <div
-                      key={index}
+                      key={`address-${index}`}
                       className="p-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 cursor-pointer text-gray-200 transition-all duration-200 border-b border-indigo-500/20 last:border-b-0"
                       onClick={() => selectSuggestion(suggestion)}
                     >

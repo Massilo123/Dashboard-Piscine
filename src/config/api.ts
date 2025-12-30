@@ -13,6 +13,7 @@ export const API_CONFIG = {
     clientRdv: `${API_BASE_URL}/api/client-rdv`,
     mapboxClientsNearby: `${API_BASE_URL}/api/mapbox/clients-nearby`,
     mapboxClientsNearbyCoordinates: `${API_BASE_URL}/api/mapbox/clients-nearby-coordinates`,
+    mapboxClientsByDistrict: `${API_BASE_URL}/api/mapbox/clients-by-district`,
     clients: `${API_BASE_URL}/api/clienti`,
     searchClients: `${API_BASE_URL}/api/clients/search`,
     appointments: `${API_BASE_URL}/api/appointments`,

@@ -410,10 +410,10 @@ const ClientSearch = () => {
                                     />
                                     
                                     {suggestions.length > 0 && (
-                                        <div className="absolute z-10 w-full bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm mt-1 border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20">
+                                        <div className="absolute z-10 w-full bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-sm mt-1 border border-cyan-500/30 rounded-lg shadow-xl shadow-cyan-500/20 max-h-60 overflow-y-auto">
                                             {suggestions.map((suggestion, index) => (
                                                 <div
-                                                    key={index}
+                                                    key={`address-${index}`}
                                                     className="p-3 hover:bg-gradient-to-r hover:from-cyan-500/10 hover:to-indigo-500/10 cursor-pointer text-gray-200 transition-all duration-200 border-b border-indigo-500/20 last:border-b-0"
                                                     onClick={() => {
                                                         setAddress(suggestion.place_name);
