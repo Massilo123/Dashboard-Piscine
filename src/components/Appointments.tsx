@@ -83,7 +83,9 @@ const Appointments = () => {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
+    // Parser la date en format local (YYYY-MM-DD) pour éviter les problèmes de fuseau horaire
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('fr-CA', { 
       year: 'numeric', 
       month: 'long', 
@@ -134,7 +136,8 @@ const Appointments = () => {
   const sortedDates = Object.keys(groupedAppointments).sort((a, b) => {
     if (a === 'Sans date') return 1;
     if (b === 'Sans date') return -1;
-    return new Date(a).getTime() - new Date(b).getTime();
+    // Comparer directement les strings au format YYYY-MM-DD pour éviter les problèmes de fuseau horaire
+    return a.localeCompare(b);
   });
 
   if (loading) {

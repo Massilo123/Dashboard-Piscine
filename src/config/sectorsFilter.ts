@@ -143,3 +143,4 @@ export function filterLocations(query: string): string[] {
   }).slice(0, 10); // Limiter à 10 résultats
 }
 
+
