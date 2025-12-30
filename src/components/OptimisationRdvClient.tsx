@@ -243,6 +243,8 @@ const OptimisationRdvClient = () => {
   const handleClientSelect = (client: SearchClient) => {
     setAddress(client.address);
     setIsAddressSelected(true);
+    setLocationSuggestions([]);
+    setSuggestions([]);
     setClientSearchQuery('');
     setClientSearchResults([]);
     setShowClientSearchResults(false);
@@ -269,14 +271,16 @@ const OptimisationRdvClient = () => {
   const selectSuggestion = (suggestion: Suggestion) => {
     setAddress(suggestion.place_name);
     setSuggestions([]);
+    setLocationSuggestions([]);
     setIsAddressSelected(true);
   };
 
   // Fonction pour gérer la sélection d'une ville/district depuis les suggestions
   const handleLocationSelect = (location: string) => {
     setAddress(location);
-    setIsAddressSelected(false);
+    setIsAddressSelected(true);
     setLocationSuggestions([]);
+    setSuggestions([]);
   };
 
   const fetchClient = async (excludeDates: string[] = []) => {
