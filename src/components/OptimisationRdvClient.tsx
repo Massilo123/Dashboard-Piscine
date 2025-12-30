@@ -268,6 +268,15 @@ const OptimisationRdvClient = () => {
     setShowDateFilter(!showDateFilter);
   }
 
+  // Fonction pour formater une date au format français (JJ/MM/AAAA)
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString + 'T00:00:00');
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
   const selectSuggestion = (suggestion: Suggestion) => {
     setAddress(suggestion.place_name);
     setSuggestions([]);
@@ -422,20 +431,29 @@ const OptimisationRdvClient = () => {
   return (
     <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 space-y-4 py-6" ref={wrapperRef}>
       <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 p-4 sm:p-6 border border-indigo-500/20">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
             <h2 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
               Client le plus proche.
             </h2>
           </div>
-          <button 
-            onClick={toggleDateFilter}
-            className="flex items-center gap-1 text-cyan-200 px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 transition-all duration-200 backdrop-blur-sm"
-          >
-            <Filter className="h-4 w-4 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
-            <span>Dates</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Affichage de l'intervalle de dates */}
+            <div className="text-sm text-gray-300 px-3 py-1.5 rounded-lg bg-gray-800/60 border border-gray-600/30">
+              <span className="text-cyan-300">De </span>
+              <span className="font-medium">{formatDate(dateRange.startDate)}</span>
+              <span className="text-cyan-300"> à </span>
+              <span className="font-medium">{formatDate(dateRange.endDate)}</span>
+            </div>
+            <button 
+              onClick={toggleDateFilter}
+              className="flex items-center gap-1 text-cyan-200 px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 hover:-translate-y-0.5 transition-all duration-200 backdrop-blur-sm"
+            >
+              <Filter className="h-4 w-4 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
+              <span>Dates</span>
+            </button>
+          </div>
         </div>
 
         {/* Filtre par date - Visible uniquement lorsque activé */}
