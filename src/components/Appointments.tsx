@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import API_CONFIG from '../config/api';
 import { Calendar, Clock, MapPin, Phone, User, Building, CheckCircle, AlertCircle } from 'lucide-react';
@@ -72,14 +72,36 @@ const Appointments = () => {
     fetchAppointments();
   }, []);
 
+  // Calculer la date d'aujourd'hui à chaque rendu pour s'assurer que le filtre est toujours à jour
+  // Pas de useMemo ici car on veut recalculer à chaque rendu pour avoir la date actuelle
+  const getTodayString = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.toISOString().split('T')[0]; // Format YYYY-MM-DD
+  };
+
+  // Filtrer les appointments pour exclure ceux dont la date est passée
+  // Ce filtre s'applique automatiquement à chaque rendu, donc au chargement de la page
+  const filteredAppointments = useMemo(() => {
+    const todayString = getTodayString();
+    return appointments.filter((appointment) => {
+      // Garder les appointments sans date
+      if (!appointment.scheduled_date) {
+        return true;
+      }
+      // Exclure les appointments dont la date est strictement inférieure à aujourd'hui
+      return appointment.scheduled_date >= todayString;
+    });
+  }, [appointments]); // Recalculer quand les appointments changent
+
   // Marquer comme vu quand les appointments sont chargés (une seule fois)
   useEffect(() => {
-    if (appointments.length > 0 && !hasMarkedAsViewed.current) {
+    if (filteredAppointments.length > 0 && !hasMarkedAsViewed.current) {
       hasMarkedAsViewed.current = true;
       handleView();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointments.length]);
+  }, [filteredAppointments.length]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -124,7 +146,7 @@ const Appointments = () => {
   };
 
   // Grouper les appointments par date
-  const groupedAppointments = appointments.reduce((acc, appointment) => {
+  const groupedAppointments = filteredAppointments.reduce((acc, appointment) => {
     const date = appointment.scheduled_date || 'Sans date';
     if (!acc[date]) {
       acc[date] = [];
@@ -162,10 +184,10 @@ const Appointments = () => {
                 Rendez-vous à venir
               </h1>
               <p className="text-gray-400">
-                {appointments.length} {appointments.length === 1 ? 'rendez-vous' : 'rendez-vous'} programmé{appointments.length > 1 ? 's' : ''}
+                {filteredAppointments.length} {filteredAppointments.length === 1 ? 'rendez-vous' : 'rendez-vous'} programmé{filteredAppointments.length > 1 ? 's' : ''}
               </p>
             </div>
-            {!hasViewed && appointments.length > 0 && (
+            {!hasViewed && filteredAppointments.length > 0 && (
               <button
                 onClick={handleView}
                 className="px-4 py-2 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-300 rounded-md text-sm font-medium border border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all duration-200 backdrop-blur-sm"
@@ -182,7 +204,7 @@ const Appointments = () => {
           </div>
         )}
 
-        {appointments.length === 0 ? (
+        {filteredAppointments.length === 0 ? (
           <div className="text-center py-16">
             <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 text-lg">Aucun rendez-vous à venir</p>
