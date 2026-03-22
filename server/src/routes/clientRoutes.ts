@@ -53,17 +53,18 @@ router.get('/search', async (req, res) => {
     }
 
     const searchQuery = query.trim();
-    
-    // Créer une expression régulière pour la recherche insensible à la casse
-    const regex = new RegExp(searchQuery, 'i');
+
+    // Échapper les caractères spéciaux pour éviter les attaques ReDoS
+    const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Rechercher dans le nom (givenName + familyName), l'adresse et le numéro de téléphone
+    // Utilisation de $regex + $options natif MongoDB (plus sûr que new RegExp())
     const clients = await Client.find({
       $or: [
-        { givenName: { $regex: regex } },
-        { familyName: { $regex: regex } },
-        { addressLine1: { $regex: regex } },
-        { phoneNumber: { $regex: regex } }
+        { givenName: { $regex: escapedQuery, $options: 'i' } },
+        { familyName: { $regex: escapedQuery, $options: 'i' } },
+        { addressLine1: { $regex: escapedQuery, $options: 'i' } },
+        { phoneNumber: { $regex: escapedQuery, $options: 'i' } }
       ]
     })
     .select('givenName familyName phoneNumber addressLine1 coordinates _id')

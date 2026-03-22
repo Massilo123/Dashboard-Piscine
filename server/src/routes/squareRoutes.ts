@@ -1,11 +1,18 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Router, Request, Response } from 'express';
 import squareClient from '../config/square';
 import Client from '../models/Client';
 
 const router = Router();
 
-const sanitizeData = (obj: any): any => {
+type JsonSerializable =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonSerializable[]
+  | { [key: string]: JsonSerializable };
+
+const sanitizeData = (obj: unknown): JsonSerializable => {
     return JSON.parse(JSON.stringify(obj, (_, value) =>
         typeof value === 'bigint' ? value.toString() : value
     ));

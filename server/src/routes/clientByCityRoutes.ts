@@ -3541,5 +3541,165 @@ router.post('/geocode-missing', async (req: Request, res: Response): Promise<voi
   }
 });
 
+// ─── Routes directes (sans cache) fusionnées depuis clientByCityRoutesDirect.ts ───
+
+// Route pour récupérer les clients par ville SANS cache (aggregate MongoDB)
+router.get('/by-city-direct', async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('📊 Calcul direct depuis MongoDB (sans cache)...');
+    const startTime = Date.now();
+
+    const result = await Client.aggregate([
+      { $match: { addressLine1: { $exists: true, $ne: '' } } },
+      {
+        $group: {
+          _id: {
+            sector: { $ifNull: ['$sector', 'Non assignés'] },
+            city: { $ifNull: ['$city', 'Inconnu'] },
+            district: '$district'
+          },
+          clients: {
+            $push: {
+              _id: '$_id',
+              givenName: '$givenName',
+              familyName: '$familyName',
+              phoneNumber: '$phoneNumber',
+              addressLine1: '$addressLine1',
+              coordinates: '$coordinates',
+              city: { $ifNull: ['$city', 'Inconnu'] },
+              district: '$district'
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id.sector',
+          cities: {
+            $push: {
+              city: '$_id.city',
+              district: '$_id.district',
+              clients: '$clients'
+            }
+          }
+        }
+      }
+    ]);
+
+    const structuredData: Record<string, Record<string, { clients: ClientWithLocation[]; districts: Record<string, ClientWithLocation[]> }>> = {};
+    let totalClients = 0;
+
+    for (const sectorGroup of result) {
+      const sector = sectorGroup._id;
+      structuredData[sector] = {};
+
+      const citiesMap = new Map<string, { clients: ClientWithLocation[]; districts: Record<string, ClientWithLocation[]> }>();
+
+      for (const cityData of sectorGroup.cities) {
+        const city = cityData.city;
+
+        if (!citiesMap.has(city)) {
+          citiesMap.set(city, { clients: [], districts: {} });
+        }
+
+        const cityObj = citiesMap.get(city)!;
+
+        if (cityData.district) {
+          if (!cityObj.districts[cityData.district]) {
+            cityObj.districts[cityData.district] = [];
+          }
+          cityObj.districts[cityData.district].push(...cityData.clients);
+        } else {
+          cityObj.clients.push(...cityData.clients);
+        }
+
+        totalClients += cityData.clients.length;
+      }
+
+      if (sector === 'Montréal' || sector === 'Laval') {
+        structuredData[sector][sector] = { clients: [], districts: {} };
+        citiesMap.forEach((cityData) => {
+          if (Object.keys(cityData.districts).length > 0) {
+            Object.assign(structuredData[sector][sector].districts, cityData.districts);
+          }
+          if (cityData.clients.length > 0) {
+            structuredData[sector][sector].clients.push(...cityData.clients);
+          }
+        });
+      } else {
+        citiesMap.forEach((cityData, city) => {
+          structuredData[sector][city] = cityData;
+        });
+      }
+    }
+
+    const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`✅ Calcul terminé en ${totalTime}s (${totalClients} clients)`);
+
+    res.json({ success: true, data: structuredData, totalClients });
+  } catch (error) {
+    console.error('❌ Erreur lors du calcul direct:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Une erreur est survenue'
+    });
+  }
+});
+
+// Route pour récupérer les clients pour la map SANS cache
+router.get('/for-map-direct', async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log('📍 Calcul direct depuis MongoDB pour la map (sans cache)...');
+    const startTime = Date.now();
+
+    const clients = await Client.find({
+      coordinates: { $exists: true },
+      'coordinates.lng': { $exists: true },
+      'coordinates.lat': { $exists: true },
+      city: { $exists: true, $ne: null },
+      sector: { $exists: true, $ne: null }
+    }).lean();
+
+    const formattedClients = clients.map(client => ({
+      _id: client._id.toString(),
+      name: `${client.givenName || ''} ${client.familyName || ''}`.trim(),
+      phoneNumber: client.phoneNumber || undefined,
+      address: client.addressLine1 || '',
+      city: client.city || 'Inconnu',
+      district: client.district || undefined,
+      sector: client.sector || 'Non assignés',
+      coordinates: {
+        lng: (client.coordinates as { lng: number; lat: number }).lng,
+        lat: (client.coordinates as { lng: number; lat: number }).lat
+      }
+    }));
+
+    const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`✅ Calcul terminé en ${totalTime}s (${formattedClients.length} clients)`);
+
+    res.json({
+      success: true,
+      clients: formattedClients,
+      total: formattedClients.length,
+      totalInDatabase: await Client.countDocuments(),
+      totalWithCoordinates: formattedClients.length,
+      withoutCoordinates: await Client.countDocuments({
+        $or: [
+          { coordinates: { $exists: false } },
+          { 'coordinates.lng': { $exists: false } },
+          { 'coordinates.lat': { $exists: false } }
+        ]
+      }),
+      missingClients: []
+    });
+  } catch (error) {
+    console.error('❌ Erreur lors du calcul direct pour la map:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Une erreur est survenue'
+    });
+  }
+});
+
 export default router;
 
