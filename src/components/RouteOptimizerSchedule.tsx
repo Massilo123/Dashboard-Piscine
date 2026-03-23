@@ -615,12 +615,12 @@ const RouteOptimizerSchedule = () => {
             </div>
 
             {/* Contrôles de date et boutons */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 min-w-0">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 min-w-0 px-1">
               <input
                 type="date"
                 value={date}
                 onChange={handleDateChange}
-                className="border border-cyan-500/30 rounded-lg p-2.5 bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 w-full min-w-0 sm:w-auto backdrop-blur-sm shadow-md transition-all duration-200"
+                className="border border-cyan-500/30 rounded-lg px-3 py-2.5 bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 w-full min-w-0 sm:w-auto backdrop-blur-sm shadow-md transition-all duration-200"
               />
               <div className="flex gap-2 sm:gap-4">
                 <button
