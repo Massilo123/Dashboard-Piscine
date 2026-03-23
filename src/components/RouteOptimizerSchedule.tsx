@@ -422,7 +422,7 @@ const RouteOptimizerSchedule = () => {
   
     return (
       <div className="w-full max-w-7xl mx-auto p-2 sm:p-4 space-y-4">
-        <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 p-4 sm:p-6 border border-indigo-500/20">
+        <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 p-4 sm:p-6 border border-indigo-500/20 overflow-hidden">
           {/* Layout desktop : 2 colonnes - gauche (titre+boutons+carte), droite (liste) */}
           <div className="hidden lg:grid lg:grid-cols-3 lg:gap-4 lg:items-stretch">
             {/* Colonne gauche : Titre + Boutons + Carte */}
@@ -436,12 +436,12 @@ const RouteOptimizerSchedule = () => {
               </div>
 
               {/* Contrôles de date et boutons */}
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 min-w-0">
                 <input
                   type="date"
                   value={date}
                   onChange={handleDateChange}
-                  className="border border-cyan-500/30 rounded-lg p-2.5 bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 w-full sm:w-auto backdrop-blur-sm shadow-md transition-all duration-200"
+                  className="border border-cyan-500/30 rounded-lg p-2.5 bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 w-full min-w-0 sm:w-auto backdrop-blur-sm shadow-md transition-all duration-200"
                 />
                 <div className="flex gap-2 sm:gap-4">
                   <button
@@ -615,12 +615,12 @@ const RouteOptimizerSchedule = () => {
             </div>
 
             {/* Contrôles de date et boutons */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 min-w-0">
               <input
                 type="date"
                 value={date}
                 onChange={handleDateChange}
-                className="border border-cyan-500/30 rounded-lg p-2.5 bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 w-full sm:w-auto backdrop-blur-sm shadow-md transition-all duration-200"
+                className="border border-cyan-500/30 rounded-lg p-2.5 bg-gray-900/60 text-white focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 focus:shadow-lg focus:shadow-cyan-500/30 w-full min-w-0 sm:w-auto backdrop-blur-sm shadow-md transition-all duration-200"
               />
               <div className="flex gap-2 sm:gap-4">
                 <button
@@ -635,7 +635,7 @@ const RouteOptimizerSchedule = () => {
                   <Calendar className="h-4 w-4 mr-1.5 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
                   Aujourd'hui
                 </button>
-               
+
                 <button
                   onClick={fetchOptimizedRoute}
                   disabled={loading}
