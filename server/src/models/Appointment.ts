@@ -14,7 +14,8 @@ const appointmentSchema = new mongoose.Schema({
     conversation_id: { type: String },
     listing_title: { type: String },
     pool_type: { type: String },
-    important_notes: { type: String },
+    // Chaîne unique (legacy) ou tableau de phrases (recommandé)
+    important_notes: { type: mongoose.Schema.Types.Mixed },
     status: { type: String, default: 'confirmed' },
     extracted_at: { type: Date },
     created_at: { type: Date, default: Date.now },

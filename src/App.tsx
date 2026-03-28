@@ -130,17 +130,17 @@ function App() {
           
           {/* Contenu du header */}
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative max-w-[100vw]">
-            <div className="flex items-center justify-between h-16 md:h-20 min-h-[4rem] md:min-h-[5rem]">
-              {/* Logo et nom */}
-              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 mr-2">
+            <div className="flex items-center justify-between gap-2 md:gap-4 h-16 md:h-20 min-h-[4rem] md:min-h-[5rem]">
+              {/* Logo et nom — flex-1 seulement sur mobile (tronquer le titre) ; sur desktop largeur au contenu */}
+              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 md:flex-none md:shrink-0">
                 <AquariusLogo />
-                <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] truncate sm:whitespace-normal">
+                <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] truncate md:overflow-visible md:whitespace-normal">
                   Piscine Aquarius
                 </span>
               </div>
               
               {/* Navigation Desktop */}
-              <nav className="hidden md:flex items-center space-x-1 lg:space-x-3">
+              <nav className="hidden md:flex items-center flex-wrap justify-end gap-x-1 lg:gap-x-3 shrink-0">
                 <NavLink to="/client-search" icon={Search}>Recherche Client</NavLink>
                 <NavLink to="/schedule" icon={Calendar}>Planning</NavLink>
                 <NavLink to="/optimisation-rdv" icon={MapPin}>RDV Proche</NavLink>
@@ -150,7 +150,7 @@ function App() {
               </nav>
               
               {/* Bouton RDV et menu mobile */}
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 shrink-0">
                 <AppointmentNotification />
                 
                 <button

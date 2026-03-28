@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import API_CONFIG from '../config/api';
 import { importantNotesToItems } from '../utils/importantNotesItems';
-import { Calendar, Clock, MapPin, Phone, User, Building, CheckCircle, AlertCircle, StickyNote } from 'lucide-react';
+import { ImportantNotesCollapsible } from './ImportantNotesCollapsible';
+import { Calendar, Clock, MapPin, Phone, User, Building, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface Appointment {
   _id: string;
@@ -19,7 +20,7 @@ interface Appointment {
   conversation_id: string;
   listing_title: string;
   pool_type: string;
-  important_notes?: string;
+  important_notes?: string | string[];
   status: string;
   extracted_at: string;
   created_at: string;
@@ -313,18 +314,7 @@ const Appointments = () => {
                       </div>
 
                       {noteItems.length > 0 && (
-                        <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-100/95">
-                          <div className="flex items-start gap-2">
-                            <StickyNote className="w-4 h-4 text-amber-400 flex-shrink-0 mt-1" />
-                            <ul className="flex-1 space-y-2 pl-1 list-disc marker:text-amber-400 [list-style-position:outside] ml-4">
-                              {noteItems.map((line, i) => (
-                                <li key={i} className="leading-snug break-words pl-0.5">
-                                  {line}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
+                        <ImportantNotesCollapsible items={noteItems} className="mt-4" />
                       )}
 
                       {appointment.user_name && (

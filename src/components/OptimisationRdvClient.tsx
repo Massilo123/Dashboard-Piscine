@@ -1,10 +1,11 @@
-import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Filter, X, Search, StickyNote } from 'lucide-react'
+import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Filter, X, Search } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 import API_CONFIG from '../config/api';
 import { filterLocations } from '../config/sectorsFilter';
 import { importantNotesToItems } from '../utils/importantNotesItems';
+import { ImportantNotesCollapsible } from './ImportantNotesCollapsible';
 
 const baseClient = mbxClient({ accessToken: import.meta.env.VITE_MAPBOX_TOKEN || '' });
 const geocodingService = mbxGeocoding(baseClient);
@@ -51,7 +52,7 @@ interface ClientData {
     phoneNumber?: string
     city?: string
     district?: string
-    important_notes?: string
+    important_notes?: string | string[]
   }
   booking: {
     id: string
@@ -730,18 +731,7 @@ const OptimisationRdvClient = () => {
                     )}
 
                     {clientNoteItems.length > 0 && (
-                      <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-100/95">
-                        <div className="flex items-start gap-2">
-                          <StickyNote className="w-4 h-4 text-amber-400 flex-shrink-0 mt-1" />
-                          <ul className="flex-1 space-y-2 pl-1 list-disc marker:text-amber-400 [list-style-position:outside] ml-4">
-                            {clientNoteItems.map((line, i) => (
-                              <li key={i} className="leading-snug break-words pl-0.5">
-                                {line}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
+                      <ImportantNotesCollapsible items={clientNoteItems} className="mt-3" />
                     )}
                   </div>
                 </div>

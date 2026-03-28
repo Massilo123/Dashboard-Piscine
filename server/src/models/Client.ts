@@ -17,7 +17,7 @@ const clientSchema = new mongoose.Schema({
     // Champs pour suivre les rendez-vous
     bookingCount: { type: Number, default: 0 }, // Nombre total de rendez-vous
     isFrequentClient: { type: Boolean, default: false }, // true si bookingCount >= 3
-    important_notes: { type: String }
+    important_notes: { type: mongoose.Schema.Types.Mixed }
 }, {
     timestamps: true // Ajoute automatiquement createdAt et updatedAt
 });
