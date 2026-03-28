@@ -43,6 +43,7 @@ router.get('/future', async (req: Request, res: Response) => {
         district: apt.district || '',
         listing_title: apt.listing_title || '',
         pool_type: apt.pool_type || '',
+        important_notes: apt.important_notes || '',
         updated_at: apt.updated_at ? new Date(apt.updated_at).toISOString() : ''
       });
       
@@ -141,6 +142,7 @@ router.get('/unviewed-count', async (req: Request, res: Response) => {
         district: apt.district || '',
         listing_title: apt.listing_title || '',
         pool_type: apt.pool_type || '',
+        important_notes: apt.important_notes || '',
         updated_at: apt.updated_at ? new Date(apt.updated_at).toISOString() : ''
       });
       

@@ -125,16 +125,16 @@ function App() {
         </div>
 
         {/* Header Élégant */}
-        <header className="fixed top-0 left-0 right-0 z-50">
+        <header className="fixed top-0 left-0 right-0 z-50 pt-[env(safe-area-inset-top,0px)]">
           <div className="absolute inset-0 bg-gradient-to-r from-gray-900/95 via-indigo-950/95 to-purple-950/95 backdrop-blur-md border-b border-indigo-500/30 shadow-lg shadow-indigo-500/10"></div>
           
           {/* Contenu du header */}
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
-            <div className="flex items-center justify-between h-16 md:h-20">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative max-w-[100vw]">
+            <div className="flex items-center justify-between h-16 md:h-20 min-h-[4rem] md:min-h-[5rem]">
               {/* Logo et nom */}
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1 mr-2">
                 <AquariusLogo />
-                <span className="text-xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
+                <span className="text-base sm:text-xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)] truncate sm:whitespace-normal">
                   Piscine Aquarius
                 </span>
               </div>
@@ -180,8 +180,8 @@ function App() {
           <MobileMenu mobileMenuOpen={mobileMenuOpen} toggleMobileMenu={toggleMobileMenu} />
         </header>
 
-        {/* Content Area avec spacing pour le header fixe */}
-        <div className="container mx-auto py-4 px-4 relative z-10 mt-20">
+        {/* Content Area : marge sous header + encoches / home indicator */}
+        <div className="container mx-auto py-4 px-4 relative z-10 max-w-[100vw] mt-[calc(4rem+env(safe-area-inset-top,0px))] md:mt-[calc(5rem+env(safe-area-inset-top,0px))] pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
           <AuthGate>
             <Routes>
               <Route path="/" element={<Navigate to="/schedule" replace />} />

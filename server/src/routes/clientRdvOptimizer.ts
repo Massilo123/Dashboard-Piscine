@@ -237,7 +237,7 @@ router.post('/', async (req: Request, res: Response) => {
             'coordinates.lng': { $exists: true, $ne: null },
             'coordinates.lat': { $exists: true, $ne: null },
             addressLine1: { $exists: true, $ne: '' }
-        }).select('squareId givenName familyName phoneNumber addressLine1 coordinates city district');
+        }).select('squareId givenName familyName phoneNumber addressLine1 coordinates city district important_notes');
 
         // Créer un map pour accéder rapidement aux clients par squareId
         const clientsMap = new Map<string, typeof clientsFromMongo[0]>();
@@ -263,6 +263,7 @@ router.post('/', async (req: Request, res: Response) => {
             phoneNumber?: string;
             city?: string;
             district?: string;
+            important_notes?: string;
             haversineDistance: number; // Pour le tri initial
         }[] = [];
 
@@ -312,6 +313,7 @@ router.post('/', async (req: Request, res: Response) => {
                     phoneNumber: client.phoneNumber || undefined,
                     city: client.city || undefined,
                     district: client.district || undefined,
+                    important_notes: client.important_notes || undefined,
                     haversineDistance
                 });
             }
@@ -485,7 +487,8 @@ router.post('/', async (req: Request, res: Response) => {
                     address: nearestClient.address,
                     phoneNumber: nearestClient.phoneNumber || undefined,
                     city: nearestClient.city || undefined,
-                    district: nearestClient.district || undefined
+                    district: nearestClient.district || undefined,
+                    important_notes: nearestClient.important_notes || undefined
                 },
                 booking: {
                     id: nearestClient.bookingId,

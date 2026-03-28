@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import API_CONFIG from '../config/api';
-import { Calendar, Clock, MapPin, Phone, User, Building, CheckCircle, AlertCircle } from 'lucide-react';
+import { importantNotesToItems } from '../utils/importantNotesItems';
+import { Calendar, Clock, MapPin, Phone, User, Building, CheckCircle, AlertCircle, StickyNote } from 'lucide-react';
 
 interface Appointment {
   _id: string;
@@ -18,6 +19,7 @@ interface Appointment {
   conversation_id: string;
   listing_title: string;
   pool_type: string;
+  important_notes?: string;
   status: string;
   extracted_at: string;
   created_at: string;
@@ -56,7 +58,8 @@ const Appointments = () => {
       const response = await axios.get(API_CONFIG.endpoints.appointmentsFuture);
       
       if (response.data.success) {
-        setAppointments(response.data.appointments || []);
+        const raw = response.data.appointments;
+        setAppointments(Array.isArray(raw) ? raw : []);
       } else {
         setError('Erreur lors de la récupération des rendez-vous');
       }
@@ -83,8 +86,9 @@ const Appointments = () => {
   // Filtrer les appointments pour exclure ceux dont la date est passée
   // Ce filtre s'applique automatiquement à chaque rendu, donc au chargement de la page
   const filteredAppointments = useMemo(() => {
+    const list = Array.isArray(appointments) ? appointments : [];
     const todayString = getTodayString();
-    return appointments.filter((appointment) => {
+    return list.filter((appointment) => {
       // Garder les appointments sans date
       if (!appointment.scheduled_date) {
         return true;
@@ -92,7 +96,7 @@ const Appointments = () => {
       // Exclure les appointments dont la date est strictement inférieure à aujourd'hui
       return appointment.scheduled_date >= todayString;
     });
-  }, [appointments]); // Recalculer quand les appointments changent
+  }, [appointments]);
 
   // Marquer comme vu quand les appointments sont chargés (une seule fois)
   useEffect(() => {
@@ -104,25 +108,39 @@ const Appointments = () => {
   }, [filteredAppointments.length]);
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    // Parser la date en format local (YYYY-MM-DD) pour éviter les problèmes de fuseau horaire
-    const [year, month, day] = dateString.split('-').map(Number);
+    if (!dateString || typeof dateString !== 'string') return 'N/A';
+    const ymd = dateString.slice(0, 10);
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+    if (!m) {
+      const d = new Date(dateString);
+      return Number.isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('fr-CA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    }
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    const day = Number(m[3]);
     const date = new Date(year, month - 1, day);
-    return date.toLocaleDateString('fr-CA', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    return Number.isNaN(date.getTime())
+      ? 'N/A'
+      : date.toLocaleDateString('fr-CA', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
   };
 
   const formatTime = (timeString: string) => {
-    if (!timeString) return 'N/A';
-    // Format HH:mm en format 12h
-    const [hours, minutes] = timeString.split(':');
-    const hour = parseInt(hours);
+    if (timeString == null || timeString === '') return 'N/A';
+    const s = typeof timeString === 'string' ? timeString : String(timeString);
+    const [hours, minutes = '00'] = s.split(':');
+    const hour = parseInt(hours, 10);
+    if (Number.isNaN(hour)) return 'N/A';
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const hour12 = hour % 12 || 12;
-    return `${hour12}:${minutes} ${ampm}`;
+    return `${hour12}:${minutes.padStart(2, '0').slice(0, 2)} ${ampm}`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -219,7 +237,9 @@ const Appointments = () => {
                 </h2>
                 
                 <div className="space-y-4">
-                  {groupedAppointments[date].map((appointment) => (
+                  {groupedAppointments[date].map((appointment) => {
+                    const noteItems = importantNotesToItems(appointment.important_notes);
+                    return (
                     <div
                       key={appointment._id}
                       className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-5 hover:border-cyan-500/50 transition-all duration-200"
@@ -292,6 +312,21 @@ const Appointments = () => {
                         </div>
                       </div>
 
+                      {noteItems.length > 0 && (
+                        <div className="mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm text-amber-100/95">
+                          <div className="flex items-start gap-2">
+                            <StickyNote className="w-4 h-4 text-amber-400 flex-shrink-0 mt-1" />
+                            <ul className="flex-1 space-y-2 pl-1 list-disc marker:text-amber-400 [list-style-position:outside] ml-4">
+                              {noteItems.map((line, i) => (
+                                <li key={i} className="leading-snug break-words pl-0.5">
+                                  {line}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+
                       {appointment.user_name && (
                         <div className="mt-4 pt-4 border-t border-gray-700/50 flex items-center text-xs text-gray-500">
                           <User className="w-3 h-3 mr-1" />
@@ -299,7 +334,8 @@ const Appointments = () => {
                         </div>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}

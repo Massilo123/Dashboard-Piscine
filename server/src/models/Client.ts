@@ -16,7 +16,8 @@ const clientSchema = new mongoose.Schema({
     sector: { type: String }, // Montréal, Laval, Rive Nord, Rive Sud, Autres
     // Champs pour suivre les rendez-vous
     bookingCount: { type: Number, default: 0 }, // Nombre total de rendez-vous
-    isFrequentClient: { type: Boolean, default: false } // true si bookingCount >= 3
+    isFrequentClient: { type: Boolean, default: false }, // true si bookingCount >= 3
+    important_notes: { type: String }
 }, {
     timestamps: true // Ajoute automatiquement createdAt et updatedAt
 });
