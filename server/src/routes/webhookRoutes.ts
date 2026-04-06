@@ -329,30 +329,31 @@ async function processWebhookEvent(type: string, data: any): Promise<{ success: 
                 const bookingUpdatedCustomerId = extractCustomerIdFromBooking(data);
                 console.log(`🔍 ID client extrait du booking: ${bookingUpdatedCustomerId || 'NON TROUVÉ'}`);
                 if (bookingUpdatedCustomerId) {
-                    try {
-                        // Vérifier le statut du booking pour logger l'information
-                        const booking = data?.object?.booking || data?.booking || data?.object;
-                        const status = booking?.status ? String(booking.status) : 'UNKNOWN';
-                        const isCancelled = status === 'CANCELLED' || 
-                                          status === 'CANCELLED_BY_SELLER' || 
-                                          status === 'CANCELLED_BY_CUSTOMER';
-                        
-                        if (isCancelled) {
-                            console.log(`❌ Rendez-vous annulé (statut: ${status}) - recalcul du compteur...`);
-                        } else {
-                            console.log(`ℹ️ Rendez-vous mis à jour (statut: ${status}) - recalcul du compteur...`);
-                        }
-                        
-                        // Utiliser la fonction existante pour recompter tous les bookings
-                        const { updateClientBookingCount } = await import('../utils/updateBookingCounts');
-                        const result = await updateClientBookingCount(bookingUpdatedCustomerId);
-                        console.log(`✅ Compteur de rendez-vous recalculé pour ${bookingUpdatedCustomerId}: ${result.bookingCount} (fréquent: ${result.isFrequentClient})`);
-                        return { success: true };
-                    } catch (error) {
-                        const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
-                        console.error(`❌ Erreur lors du recalcul du compteur pour ${bookingUpdatedCustomerId}:`, error);
-                        return { success: false, error: errorMsg };
+                    // Vérifier le statut du booking pour logger l'information
+                    const booking = data?.object?.booking || data?.booking || data?.object;
+                    const status = booking?.status ? String(booking.status) : 'UNKNOWN';
+                    const isCancelled = status === 'CANCELLED' ||
+                                      status === 'CANCELLED_BY_SELLER' ||
+                                      status === 'CANCELLED_BY_CUSTOMER';
+
+                    if (isCancelled) {
+                        console.log(`❌ Rendez-vous annulé (statut: ${status}) - recalcul du compteur en background...`);
+                    } else {
+                        console.log(`ℹ️ Rendez-vous mis à jour (statut: ${status}) - recalcul du compteur en background...`);
                     }
+
+                    // Traiter en arrière-plan pour ne pas bloquer la réponse à Square (évite le 504)
+                    import('../utils/updateBookingCounts').then(({ updateClientBookingCount }) => {
+                        updateClientBookingCount(bookingUpdatedCustomerId)
+                            .then(result => {
+                                console.log(`✅ Compteur de rendez-vous recalculé pour ${bookingUpdatedCustomerId}: ${result.bookingCount} (fréquent: ${result.isFrequentClient})`);
+                            })
+                            .catch(err => {
+                                console.error(`❌ Erreur lors du recalcul du compteur pour ${bookingUpdatedCustomerId}:`, err);
+                            });
+                    });
+
+                    return { success: true };
                 } else {
                     const errorMsg = 'booking.updated reçu mais pas d\'ID client trouvé';
                     console.warn(`⚠️ ${errorMsg}. Structure data:`, JSON.stringify(data, null, 2));
