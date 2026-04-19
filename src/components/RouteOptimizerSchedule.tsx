@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom'
-import { Calendar, Clock, MapPin, Navigation, CheckCircle, Timer, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Calendar, Clock, MapPin, Navigation, CheckCircle, Timer } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -43,7 +43,7 @@ interface RouteData {
 }
 
 const RouteOptimizerSchedule = () => {
-    const [date, setDate] = useState<string>('')
+    const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0])
     const [loading, setLoading] = useState<boolean>(false)
     const [routeData, setRouteData] = useState<RouteData | null>(null)
     const [error, setError] = useState<string>('')
@@ -69,6 +69,13 @@ const RouteOptimizerSchedule = () => {
         }
     }, [shouldFetch, date])
 
+    // Auto-fetch today's route on mobile mount
+    useEffect(() => {
+        if (window.innerWidth < 1024) {
+            fetchOptimizedRoute()
+        }
+    }, [])
+
     // Reset carousel when new route data arrives
     useEffect(() => {
         setCurrentCardIndex(0)
@@ -90,7 +97,7 @@ const RouteOptimizerSchedule = () => {
         if (wp.type === 'starting_point') {
             const points: L.LatLngExpression[] = waypoints.map(w => [w.coordinates[1], w.coordinates[0]])
             if (points.length > 0) {
-                mapRef.current.flyToBounds(L.latLngBounds(points), { padding: [50, 50], duration: 0.7 })
+                mapRef.current.flyToBounds(L.latLngBounds(points), { paddingTopLeft: [40, 40], paddingBottomRight: [40, 220], duration: 0.7 })
             }
             return
         }
@@ -110,9 +117,6 @@ const RouteOptimizerSchedule = () => {
         flyToWaypoint(index)
         setTimeout(() => { ignoreScroll.current = false }, smooth ? 320 : 80)
     }, [flyToWaypoint])
-
-    const prevCard = () => scrollToIndex(Math.max(0, currentCardIndex - 1))
-    const nextCard = () => routeData && scrollToIndex(Math.min(routeData.waypoints.length - 1, currentCardIndex + 1))
 
     const handleCarouselScroll = () => {
         if (ignoreScroll.current) return
@@ -354,7 +358,7 @@ const RouteOptimizerSchedule = () => {
 
             if (routePoints.length > 0) {
                 const bounds = L.latLngBounds(routePoints);
-                newMap.fitBounds(bounds, { padding: [50, 50] });
+                newMap.fitBounds(bounds, { paddingTopLeft: [40, 40], paddingBottomRight: [40, 220] });
             }
 
             mapRef.current = newMap;
@@ -432,9 +436,18 @@ const RouteOptimizerSchedule = () => {
       </svg>
     )
 
+    const WazeIcon = () => (
+      <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12c0 2.9 1.18 5.53 3.1 7.43l-.31 2.57 2.85-1.14A9.93 9.93 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2z"/>
+        <circle cx="9" cy="11" r="1.3" fill="rgba(0,0,0,0.45)"/>
+        <circle cx="15" cy="11" r="1.3" fill="rgba(0,0,0,0.45)"/>
+        <path d="M9.5 14.2c.55.85 1.4 1.3 2.5 1.3s1.95-.45 2.5-1.3" fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth="1.1" strokeLinecap="round"/>
+      </svg>
+    )
+
     return (
       <>
-        <div className="w-full max-w-7xl mx-auto p-2 sm:p-4 space-y-4">
+        <div className="hidden lg:block w-full max-w-7xl mx-auto p-2 sm:p-4 space-y-4">
           <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 p-4 sm:p-6 border border-indigo-500/20 overflow-hidden">
 
             {/* ===== DESKTOP LAYOUT ===== */}
@@ -580,13 +593,13 @@ const RouteOptimizerSchedule = () => {
                           )}
                         </div>
 
-                        {index < routeData.waypoints.length - 1 && travelTimes[index] !== undefined && (
+                        {index > 0 && travelTimes[index - 1] !== undefined && (
                           <div className="flex justify-center items-center py-0.5">
                             <div className="flex items-center text-cyan-300 px-2 py-0.5 text-xs bg-gradient-to-br from-gray-900/95 to-gray-800/85 backdrop-blur-sm rounded border border-cyan-500/20 shadow-lg shadow-cyan-500/10 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
                               <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
                                 <polyline points="6 9 12 15 18 9"></polyline>
                               </svg>
-                              <span>{travelTimes[index]} min</span>
+                              <span>{travelTimes[index - 1]} min</span>
                             </div>
                           </div>
                         )}
@@ -597,87 +610,34 @@ const RouteOptimizerSchedule = () => {
               )}
             </div>
 
-            {/* ===== MOBILE LAYOUT — controls only ===== */}
-            <div className="lg:hidden flex flex-col gap-4 w-full overflow-hidden">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.8)]" />
-                <h2 className="text-lg font-semibold bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
-                  Optimisation des rendez-vous
-                </h2>
-              </div>
-
-              <div className="flex flex-col gap-2 w-full min-w-0">
-                <input
-                  type="date"
-                  value={date}
-                  onChange={handleDateChange}
-                  placeholder="Entrer une date"
-                  className="border border-cyan-500/30 rounded-lg px-4 py-4 bg-gray-900/60 text-white placeholder-gray-400 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 w-full max-w-full min-w-0 backdrop-blur-sm shadow-md transition-all duration-200 appearance-none text-base"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      const today = new Date();
-                      setDate(today.toISOString().split('T')[0]);
-                      setShouldFetch(true);
-                    }}
-                    className="flex-1 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 backdrop-blur-sm text-cyan-200 px-4 py-2.5 rounded-lg transition-all duration-200 text-sm border border-cyan-400/40 shadow-lg shadow-cyan-500/20 flex items-center justify-center"
-                  >
-                    <Calendar className="h-4 w-4 mr-1.5 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
-                    Aujourd'hui
-                  </button>
-                  <button
-                    onClick={fetchOptimizedRoute}
-                    disabled={loading}
-                    className="flex-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 disabled:from-gray-600/20 disabled:to-gray-600/20 backdrop-blur-sm text-indigo-200 px-4 py-2.5 rounded-lg disabled:text-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-sm border border-indigo-400/40 shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center"
-                  >
-                    {loading ? (
-                      <><LoadingSpinner /><span className="ml-2">Optimisation...</span></>
-                    ) : (
-                      <><CheckCircle className="h-4 w-4 mr-1.5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />Optimiser</>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {error && (
-                <div className="text-rose-300 p-3 bg-gradient-to-br from-rose-900/40 to-pink-900/40 backdrop-blur-sm rounded-lg text-sm border border-rose-500/50 shadow-lg shadow-rose-500/20 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-rose-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                  </svg>
-                  {error}
-                </div>
-              )}
-            </div>
 
           </div>
+
         </div>
 
-        {/* ===== MOBILE FULL-SCREEN MAP OVERLAY — portalled to document.body to escape any ancestor backdrop-filter/transform ===== */}
+        {/* ===== MOBILE FULL-SCREEN MAP OVERLAY — starts below site header ===== */}
         {routeData && createPortal(
-          <div className="fixed inset-0 lg:hidden flex flex-col justify-between" style={{ zIndex: 9999 }}>
+          <div className="lg:hidden flex flex-col justify-between" style={{ position: 'fixed', top: 'calc(4rem + env(safe-area-inset-top, 0px))', left: 0, right: 0, bottom: 0, zIndex: 49 }}>
 
-            {/* Map background — isolated stacking context so Leaflet's internal z-indexes don't escape */}
-            <div ref={mapContainerMobile} className="absolute inset-0 w-full h-full" style={{ zIndex: 0, isolation: 'isolate' }} />
+            {/* Map background */}
+            <div
+                ref={mapContainerMobile}
+                className="absolute inset-0 w-full h-full"
+                style={{ zIndex: 0, isolation: 'isolate' }}
+              />
 
             {/* Top controls bar */}
-            <div className="relative bg-gray-900/85 backdrop-blur-md border-b border-indigo-500/30 px-3 py-2" style={{ zIndex: 1000 }}>
+            <div className="relative bg-gradient-to-r from-gray-900/95 via-indigo-950/95 to-purple-950/95 backdrop-blur-md border-b border-indigo-500/30 shadow-lg shadow-indigo-500/10 px-3 py-2" style={{ zIndex: 1000 }}>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
                   value={date}
                   onChange={handleDateChange}
-                  className="flex-1 min-w-0 border border-cyan-500/30 rounded-lg px-3 py-2 bg-gray-900/60 text-white text-sm focus:ring-1 focus:ring-cyan-500/50 backdrop-blur-sm appearance-none"
+                  className="flex-1 min-w-0 border border-indigo-500/30 rounded-lg px-3 py-2 bg-transparent text-white text-sm focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-400/60 appearance-none transition-all duration-200"
                 />
                 <button
-                  onClick={() => {
-                    const today = new Date();
-                    setDate(today.toISOString().split('T')[0]);
-                    setShouldFetch(true);
-                  }}
-                  className="flex-shrink-0 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 text-cyan-200 p-2 rounded-lg border border-cyan-400/40 shadow-lg active:scale-95 transition-transform"
+                  onClick={() => { const today = new Date(); setDate(today.toISOString().split('T')[0]); setShouldFetch(true); }}
+                  className="flex-shrink-0 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 p-2 rounded-lg border border-cyan-400/40 shadow-lg shadow-cyan-500/10 active:scale-95 transition-all duration-200"
                   title="Aujourd'hui"
                 >
                   <Calendar className="h-4 w-4 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
@@ -685,30 +645,18 @@ const RouteOptimizerSchedule = () => {
                 <button
                   onClick={fetchOptimizedRoute}
                   disabled={loading}
-                  className="flex-shrink-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-200 p-2 rounded-lg border border-indigo-400/40 shadow-lg disabled:opacity-50 active:scale-95 transition-transform"
+                  className="flex-shrink-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 p-2 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/10 disabled:opacity-50 active:scale-95 transition-all duration-200"
                   title="Optimiser"
                 >
                   {loading ? <LoadingSpinner /> : <CheckCircle className="h-4 w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />}
                 </button>
-                <button
-                  onClick={() => setRouteData(null)}
-                  className="flex-shrink-0 text-gray-400 hover:text-white p-2 rounded-lg border border-gray-500/30 hover:border-gray-400/50 transition-colors active:scale-95"
-                  title="Fermer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
               </div>
             </div>
 
-            {/* Bottom carousel stack — gradient bg anchors it visually to the bottom edge */}
-            <div className="relative" style={{
-              zIndex: 1000,
-              background: 'linear-gradient(to top, rgba(8,8,20,0.95) 0%, rgba(8,8,20,0.80) 60%, transparent 100%)',
-              paddingTop: '2rem',
-              paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))',
-            }}>
+            {/* Bottom carousel stack */}
+            <div className="relative" style={{ zIndex: 1000, background: 'linear-gradient(to top, rgba(8,8,20,0.95) 0%, rgba(8,8,20,0.80) 60%, transparent 100%)', paddingTop: '2rem', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
 
-              {/* Info row: stop counter + swipe hint */}
+              {/* Stop indicator */}
               <div className="flex justify-between items-center px-4 mb-1.5">
                 <span className="text-xs font-semibold text-white/80 bg-gray-900/60 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-indigo-500/25">
                   {routeData.waypoints[currentCardIndex]?.type === 'starting_point'
@@ -722,160 +670,171 @@ const RouteOptimizerSchedule = () => {
                 )}
               </div>
 
-              {/* Carousel + nav buttons row */}
-              <div className="relative flex items-center gap-1 px-1">
+              {/* Scroll-snap carousel */}
+              <div
+                ref={carouselRef}
+                onScroll={handleCarouselScroll}
+                className="flex flex-row flex-nowrap overflow-x-auto overflow-y-hidden"
+                style={{
+                  scrollSnapType: 'x mandatory',
+                  scrollBehavior: 'smooth',
+                  WebkitOverflowScrolling: 'touch',
+                  touchAction: 'pan-x',
+                  scrollbarWidth: 'none',
+                }}
+              >
+                {routeData.waypoints.map((waypoint, index) => {
+                  const wazeUrl = `https://waze.com/ul?ll=${waypoint.coordinates[1]},${waypoint.coordinates[0]}&navigate=yes`;
+                  const timeStr = waypoint.startAt
+                    ? (new Date(waypoint.startAt).getHours() === 0
+                        ? 'Toute la journée'
+                        : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
+                    : null;
 
-                {/* Prev button */}
-                {routeData.waypoints.length > 1 && (
-                  <button
-                    onClick={prevCard}
-                    disabled={currentCardIndex === 0}
-                    className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-gray-900/80 backdrop-blur-md border border-indigo-500/30 rounded-full text-indigo-300 shadow-lg shadow-indigo-500/10 disabled:opacity-20 active:scale-95 transition-transform"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                )}
+                  return (
+                    <div
+                      key={index}
+                      style={{ flex: '0 0 100%', minWidth: '100%', maxWidth: '100%', scrollSnapAlign: 'start', scrollSnapStop: 'always', boxSizing: 'border-box', padding: '0 0.25rem', height: '250px' }}
+                    >
+                      <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-indigo-500/30 rounded-2xl shadow-2xl shadow-indigo-500/20 p-4 h-full flex flex-col">
 
-                {/* Scroll-snap carousel */}
-                <div
-                  ref={carouselRef}
-                  onScroll={handleCarouselScroll}
-                  className="flex-1 flex flex-row flex-nowrap overflow-x-auto overflow-y-hidden"
-                  style={{
-                    scrollSnapType: 'x mandatory',
-                    scrollBehavior: 'smooth',
-                    WebkitOverflowScrolling: 'touch',
-                    touchAction: 'pan-x',
-                    scrollbarWidth: 'none',
-                  }}
-                >
-                  {routeData.waypoints.map((waypoint, index) => {
-                    const wazeUrl = `https://waze.com/ul?ll=${waypoint.coordinates[1]},${waypoint.coordinates[0]}&navigate=yes`;
-                    const timeStr = waypoint.startAt
-                      ? (new Date(waypoint.startAt).getHours() === 0
-                          ? 'Toute la journée'
-                          : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
-                      : null;
-
-                    return (
-                      <div
-                        key={index}
-                        style={{ flex: '0 0 100%', minWidth: '100%', maxWidth: '100%', scrollSnapAlign: 'start', scrollSnapStop: 'always', boxSizing: 'border-box', padding: '0 0.25rem' }}
-                      >
-                        <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-indigo-500/30 rounded-2xl shadow-2xl shadow-indigo-500/20 p-4">
-
-                          {waypoint.type === 'starting_point' ? (
-                            <>
-                              <div className="flex items-center gap-2.5 mb-2.5">
-                                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500/40 to-purple-500/40 rounded-full border border-indigo-400/50 shadow-lg shadow-indigo-500/30">
-                                  <MapPin className="h-4 w-4 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
-                                </div>
-                                <span className="text-base font-bold text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.6)]">Point de départ</span>
+                        {waypoint.type === 'starting_point' ? (
+                          <>
+                            <div className="flex items-center gap-3">
+                              <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-gradient-to-br from-indigo-500/40 to-purple-500/40 rounded-full border border-indigo-400/50 shadow-lg shadow-indigo-500/30">
+                                <MapPin className="h-5 w-5 text-cyan-400 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
                               </div>
-                              <a
-                                href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-start gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 transition-colors mb-3"
-                              >
-                                <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                <span>{waypoint.address}</span>
-                              </a>
-                              <a
-                                href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 bg-gradient-to-r from-indigo-600/80 to-purple-600/80 hover:from-indigo-600 hover:to-purple-600 text-white text-sm font-semibold py-2.5 rounded-xl text-center border border-indigo-500/40 shadow-lg shadow-indigo-500/20 transition-all active:scale-95 block mt-1"
-                              >
-                                Waze
-                              </a>
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex items-center gap-2.5 mb-2.5">
-                                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500/40 to-purple-500/40 rounded-full text-white text-sm font-bold border border-indigo-400/50 shadow-lg shadow-indigo-500/30">
-                                  #{index}
+                              <div>
+                                <span className="text-lg font-bold text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.6)]">Point de départ</span>
+                                <p className="text-sm text-gray-400 mt-0.5">{waypoint.address}</p>
+                              </div>
+                            </div>
+                            {(() => {
+                              const totalMinutes = travelTimes.reduce((a, b) => a + b, 0);
+                              const legs = routeData.route && typeof routeData.route === 'object' && 'legs' in routeData.route
+                                ? (routeData.route as { legs: RouteLeg[] }).legs : null;
+                              const totalKm = legs
+                                ? (legs.reduce((s, l) => s + l.distance, 0) / 1000).toFixed(1)
+                                : '—';
+                              return (
+                                <>
+                                  <div className="flex items-center gap-2 my-3">
+                                    <div className="flex-1 h-px bg-indigo-500/20" />
+                                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">Résumé du trajet</span>
+                                    <div className="flex-1 h-px bg-indigo-500/20" />
+                                  </div>
+                                  <div className="flex items-center justify-around">
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span className="text-2xl font-bold text-indigo-300 drop-shadow-[0_0_6px_rgba(139,92,246,0.6)]">{routeData.waypoints.length - 1}</span>
+                                      <span className="text-[11px] text-gray-400">arrêts</span>
+                                    </div>
+                                    <div className="w-px h-10 bg-indigo-500/20" />
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span className="text-2xl font-bold text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,0.6)]">{totalMinutes}</span>
+                                      <span className="text-[11px] text-gray-400">minutes</span>
+                                    </div>
+                                    <div className="w-px h-10 bg-indigo-500/20" />
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span className="text-2xl font-bold text-purple-300 drop-shadow-[0_0_6px_rgba(168,85,247,0.6)]">{totalKm}</span>
+                                      <span className="text-[11px] text-gray-400">km</span>
+                                    </div>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                            {travelTimes[0] !== undefined && (() => {
+                              const legs = routeData.route && typeof routeData.route === 'object' && 'legs' in routeData.route
+                                ? (routeData.route as { legs: RouteLeg[] }).legs : null;
+                              const nextKm = legs && legs[0] ? (legs[0].distance / 1000).toFixed(1) : null;
+                              return (
+                                <div className="flex items-center gap-2 mt-auto">
+                                  <Navigation className="h-4 w-4 text-indigo-400 flex-shrink-0" />
+                                  <span className="text-sm text-gray-300">Prochain arrêt</span>
+                                  <span className="text-sm font-bold text-indigo-300 ml-auto drop-shadow-[0_0_4px_rgba(139,92,246,0.5)]">{travelTimes[0]} min{nextKm ? ` · ${nextKm} km` : ''}</span>
                                 </div>
-                                <span className="text-base font-bold text-white drop-shadow-[0_0_4px_rgba(139,92,246,0.5)] truncate flex-1">
-                                  {waypoint.customerName}
+                              );
+                            })()}
+                          </>
+                        ) : (
+                          <>
+                            {/* Header: badge + name */}
+                            <div className="flex items-center gap-2.5 mb-2.5">
+                              <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500/40 to-purple-500/40 rounded-full text-white text-sm font-bold border border-indigo-400/50 shadow-lg shadow-indigo-500/20">
+                                #{index}
+                              </div>
+                              <span className="text-base font-bold text-white drop-shadow-[0_0_4px_rgba(139,92,246,0.5)] truncate flex-1">
+                                {waypoint.customerName}
+                              </span>
+                            </div>
+
+                            {/* Address */}
+                            <a href={wazeUrl} target="_blank" rel="noopener noreferrer"
+                              className="flex items-start gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 mb-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.5)] transition-colors">
+                              <MapPin className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                              <span className="truncate">{waypoint.address}</span>
+                            </a>
+
+                            {/* Phone */}
+                            {waypoint.phoneNumber && (
+                              <div className="flex items-center gap-1.5 text-sm text-cyan-300 mb-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.4)]">
+                                <PhoneIcon />
+                                <span>{waypoint.phoneNumber}</span>
+                              </div>
+                            )}
+
+                            {/* Time */}
+                            {timeStr && (
+                              <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
+                                <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>{timeStr}</span>
+                              </div>
+                            )}
+
+                            {/* Travel time */}
+                            {index > 0 && travelTimes[index - 1] !== undefined && (
+                              <div className="flex justify-center">
+                                <span className="text-xs text-cyan-300 bg-gray-900/60 backdrop-blur-sm px-3 py-1 rounded-full border border-cyan-500/20 shadow-lg shadow-cyan-500/10 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
+                                  Trajet vers cet arrêt : {travelTimes[index - 1]} min
                                 </span>
                               </div>
+                            )}
 
+                            {/* Buttons */}
+                            <div className="flex gap-2 mt-auto pt-1">
+                              {waypoint.phoneNumber ? (
+                                <a
+                                  href={`tel:${waypoint.phoneNumber}`}
+                                  className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-cyan-600/80 to-indigo-600/80 hover:from-cyan-600 hover:to-indigo-600 text-white text-sm font-semibold py-2.5 rounded-xl border border-cyan-500/40 shadow-lg shadow-cyan-500/20 transition-all active:scale-95"
+                                >
+                                  <PhoneIcon />
+                                  Appeler
+                                </a>
+                              ) : (
+                                <span className="flex-1 flex items-center justify-center gap-1.5 bg-gray-700/50 text-gray-500 text-sm font-semibold py-2.5 rounded-xl border border-gray-600/30 cursor-not-allowed">
+                                  <PhoneIcon />
+                                  Appeler
+                                </span>
+                              )}
                               <a
                                 href={wazeUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-start gap-1.5 text-sm text-cyan-400 hover:text-cyan-300 transition-colors mb-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]"
+                                className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-indigo-600/80 to-purple-600/80 hover:from-indigo-600 hover:to-purple-600 text-white text-sm font-semibold py-2.5 rounded-xl border border-indigo-500/40 shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
                               >
-                                <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                <span className="truncate">{waypoint.address}</span>
+                                <WazeIcon />
+                                Waze
                               </a>
-
-                              {waypoint.phoneNumber && (
-                                <div className="flex items-center gap-1.5 text-sm text-cyan-300 mb-2 drop-shadow-[0_0_3px_rgba(34,211,238,0.4)]">
-                                  <PhoneIcon />
-                                  <span>{waypoint.phoneNumber}</span>
-                                </div>
-                              )}
-
-                              {timeStr && (
-                                <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
-                                  <Clock className="h-3.5 w-3.5 text-cyan-400" />
-                                  <span>{timeStr}</span>
-                                </div>
-                              )}
-
-                              <div className="flex gap-2 mt-3">
-                                {waypoint.phoneNumber ? (
-                                  <a
-                                    href={`tel:${waypoint.phoneNumber}`}
-                                    className="flex-1 bg-gradient-to-r from-emerald-600/80 to-green-600/80 hover:from-emerald-600 hover:to-green-600 text-white text-sm font-semibold py-2.5 rounded-xl text-center border border-emerald-500/40 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
-                                  >
-                                    Appeler
-                                  </a>
-                                ) : (
-                                  <span className="flex-1 bg-gray-700/50 text-gray-500 text-sm font-semibold py-2.5 rounded-xl text-center border border-gray-600/30 cursor-not-allowed">
-                                    Appeler
-                                  </span>
-                                )}
-                                <a
-                                  href={wazeUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex-1 bg-gradient-to-r from-indigo-600/80 to-purple-600/80 hover:from-indigo-600 hover:to-purple-600 text-white text-sm font-semibold py-2.5 rounded-xl text-center border border-indigo-500/40 shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
-                                >
-                                  Waze
-                                </a>
-                              </div>
-                            </>
-                          )}
-
-                          {/* Travel time to next stop */}
-                          {index < routeData.waypoints.length - 1 && travelTimes[index] !== undefined && (
-                            <div className="flex justify-center mt-3">
-                              <div className="flex items-center gap-1.5 text-xs text-cyan-300 bg-gray-900/60 backdrop-blur-sm px-3 py-1 rounded-full border border-cyan-500/20 drop-shadow-[0_0_3px_rgba(34,211,238,0.5)]">
-                                <Timer className="h-3 w-3" />
-                                <span>{travelTimes[index]} min jusqu'au prochain</span>
-                              </div>
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                          </>
+                        )}
 
-                {/* Next button */}
-                {routeData.waypoints.length > 1 && (
-                  <button
-                    onClick={nextCard}
-                    disabled={currentCardIndex === routeData.waypoints.length - 1}
-                    className="flex-shrink-0 w-9 h-9 flex items-center justify-center bg-gray-900/80 backdrop-blur-md border border-indigo-500/30 rounded-full text-indigo-300 shadow-lg shadow-indigo-500/10 disabled:opacity-20 active:scale-95 transition-transform"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                )}
+
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+
             </div>
           </div>,
           document.body

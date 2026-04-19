@@ -3701,5 +3701,33 @@ router.get('/for-map-direct', async (req: Request, res: Response): Promise<void>
   }
 });
 
+// Route pour corriger le secteur de clients mal classifiés (ex: Deux-Montagnes → Rive Nord)
+router.post('/fix-sector-by-city', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { city, correctSector } = req.body;
+
+    if (!city || !correctSector) {
+      res.status(400).json({ success: false, error: 'city et correctSector sont requis' });
+      return;
+    }
+
+    const result = await Client.updateMany(
+      { city: { $regex: new RegExp(city, 'i') } },
+      { $set: { sector: correctSector } }
+    );
+
+    res.json({
+      success: true,
+      updated: result.modifiedCount,
+      message: `${result.modifiedCount} client(s) de "${city}" mis à jour → secteur "${correctSector}"`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Une erreur est survenue'
+    });
+  }
+});
+
 export default router;
 

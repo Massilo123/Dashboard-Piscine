@@ -263,7 +263,8 @@ export const RIVE_NORD_CITIES = [
   'ste-thérèse', 'sainte-thérèse', 'oka', 'prévost', 'prevost',
   'ste-marthe-sur-le-lac', 'sainte-marthe-sur-le-lac', 'lanoraie',
   'saint-sauveur', 'st-sauveur', 'boisbriand', 'bois-briand',
-  'brownsburg-chatham', 'brownsburg chatham', 'brownsburg', 'charlemagne', 'lavaltrie'
+  'brownsburg-chatham', 'brownsburg chatham', 'brownsburg', 'charlemagne', 'lavaltrie',
+  'deux-montagnes', 'deux montagnes'
 ] as const;
 
 /**

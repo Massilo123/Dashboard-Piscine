@@ -34,6 +34,7 @@ export const RIVE_NORD = [
   'Brownsburg-Chatham',
   'Charlemagne',
   'Lavaltrie',
+  'Deux-Montagnes',
 ].sort();
 
 // Rive Sud - Liste des villes principales

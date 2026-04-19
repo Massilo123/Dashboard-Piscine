@@ -27,6 +27,7 @@ export const ALL_LOCATIONS = [
   'Brownsburg-Chatham',
   'Charlemagne',
   'Lavaltrie',
+  'Deux-Montagnes',
   // Rive Sud
   'Longueuil',
   'Brossard',
