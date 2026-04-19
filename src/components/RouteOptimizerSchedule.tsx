@@ -292,20 +292,41 @@ const RouteOptimizerSchedule = () => {
                     lineCap: 'round'
                 }).addTo(newMap);
 
+                // Calculer les temps de trajet localement (évite la dépendance au state travelTimes)
+                const localTravelTimes: number[] = [];
+                for (let i = 0; i < routeData.waypoints.length - 1; i++) {
+                    let dur = 0;
+                    if (routeData.route && typeof routeData.route === 'object' && 'legs' in routeData.route) {
+                        const legs = routeData.route.legs;
+                        if (Array.isArray(legs) && legs[i] && 'duration' in legs[i]) {
+                            dur = Math.round(legs[i].duration / 60);
+                        }
+                    } else {
+                        const sp = routeData.waypoints[i].coordinates;
+                        const ep = routeData.waypoints[i + 1].coordinates;
+                        const dx = sp[1] - ep[1];
+                        const dy = sp[0] - ep[0];
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        const ratio = distance / (routeData.totalDistance * 0.01);
+                        dur = Math.round((routeData.totalDuration * ratio) / 10);
+                    }
+                    localTravelTimes.push(dur);
+                }
+
                 // Ajouter des indicateurs de temps entre chaque segment
                 for (let i = 0; i < routePoints.length - 1; i++) {
                     const startPoint = routePoints[i];
                     const endPoint = routePoints[i + 1];
-                    
+
                     // Calculer le point milieu pour placer l'étiquette
                     const midLat = (startPoint[0] + endPoint[0]) / 2;
                     const midLng = (startPoint[1] + endPoint[1]) / 2;
-                    
+
                     // Estimer le temps de trajet (si disponible dans les données)
                     let estimatedDuration = "";
-                    
-                    if (i < travelTimes.length) {
-                        estimatedDuration = String(travelTimes[i]);
+
+                    if (i < localTravelTimes.length) {
+                        estimatedDuration = String(localTravelTimes[i]);
                     }
                     
                     // Créer une étiquette de temps
