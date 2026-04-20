@@ -60,6 +60,7 @@ const RouteOptimizerSchedule = () => {
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setDate(e.target.value)
       setError('')
+      if (e.target.value && window.innerWidth < 1024) setShouldFetch(true)
     }
 
     useEffect(() => {
@@ -641,14 +642,6 @@ const RouteOptimizerSchedule = () => {
                   title="Aujourd'hui"
                 >
                   <Calendar className="h-4 w-4 drop-shadow-[0_0_3px_rgba(34,211,238,0.8)]" />
-                </button>
-                <button
-                  onClick={fetchOptimizedRoute}
-                  disabled={loading}
-                  className="flex-shrink-0 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 p-2 rounded-lg border border-indigo-400/40 shadow-lg shadow-indigo-500/10 disabled:opacity-50 active:scale-95 transition-all duration-200"
-                  title="Optimiser"
-                >
-                  {loading ? <LoadingSpinner /> : <CheckCircle className="h-4 w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />}
                 </button>
               </div>
             </div>
