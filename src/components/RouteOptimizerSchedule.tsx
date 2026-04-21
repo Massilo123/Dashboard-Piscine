@@ -617,17 +617,19 @@ const RouteOptimizerSchedule = () => {
         </div>
 
         {/* ===== MOBILE FULL-SCREEN MAP OVERLAY — starts below site header ===== */}
-        {routeData && createPortal(
+        {createPortal(
           <div className="lg:hidden flex flex-col justify-between" style={{ position: 'fixed', top: 'calc(4rem + env(safe-area-inset-top, 0px))', left: 0, right: 0, bottom: 0, zIndex: 49 }}>
 
-            {/* Map background */}
-            <div
+            {/* Map background (only when route data exists) */}
+            {routeData && (
+              <div
                 ref={mapContainerMobile}
                 className="absolute inset-0 w-full h-full"
                 style={{ zIndex: 0, isolation: 'isolate' }}
               />
+            )}
 
-            {/* Top controls bar */}
+            {/* Top controls bar — always visible */}
             <div className="relative bg-gradient-to-r from-gray-900/95 via-indigo-950/95 to-purple-950/95 backdrop-blur-md border-b border-indigo-500/30 shadow-lg shadow-indigo-500/10 px-3 py-2" style={{ zIndex: 1000 }}>
               <div className="flex items-center gap-2">
                 <input
@@ -646,8 +648,33 @@ const RouteOptimizerSchedule = () => {
               </div>
             </div>
 
+            {/* Loading state */}
+            {loading && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ zIndex: 1000 }}>
+                <div className="animate-spin h-10 w-10 rounded-full border-2 border-indigo-500/30 border-t-indigo-400" />
+                <span className="text-sm text-gray-400">Optimisation en cours…</span>
+              </div>
+            )}
+
+            {/* Error state */}
+            {!loading && error && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6" style={{ zIndex: 1000 }}>
+                <div className="text-rose-300 p-4 bg-gradient-to-br from-rose-900/40 to-pink-900/40 backdrop-blur-sm rounded-xl text-sm border border-rose-500/50 shadow-lg shadow-rose-500/20 text-center">
+                  {error}
+                </div>
+              </div>
+            )}
+
+            {/* Empty state */}
+            {!loading && !error && !routeData && (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6" style={{ zIndex: 1000 }}>
+                <Calendar className="h-12 w-12 text-indigo-400/40" />
+                <span className="text-sm text-gray-500 text-center">Aucun rendez-vous trouvé pour cette date</span>
+              </div>
+            )}
+
             {/* Bottom carousel stack */}
-            <div className="relative" style={{ zIndex: 1000, background: 'linear-gradient(to top, rgba(8,8,20,0.95) 0%, rgba(8,8,20,0.80) 60%, transparent 100%)', paddingTop: '2rem', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
+            {routeData && <div className="relative" style={{ zIndex: 1000, background: 'linear-gradient(to top, rgba(8,8,20,0.95) 0%, rgba(8,8,20,0.80) 60%, transparent 100%)', paddingTop: '2rem', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
 
               {/* Stop indicator */}
               <div className="flex justify-between items-center px-4 mb-1.5">
@@ -828,7 +855,7 @@ const RouteOptimizerSchedule = () => {
                 })}
               </div>
 
-            </div>
+            </div>}
           </div>,
           document.body
         )}
