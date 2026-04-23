@@ -374,11 +374,11 @@ router.post('/', async (req: Request, res: Response) => {
             });
         }
 
-        // 8. Trier par distance réelle et trouver le plus proche
+        // 8. Trier par durée de trajet et trouver le plus proche
         clientsWithRealDistances.sort((a, b) => {
-            if (a.distance === null) return 1;
-            if (b.distance === null) return -1;
-            return a.distance - b.distance;
+            if (a.duration === null) return 1;
+            if (b.duration === null) return -1;
+            return a.duration - b.duration;
         });
 
         const nearestClient = clientsWithRealDistances[0];
