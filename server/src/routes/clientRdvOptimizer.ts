@@ -201,6 +201,11 @@ router.post('/', async (req: Request, res: Response) => {
                 const bookingDate = new Date(booking.startAt);
                 const dateString = bookingDate.toISOString().split('T')[0];
                 
+                // Exclure les rendez-vous annulés
+                if (booking.status !== 'ACCEPTED' && booking.status !== 'PENDING') {
+                    continue;
+                }
+
                 // Si on cherche une date spécifique et que ce n'est pas celle-ci, sauter
                 if (specificDate && dateString !== specificDate) {
                     continue;
