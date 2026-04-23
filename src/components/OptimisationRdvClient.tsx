@@ -1,5 +1,7 @@
 import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Filter, X, Search } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import mbxClient from '@mapbox/mapbox-sdk';
 import mbxGeocoding from '@mapbox/mapbox-sdk/services/geocoding';
 import API_CONFIG from '../config/api';
@@ -38,6 +40,7 @@ interface Waypoint {
   district?: string;
 }
 
+
 interface OptimizedRoute {
   totalDistance: number;
   totalDuration: number;
@@ -45,6 +48,7 @@ interface OptimizedRoute {
 }
 
 interface ClientData {
+  sourceCoordinates?: [number, number]
   client: {
     id: string
     name: string
@@ -108,7 +112,9 @@ const OptimisationRdvClient = () => {
   })
   const wrapperRef = useRef<HTMLDivElement>(null)
   const filterRef = useRef<HTMLDivElement>(null)
-  
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<L.Map | null>(null)
+
   // États pour la recherche de clients
   const [clientSearchQuery, setClientSearchQuery] = useState<string>('')
   const [clientSearchResults, setClientSearchResults] = useState<SearchClient[]>([])
@@ -207,6 +213,125 @@ const OptimisationRdvClient = () => {
       clearTimeout(timeoutId);
     };
   }, [address, isAddressSelected]);
+
+  // Initialisation de la carte Leaflet
+  useEffect(() => {
+    const optimizedRoute = clientData?.statistics.dailyStats.optimizedRoute;
+    const hasCoords = optimizedRoute?.waypoints?.some(wp => wp.coordinates);
+
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
+
+    if (!clientData || !hasCoords || !mapContainerRef.current) return;
+
+    const initMap = () => {
+      if (!mapContainerRef.current) return;
+      const rect = mapContainerRef.current.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        setTimeout(initMap, 100);
+        return;
+      }
+
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+
+      const waypoints = optimizedRoute!.waypoints.filter(wp => wp.coordinates);
+      const sourceCoords = clientData.sourceCoordinates;
+
+      const allCoords: [number, number][] = [
+        ...waypoints.map(wp => wp.coordinates!),
+        ...(sourceCoords ? [sourceCoords] : [])
+      ];
+      const lats = allCoords.map(c => c[1]);
+      const lngs = allCoords.map(c => c[0]);
+      const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
+      const centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
+
+      const map = L.map(mapContainerRef.current).setView([centerLat, centerLng], 11);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(map);
+
+      const routePoints: L.LatLngExpression[] = [];
+
+      waypoints.forEach((wp, index) => {
+        const position: L.LatLngExpression = [wp.coordinates![1], wp.coordinates![0]];
+        routePoints.push(position);
+
+        let icon: L.DivIcon;
+        if (index === 0) {
+          icon = L.divIcon({
+            className: 'custom-icon',
+            html: `<div style="background:linear-gradient(135deg,#8b5cf6,#6366f1);width:22px;height:22px;border-radius:11px;
+                    display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.8);
+                    box-shadow:0 0 4px rgba(139,92,246,0.5),0 0 8px rgba(139,92,246,0.3);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+                    <circle cx="12" cy="10" r="3"/></svg></div>`,
+            iconSize: [22, 22], iconAnchor: [11, 11],
+          });
+        } else {
+          icon = L.divIcon({
+            className: 'custom-icon',
+            html: `<div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);width:20px;height:20px;border-radius:10px;
+                    display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:11px;
+                    border:1px solid rgba(255,255,255,0.8);
+                    box-shadow:0 0 4px rgba(99,102,241,0.5),0 0 8px rgba(99,102,241,0.3);">${index}</div>`,
+            iconSize: [20, 20], iconAnchor: [10, 10],
+          });
+        }
+
+        const popupContent = `<div style="max-width:180px;padding:10px 14px;">
+          <div style="font-weight:600;font-size:14px;margin-bottom:6px;color:#a78bfa;">${index === 0 ? 'Départ' : `Client ${index}`}</div>
+          <div style="font-size:12px;color:#9ca3af;">${wp.address}</div>
+          ${wp.city ? `<div style="margin-top:4px;font-size:11px;color:#818cf8;">${wp.city}${wp.district ? ` — ${wp.district}` : ''}</div>` : ''}
+        </div>`;
+
+        L.marker(position, { icon }).addTo(map).bindPopup(popupContent);
+      });
+
+      if (routePoints.length > 1) {
+        L.polyline(routePoints, { color: '#a78bfa', weight: 4, opacity: 0.25, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+        L.polyline(routePoints, { color: '#8b5cf6', weight: 2.5, opacity: 0.85, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+      }
+
+      if (sourceCoords) {
+        const sourcePos: L.LatLngExpression = [sourceCoords[1], sourceCoords[0]];
+        const sourceIcon = L.divIcon({
+          className: 'custom-icon',
+          html: `<div style="background:linear-gradient(135deg,#f59e0b,#f97316);width:24px;height:24px;border-radius:12px;
+                  display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;
+                  border:2px solid rgba(255,255,255,0.9);
+                  box-shadow:0 0 6px rgba(245,158,11,0.7),0 0 12px rgba(245,158,11,0.4);">+</div>`,
+          iconSize: [24, 24], iconAnchor: [12, 12],
+        });
+        const sourcePopup = `<div style="max-width:180px;padding:10px 14px;">
+          <div style="font-weight:600;font-size:14px;margin-bottom:6px;color:#f59e0b;">Nouveau client</div>
+          <div style="font-size:12px;color:#9ca3af;">${clientData.client.address}</div>
+        </div>`;
+        L.marker(sourcePos, { icon: sourceIcon }).addTo(map).bindPopup(sourcePopup);
+      }
+
+      const allPoints: L.LatLngExpression[] = [
+        ...routePoints,
+        ...(sourceCoords ? [[sourceCoords[1], sourceCoords[0]] as L.LatLngExpression] : [])
+      ];
+      if (allPoints.length > 0) {
+        map.fitBounds(L.latLngBounds(allPoints), { padding: [40, 40] });
+      }
+
+      mapRef.current = map;
+    };
+
+    const timeoutId = setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(initMap)), 200);
+    return () => {
+      clearTimeout(timeoutId);
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
+    };
+  }, [clientData]);
 
   // Recherche de clients dans la base de données
   useEffect(() => {
@@ -832,6 +957,22 @@ const OptimisationRdvClient = () => {
                   </div>
                 )}
               </div>
+
+              {/* Section : Carte du jour */}
+              {clientData.statistics.dailyStats.optimizedRoute?.waypoints?.some(wp => wp.coordinates) && (
+                <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 border border-indigo-500/20 overflow-hidden">
+                  <div className="px-4 pt-3 pb-2 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-cyan-400" />
+                    <h4 className="text-sm font-semibold text-cyan-300">Carte du jour</h4>
+                    <span className="text-xs text-gray-400">— {clientData.booking.date}</span>
+                    <span className="ml-auto flex items-center gap-1.5 text-xs text-amber-300">
+                      <span style={{width:12,height:12,borderRadius:6,background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'inline-block',border:'1px solid rgba(255,255,255,0.7)'}} />
+                      Nouveau client
+                    </span>
+                  </div>
+                  <div ref={mapContainerRef} style={{ height: '340px' }} className="w-full" />
+                </div>
+              )}
 
               {/* Section : Actions */}
               {isStatsExpanded && (

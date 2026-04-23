@@ -486,6 +486,7 @@ router.post('/', async (req: Request, res: Response) => {
         res.json({
             success: true,
             data: {
+                sourceCoordinates: sourceCoordinates as [number, number],
                 client: {
                     id: nearestClient.customerId,
                     name: nearestClient.customerName,
@@ -522,16 +523,16 @@ router.post('/', async (req: Request, res: Response) => {
                             totalDistance: optimizedRoute.totalDistance,
                             totalDuration: optimizedRoute.totalDuration,
                             waypoints: optimizedRoute.waypoints.map((wp, index) => {
-                                // Pour le point de départ, pas de ville/district
                                 if (index === 0) {
                                     return {
-                                        address: wp.address
+                                        address: wp.address,
+                                        coordinates: wp.coordinates as [number, number]
                                     };
                                 }
-                                // Pour les autres waypoints, récupérer les infos depuis le map
                                 const clientInfo = clientInfoMap.get(wp.address);
                                 return {
                                     address: wp.address,
+                                    coordinates: wp.coordinates as [number, number],
                                     city: clientInfo?.city || undefined,
                                     district: clientInfo?.district || undefined
                                 };
