@@ -51,18 +51,14 @@ const PORT = process.env.PORT || 3000;
 const startServer = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI!);
-    console.log('✅ Connected to MongoDB:', process.env.MONGODB_URI);
-    
-    app.listen(PORT, () => {
-      console.log(`🚀Server is running on port ${PORT}`);
-    });
-
-    console.log("Square Token:", SQUARE_ACCESS_TOKEN); // Vérifie que ton token est bien chargé
-    
+    console.log('✅ Connected to MongoDB');
   } catch (error) {
-    console.error('❌ Failed to connect to MongoDB:', error);
-    process.exit(1);
+    console.error('⚠️  MongoDB unavailable (routes dépendantes désactivées):', (error as Error).message);
   }
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
 };
 
 startServer();
