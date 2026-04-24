@@ -104,7 +104,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen w-full bg-gradient-to-br from-gray-950 via-gray-950 to-gray-950 relative overflow-hidden">
+      <div className="min-h-screen w-full bg-gradient-to-br from-gray-950 via-gray-950 to-gray-950 relative overflow-x-hidden">
         {/* Éléments décoratifs d'arrière-plan */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {/* Pattern en arrière-plan - très subtil */}
