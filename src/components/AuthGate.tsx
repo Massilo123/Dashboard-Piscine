@@ -44,9 +44,9 @@ const AuthGate = ({ children }: AuthGateProps) => {
   // Empêcher le scroll pendant l'affichage de la page d'auth
   useEffect(() => {
     if (!isAuthenticated) {
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflowY = 'hidden';
       return () => {
-        document.body.style.overflow = '';
+        document.body.style.overflowY = '';
       };
     }
   }, [isAuthenticated]);

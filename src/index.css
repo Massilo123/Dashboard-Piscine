@@ -14,6 +14,7 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body {
@@ -23,7 +24,7 @@ body {
   min-height: 100dvh;
   background-color: #030712;
   overflow-x: hidden;
-  overscroll-behavior-y: none;
+  overflow-y: auto;
   -webkit-tap-highlight-color: transparent;
 }
 
