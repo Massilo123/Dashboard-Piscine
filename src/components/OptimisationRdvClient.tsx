@@ -44,7 +44,7 @@ interface Waypoint {
 interface OptimizedRoute {
   totalDistance: number;
   totalDuration: number;
-  route?: { legs?: { duration: number }[] };
+  legDurations?: number[];
   waypoints: Waypoint[];
 }
 
@@ -298,29 +298,9 @@ const OptimisationRdvClient = () => {
         L.polyline(routePoints, { color: '#a78bfa', weight: 4, opacity: 0.25, lineJoin: 'round', lineCap: 'round' }).addTo(map);
         L.polyline(routePoints, { color: '#8b5cf6', weight: 2.5, opacity: 0.85, lineJoin: 'round', lineCap: 'round' }).addTo(map);
 
-        const optimizedRoute = clientData.statistics.dailyStats.optimizedRoute;
-        const localTravelTimes: number[] = [];
-        for (let i = 0; i < waypoints.length - 1; i++) {
-          let dur = 0;
-          if (optimizedRoute?.route && typeof optimizedRoute.route === 'object' && 'legs' in optimizedRoute.route) {
-            const legs = (optimizedRoute.route as { legs: { duration: number }[] }).legs;
-            if (Array.isArray(legs) && legs[i] && 'duration' in legs[i]) {
-              dur = Math.round(legs[i].duration / 60);
-            }
-          }
-          if (dur === 0 && optimizedRoute) {
-            const sp = waypoints[i].coordinates!;
-            const ep = waypoints[i + 1].coordinates!;
-            const dx = sp[1] - ep[1];
-            const dy = sp[0] - ep[0];
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const ratio = dist / ((optimizedRoute.totalDistance || 1) * 0.01);
-            dur = Math.round((optimizedRoute.totalDuration * ratio) / 10);
-          }
-          localTravelTimes.push(dur);
-        }
+        const legDurations = clientData.statistics.dailyStats.optimizedRoute?.legDurations || [];
         for (let i = 0; i < routePoints.length - 1; i++) {
-          const dur = localTravelTimes[i];
+          const dur = legDurations[i];
           if (dur > 0) {
             const midLat = (routePoints[i][0] + routePoints[i + 1][0]) / 2;
             const midLng = (routePoints[i][1] + routePoints[i + 1][1]) / 2;

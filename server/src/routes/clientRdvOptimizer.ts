@@ -126,9 +126,13 @@ async function getDetailedRoute(locations: { address: string; coordinates: numbe
         throw new Error('Impossible de calculer l\'itinéraire détaillé');
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const legs: any[] = response.body.routes[0].legs || [];
+    const legDurations: number[] = legs.map((leg: { duration: number }) => Math.round(leg.duration / 60));
+
     return {
         waypoints: waypoints,
-        route: response.body.routes[0],
+        legDurations,
         totalDuration: Math.round(response.body.routes[0].duration / 60), // minutes
         totalDistance: Math.round(response.body.routes[0].distance / 100) / 10 // km
     };
@@ -465,7 +469,7 @@ router.post('/', async (req: Request, res: Response) => {
                 
                 optimizedRoute = {
                     waypoints: detailedRoute.waypoints,
-                    route: detailedRoute.route,
+                    legDurations: detailedRoute.legDurations,
                     totalDuration: detailedRoute.totalDuration,
                     totalDistance: detailedRoute.totalDistance
                 };
@@ -527,7 +531,7 @@ router.post('/', async (req: Request, res: Response) => {
                         optimizedRoute: optimizedRoute ? {
                             totalDistance: optimizedRoute.totalDistance,
                             totalDuration: optimizedRoute.totalDuration,
-                            route: optimizedRoute.route,
+                            legDurations: optimizedRoute.legDurations,
                             waypoints: optimizedRoute.waypoints.map((wp, index) => {
                                 if (index === 0) {
                                     return {
