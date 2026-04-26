@@ -905,60 +905,63 @@ const OptimisationRdvClient = () => {
                 <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 border border-indigo-500/20 overflow-hidden">
 
                   {/* Bandeau stats — client count en vedette */}
-                  <div className="px-4 py-3 flex items-center gap-4 border-b border-indigo-500/20">
-                    {/* Nombre de clients — élément principal */}
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500/30 to-indigo-600/30 border border-violet-400/50 shadow-lg shadow-violet-500/20">
-                        <Users className="absolute h-3.5 w-3.5 text-violet-300 top-1.5 right-1.5 opacity-60" />
-                        <span className="text-2xl font-extrabold text-white leading-none">
-                          {clientData.statistics.dailyStats.optimizedRoute
-                            ? clientData.statistics.dailyStats.optimizedRoute.waypoints.length - 1
-                            : clientData.statistics.dailyStats.clientCount}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-violet-200 leading-tight">
-                          planifiés ce jour
+                  <div className="px-3 py-2.5 border-b border-indigo-500/20 flex flex-col gap-2">
+                    {/* Rangée principale : nombre + distance + durée */}
+                    <div className="flex items-center gap-2 sm:gap-4">
+                      {/* Nombre de clients */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-violet-500/30 to-indigo-600/30 border border-violet-400/50 shadow-lg shadow-violet-500/20">
+                          <Users className="absolute h-3 w-3 text-violet-300 top-1 right-1 opacity-60" />
+                          <span className="text-xl sm:text-2xl font-extrabold text-white leading-none">
+                            {clientData.statistics.dailyStats.optimizedRoute
+                              ? clientData.statistics.dailyStats.optimizedRoute.waypoints.length - 1
+                              : clientData.statistics.dailyStats.clientCount}
+                          </span>
                         </div>
-                        <div className="text-xs text-gray-400">{clientData.booking.date}</div>
+                        <div className="min-w-0">
+                          <div className="text-xs sm:text-sm font-semibold text-violet-200 leading-tight whitespace-nowrap">
+                            planifiés ce jour
+                          </div>
+                          <div className="text-[10px] sm:text-xs text-gray-400 truncate max-w-[110px] sm:max-w-none">
+                            {clientData.booking.date}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="h-8 w-px bg-indigo-500/25 shrink-0" />
+
+                      {/* Distance */}
+                      <div className="text-center shrink-0">
+                        <div className="text-sm sm:text-base font-bold text-cyan-300">
+                          {clientData.statistics.dailyStats.optimizedRoute
+                            ? `${clientData.statistics.dailyStats.optimizedRoute.totalDistance} km`
+                            : `${clientData.statistics.dailyStats.totalDistance} km`}
+                        </div>
+                        <div className="text-[10px] sm:text-[11px] text-gray-400">distance</div>
+                      </div>
+
+                      <div className="h-8 w-px bg-indigo-500/25 shrink-0" />
+
+                      {/* Durée */}
+                      <div className="text-center shrink-0">
+                        <div className="text-sm sm:text-base font-bold text-cyan-300">
+                          {clientData.statistics.dailyStats.optimizedRoute
+                            ? `${clientData.statistics.dailyStats.optimizedRoute.totalDuration} min`
+                            : `${clientData.statistics.dailyStats.totalDuration} min`}
+                        </div>
+                        <div className="text-[10px] sm:text-[11px] text-gray-400">durée</div>
                       </div>
                     </div>
 
-                    {/* Séparateur */}
-                    <div className="h-10 w-px bg-indigo-500/25 mx-1" />
-
-                    {/* Distance */}
-                    <div className="text-center">
-                      <div className="text-base font-bold text-cyan-300">
-                        {clientData.statistics.dailyStats.optimizedRoute
-                          ? `${clientData.statistics.dailyStats.optimizedRoute.totalDistance} km`
-                          : `${clientData.statistics.dailyStats.totalDistance} km`}
-                      </div>
-                      <div className="text-[11px] text-gray-400">distance</div>
-                    </div>
-
-                    {/* Séparateur */}
-                    <div className="h-10 w-px bg-indigo-500/25 mx-1" />
-
-                    {/* Durée */}
-                    <div className="text-center">
-                      <div className="text-base font-bold text-cyan-300">
-                        {clientData.statistics.dailyStats.optimizedRoute
-                          ? `${clientData.statistics.dailyStats.optimizedRoute.totalDuration} min`
-                          : `${clientData.statistics.dailyStats.totalDuration} min`}
-                      </div>
-                      <div className="text-[11px] text-gray-400">durée</div>
-                    </div>
-
-                    {/* Badge optimisé + légende nouveau client */}
-                    <div className="ml-auto flex flex-col items-end gap-1.5">
+                    {/* Rangée badges — toujours sur sa propre ligne */}
+                    <div className="flex items-center justify-end gap-2">
                       {clientData.statistics.dailyStats.optimizedRoute && (
-                        <span className="text-xs bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-200 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
+                        <span className="text-[11px] bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-200 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
                           Optimisé
                         </span>
                       )}
-                      <span className="flex items-center gap-1 text-xs text-amber-300">
-                        <span style={{width:10,height:10,borderRadius:5,background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'inline-block',border:'1px solid rgba(255,255,255,0.7)',flexShrink:0}} />
+                      <span className="flex items-center gap-1 text-[11px] text-amber-300">
+                        <span style={{width:9,height:9,borderRadius:5,background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'inline-block',border:'1px solid rgba(255,255,255,0.7)',flexShrink:0}} />
                         Nouveau client
                       </span>
                     </div>
