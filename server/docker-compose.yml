@@ -22,6 +22,9 @@ services:
       - SQUARE_ACCESS_TOKEN=${SQUARE_ACCESS_TOKEN}
       - MONGODB_URI=${MONGODB_URI}
       - HERE_API_KEY=${HERE_API_KEY}
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     networks:
       - cloudflared
     depends_on:

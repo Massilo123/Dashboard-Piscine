@@ -24,6 +24,7 @@ interface Waypoint {
   customerName?: string
   startAt?: string
   phoneNumber?: string
+  serviceType?: string
   coordinates: [number, number]
 }
 
@@ -561,6 +562,11 @@ const RouteOptimizerSchedule = () => {
                                 <div className="font-medium text-xs text-white mb-1 drop-shadow-[0_0_3px_rgba(139,92,246,0.6)] break-words">
                                   {waypoint.customerName}
                                 </div>
+                                {waypoint.serviceType && (
+                                  <span className="inline-block text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 mb-1">
+                                    {waypoint.serviceType}
+                                  </span>
+                                )}
                                 <a
                                   href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
                                   target="_blank"
@@ -656,8 +662,8 @@ const RouteOptimizerSchedule = () => {
               </div>
             )}
 
-            {/* Error state */}
-            {!loading && error && (
+            {/* Error state — only when no route data to display */}
+            {!loading && error && !routeData && (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6" style={{ zIndex: 1000 }}>
                 <div className="text-rose-300 p-4 bg-gradient-to-br from-rose-900/40 to-pink-900/40 backdrop-blur-sm rounded-xl text-sm border border-rose-500/50 shadow-lg shadow-rose-500/20 text-center">
                   {error}
@@ -778,7 +784,7 @@ const RouteOptimizerSchedule = () => {
                         ) : (
                           <>
                             {/* Header: badge + name */}
-                            <div className="flex items-center gap-2.5 mb-2.5">
+                            <div className="flex items-center gap-2.5 mb-1.5">
                               <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500/40 to-purple-500/40 rounded-full text-white text-sm font-bold border border-indigo-400/50 shadow-lg shadow-indigo-500/20">
                                 #{index}
                               </div>
@@ -786,6 +792,11 @@ const RouteOptimizerSchedule = () => {
                                 {waypoint.customerName}
                               </span>
                             </div>
+                            {waypoint.serviceType && (
+                              <span className="inline-block text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 mb-2">
+                                {waypoint.serviceType}
+                              </span>
+                            )}
 
                             {/* Address */}
                             <a href={wazeUrl} target="_blank" rel="noopener noreferrer"
