@@ -783,7 +783,7 @@ const RouteOptimizerSchedule = () => {
                           </>
                         ) : (
                           <>
-                            {/* Header: badge + name */}
+                            {/* Header: badge + name + travel time */}
                             <div className="flex items-center gap-2.5 mb-1.5">
                               <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center bg-gradient-to-br from-indigo-500/40 to-purple-500/40 rounded-full text-white text-sm font-bold border border-indigo-400/50 shadow-lg shadow-indigo-500/20">
                                 #{index}
@@ -791,6 +791,11 @@ const RouteOptimizerSchedule = () => {
                               <span className="text-base font-bold text-white drop-shadow-[0_0_4px_rgba(139,92,246,0.5)] truncate flex-1">
                                 {waypoint.customerName}
                               </span>
+                              {index > 0 && travelTimes[index - 1] !== undefined && (
+                                <span className="flex-shrink-0 text-[11px] text-cyan-300 bg-gray-900/60 backdrop-blur-sm px-2.5 py-1 rounded-full border border-cyan-500/20 shadow-lg shadow-cyan-500/10 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
+                                  {travelTimes[index - 1]} min
+                                </span>
+                              )}
                             </div>
                             {waypoint.serviceType && (
                               <span className="inline-block text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 mb-2">
@@ -818,15 +823,6 @@ const RouteOptimizerSchedule = () => {
                               <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
                                 <Clock className="h-3.5 w-3.5 flex-shrink-0" />
                                 <span>{timeStr}</span>
-                              </div>
-                            )}
-
-                            {/* Travel time */}
-                            {index > 0 && travelTimes[index - 1] !== undefined && (
-                              <div className="flex justify-center">
-                                <span className="text-xs text-cyan-300 bg-gray-900/60 backdrop-blur-sm px-3 py-1 rounded-full border border-cyan-500/20 shadow-lg shadow-cyan-500/10 drop-shadow-[0_0_3px_rgba(34,211,238,0.6)]">
-                                  Trajet vers cet arrêt : {travelTimes[index - 1]} min
-                                </span>
                               </div>
                             )}
 
