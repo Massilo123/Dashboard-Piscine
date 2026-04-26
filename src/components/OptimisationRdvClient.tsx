@@ -1,4 +1,4 @@
-import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Filter, X, Search } from 'lucide-react'
+import { MapPin, Navigation, User, Calendar, Clock, ChevronRight, ChevronLeft, Filter, X, Search, Users } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -105,7 +105,6 @@ const OptimisationRdvClient = () => {
   const [fetchingNew, setFetchingNew] = useState<boolean>(false)
   const [remainingDays, setRemainingDays] = useState<number>(0)
   const [showDateFilter, setShowDateFilter] = useState<boolean>(false)
-  const [isStatsExpanded, setIsStatsExpanded] = useState<boolean>(false)
   const [locationSuggestions, setLocationSuggestions] = useState<string[]>([])
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date().toISOString().split('T')[0],
@@ -888,144 +887,97 @@ const OptimisationRdvClient = () => {
                 </div>
               </div>
 
-              {/* Section : Statistiques quotidiennes */}
-              <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 border border-indigo-500/20 p-2.5">
-                <button
-                  onClick={() => setIsStatsExpanded(!isStatsExpanded)}
-                  className="w-full flex items-center justify-between hover:opacity-80 transition-opacity py-1"
-                >
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-semibold text-cyan-300">Statistiques du jour</h4>
-                    {clientData.statistics.dailyStats.optimizedRoute && (
-                      <span className="text-xs bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-200 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
-                        Optimisé
-                      </span>
-                    )}
-                  </div>
-                  {isStatsExpanded ? (
-                    <ChevronUp className="h-3.5 w-3.5 text-cyan-400" />
-                  ) : (
-                    <ChevronDown className="h-3.5 w-3.5 text-cyan-400" />
-                  )}
-                </button>
-                
-                {isStatsExpanded && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-3 mb-3">
-                  <div className="text-center p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg border border-cyan-500/20">
-                    <div className="text-xs text-gray-400 mb-1">Distance</div>
-                    <div className="text-lg font-bold text-cyan-300">
-                      {clientData.statistics.dailyStats.optimizedRoute ? 
-                        `${clientData.statistics.dailyStats.optimizedRoute.totalDistance} km` : 
-                        `${clientData.statistics.dailyStats.totalDistance} km`}
-                    </div>
-                  </div>
-                  <div className="text-center p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg border border-cyan-500/20">
-                    <div className="text-xs text-gray-400 mb-1">Durée</div>
-                    <div className="text-lg font-bold text-cyan-300">
-                      {clientData.statistics.dailyStats.optimizedRoute ? 
-                        `${clientData.statistics.dailyStats.optimizedRoute.totalDuration} min` : 
-                        `${clientData.statistics.dailyStats.totalDuration} min`}
-                    </div>
-                  </div>
-                  <div className="text-center p-3 bg-gradient-to-br from-gray-900/95 to-gray-800/85 rounded-lg border border-cyan-500/20">
-                    <div className="text-xs text-gray-400 mb-1">Clients</div>
-                    <div className="text-lg font-bold text-cyan-300">
-                      {clientData.statistics.dailyStats.clientCount}
-                    </div>
-                  </div>
-                    </div>
-                    
-                    {/* Info rapide */}
-                    <div className="flex items-center justify-between text-sm pt-3 border-t border-indigo-500/20">
-                      <span className="text-cyan-300">{clientData.statistics.clientsOnSameDay} client{clientData.statistics.clientsOnSameDay > 1 ? 's' : ''} ce jour</span>
-                      <span className="text-indigo-300">
-                        {remainingDays > 0 
-                          ? `${remainingDays} jour${remainingDays > 1 ? 's' : ''} restant${remainingDays > 1 ? 's' : ''}`
-                          : "0 jour restant"}
-                      </span>
-                    </div>
-                    
-                    {/* Ordre de visite optimisé (si disponible) */}
-                    {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
-                      <div className="mt-4 pt-4 border-t border-indigo-500/20">
-                        <div className="text-xs font-medium text-cyan-300 mb-2">Ordre de visite optimisé :</div>
-                        <ol className="space-y-1.5 text-xs text-gray-300">
-                          <li className="flex items-start gap-2">
-                            <span className="text-cyan-400 font-medium">1.</span>
-                            <span>{STARTING_POINT}</span>
-                          </li>
-                          {clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map((wp, index) => (
-                            <li key={index} className="flex items-center gap-2">
-                              <span className="text-cyan-400 font-medium flex-shrink-0">{index + 2}.</span>
-                              <div className="flex-1 flex items-center justify-between gap-1.5 sm:gap-2 flex-wrap">
-                                <span className="text-gray-300">{wp.address}</span>
-                                {(wp.city || wp.district) && (
-                                  <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                                    {wp.city && (
-                                      <span className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 bg-indigo-500/30 text-indigo-200 rounded-md border border-indigo-400/50 font-medium">
-                                        {wp.city}
-                                      </span>
-                                    )}
-                                    {wp.district && (
-                                      <span className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 sm:py-1 bg-purple-500/30 text-purple-200 rounded-md border border-purple-400/50 font-medium">
-                                        {wp.district}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Section : Carte du jour */}
+              {/* Section : Carte du jour avec stats intégrées */}
               {clientData.statistics.dailyStats.optimizedRoute?.waypoints?.some(wp => wp.coordinates) && (
                 <div className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 backdrop-blur-sm rounded-xl shadow-xl shadow-indigo-500/5 border border-indigo-500/20 overflow-hidden">
-                  <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-cyan-400" />
-                    <h4 className="text-sm font-semibold text-cyan-300">Carte du jour</h4>
-                    <span className="text-xs text-gray-400">— {clientData.booking.date}</span>
-                    <span className="ml-auto flex items-center gap-1.5 text-xs text-amber-300">
-                      <span style={{width:12,height:12,borderRadius:6,background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'inline-block',border:'1px solid rgba(255,255,255,0.7)'}} />
-                      Nouveau client
-                    </span>
+
+                  {/* Bandeau stats — client count en vedette */}
+                  <div className="px-4 py-3 flex items-center gap-4 border-b border-indigo-500/20">
+                    {/* Nombre de clients — élément principal */}
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500/30 to-indigo-600/30 border border-violet-400/50 shadow-lg shadow-violet-500/20">
+                        <Users className="absolute h-3.5 w-3.5 text-violet-300 top-1.5 right-1.5 opacity-60" />
+                        <span className="text-2xl font-extrabold text-white leading-none">
+                          {clientData.statistics.dailyStats.clientCount}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-violet-200 leading-tight">
+                          client{clientData.statistics.dailyStats.clientCount > 1 ? 's' : ''}
+                        </div>
+                        <div className="text-xs text-gray-400">{clientData.booking.date}</div>
+                      </div>
+                    </div>
+
+                    {/* Séparateur */}
+                    <div className="h-10 w-px bg-indigo-500/25 mx-1" />
+
+                    {/* Distance */}
+                    <div className="text-center">
+                      <div className="text-base font-bold text-cyan-300">
+                        {clientData.statistics.dailyStats.optimizedRoute
+                          ? `${clientData.statistics.dailyStats.optimizedRoute.totalDistance} km`
+                          : `${clientData.statistics.dailyStats.totalDistance} km`}
+                      </div>
+                      <div className="text-[11px] text-gray-400">distance</div>
+                    </div>
+
+                    {/* Séparateur */}
+                    <div className="h-10 w-px bg-indigo-500/25 mx-1" />
+
+                    {/* Durée */}
+                    <div className="text-center">
+                      <div className="text-base font-bold text-cyan-300">
+                        {clientData.statistics.dailyStats.optimizedRoute
+                          ? `${clientData.statistics.dailyStats.optimizedRoute.totalDuration} min`
+                          : `${clientData.statistics.dailyStats.totalDuration} min`}
+                      </div>
+                      <div className="text-[11px] text-gray-400">durée</div>
+                    </div>
+
+                    {/* Badge optimisé + légende nouveau client */}
+                    <div className="ml-auto flex flex-col items-end gap-1.5">
+                      {clientData.statistics.dailyStats.optimizedRoute && (
+                        <span className="text-xs bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-200 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
+                          Optimisé
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1 text-xs text-amber-300">
+                        <span style={{width:10,height:10,borderRadius:5,background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'inline-block',border:'1px solid rgba(255,255,255,0.7)',flexShrink:0}} />
+                        Nouveau client
+                      </span>
+                    </div>
                   </div>
-                  <div ref={mapContainerRef} style={{ height: '340px' }} className="w-full" />
+
+                  {/* Carte */}
+                  <div ref={mapContainerRef} style={{ height: '320px' }} className="w-full" />
                 </div>
               )}
 
               {/* Section : Actions */}
-              {isStatsExpanded && (
-                <div className="space-y-2">
+              <div className="space-y-2">
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(clientData.client.address)}&travelmode=driving`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 py-3 rounded-lg transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
+                >
+                  <Navigation className="h-5 w-5" />
+                  <span>Itinéraire vers ce client</span>
+                </a>
+
+                {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
                   <a
-                    href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(address)}&destination=${encodeURIComponent(clientData.client.address)}&travelmode=driving`}
+                    href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(STARTING_POINT)}&destination=${encodeURIComponent(STARTING_POINT)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 text-indigo-200 py-3 rounded-lg transition-all duration-200 border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
+                    className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-200 py-3 rounded-lg transition-all duration-200 border border-purple-400/40 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
                   >
                     <Navigation className="h-5 w-5" />
-                    <span>Itinéraire vers ce client</span>
+                    <span>Itinéraire optimisé (tous les clients)</span>
                   </a>
-
-                  {clientData.statistics.dailyStats.optimizedRoute && clientData.statistics.dailyStats.clientCount > 1 && (
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(STARTING_POINT)}&destination=${encodeURIComponent(STARTING_POINT)}&waypoints=${clientData.statistics.dailyStats.optimizedRoute.waypoints.slice(1).map(wp => encodeURIComponent(wp.address)).join('|')}&travelmode=driving`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 text-purple-200 py-3 rounded-lg transition-all duration-200 border border-purple-400/40 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:-translate-y-0.5 backdrop-blur-sm font-medium"
-                    >
-                      <Navigation className="h-5 w-5" />
-                      <span>Itinéraire optimisé (tous les clients)</span>
-                    </a>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>
