@@ -284,9 +284,9 @@ const OptimisationRdvClient = () => {
           });
         }
 
-        const label = index === 0 ? 'Départ' : (wp.customerName || wp.address);
+        const label = index === 0 ? 'Départ' : (wp.customerName || null);
         const popupContent = `<div style="max-width:180px;padding:10px 14px;">
-          <div style="font-weight:600;font-size:14px;margin-bottom:6px;color:#a78bfa;">${label}</div>
+          ${label ? `<div style="font-weight:600;font-size:14px;margin-bottom:6px;color:#a78bfa;">${label}</div>` : ''}
           <div style="font-size:12px;color:#9ca3af;">${wp.address}</div>
           ${wp.city ? `<div style="margin-top:4px;font-size:11px;color:#818cf8;">${wp.city}${wp.district ? ` — ${wp.district}` : ''}</div>` : ''}
         </div>`;
