@@ -109,10 +109,11 @@ function findOptimalRoute(matrix: number[][], n: number): number[] {
 }
 
 // Fonction pour obtenir l'itinéraire détaillé
-async function getDetailedRoute(locations: { address: string; coordinates: number[] }[], route: number[]) {
+async function getDetailedRoute(locations: { address: string; coordinates: number[]; customerName?: string }[], route: number[]) {
     const waypoints = route.map(index => ({
         coordinates: locations[index].coordinates as [number, number],
-        address: locations[index].address
+        address: locations[index].address,
+        customerName: locations[index].customerName
     }));
 
     const response = await directionsService.getDirections({
@@ -406,19 +407,20 @@ router.post('/', async (req: Request, res: Response) => {
         // 10. NOUVEAU: Calculer l'itinéraire optimisé pour tous les clients de cette journée
         let optimizedRoute = null;
         // Créer un map pour associer les adresses aux informations client (défini en dehors du try pour être accessible après)
-        const clientInfoMap = new Map<string, { city?: string; district?: string }>();
-        
+        const clientInfoMap = new Map<string, { city?: string; district?: string; customerName?: string }>();
+
         try {
             // Récupérer tous les clients de la même journée (avec leurs coordonnées déjà disponibles)
             const clientsOnSameDayList = clientsWithRealDistances.filter(
                 client => client.bookingDate === nearestClient.bookingDate
             );
-            
+
             // Remplir le map avec les informations des clients
             clientsOnSameDayList.forEach(client => {
                 clientInfoMap.set(client.address, {
                     city: client.city,
-                    district: client.district
+                    district: client.district,
+                    customerName: client.customerName
                 });
             });
             
@@ -442,11 +444,13 @@ router.post('/', async (req: Request, res: Response) => {
                 const coordinates = [
                     {
                         address: STARTING_POINT,
-                        coordinates: startPointCoordinates
+                        coordinates: startPointCoordinates,
+                        customerName: undefined
                     },
                     ...clientsOnSameDayList.map(client => ({
                         address: client.address,
-                        coordinates: client.coordinates
+                        coordinates: client.coordinates,
+                        customerName: client.customerName
                     }))
                 ];
 
@@ -461,6 +465,7 @@ router.post('/', async (req: Request, res: Response) => {
                 
                 optimizedRoute = {
                     waypoints: detailedRoute.waypoints,
+                    route: detailedRoute.route,
                     totalDuration: detailedRoute.totalDuration,
                     totalDistance: detailedRoute.totalDistance
                 };
@@ -522,6 +527,7 @@ router.post('/', async (req: Request, res: Response) => {
                         optimizedRoute: optimizedRoute ? {
                             totalDistance: optimizedRoute.totalDistance,
                             totalDuration: optimizedRoute.totalDuration,
+                            route: optimizedRoute.route,
                             waypoints: optimizedRoute.waypoints.map((wp, index) => {
                                 if (index === 0) {
                                     return {
@@ -534,7 +540,8 @@ router.post('/', async (req: Request, res: Response) => {
                                     address: wp.address,
                                     coordinates: wp.coordinates as [number, number],
                                     city: clientInfo?.city || undefined,
-                                    district: clientInfo?.district || undefined
+                                    district: clientInfo?.district || undefined,
+                                    customerName: clientInfo?.customerName || wp.customerName || undefined
                                 };
                             })
                         } : null

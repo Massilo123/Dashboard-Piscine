@@ -38,12 +38,13 @@ interface Waypoint {
   coordinates?: [number, number];
   city?: string;
   district?: string;
+  customerName?: string;
 }
-
 
 interface OptimizedRoute {
   totalDistance: number;
   totalDuration: number;
+  route?: { legs?: { duration: number }[] };
   waypoints: Waypoint[];
 }
 
@@ -284,8 +285,9 @@ const OptimisationRdvClient = () => {
           });
         }
 
+        const label = index === 0 ? 'Départ' : (wp.customerName || wp.address);
         const popupContent = `<div style="max-width:180px;padding:10px 14px;">
-          <div style="font-weight:600;font-size:14px;margin-bottom:6px;color:#a78bfa;">${index === 0 ? 'Départ' : `Client ${index}`}</div>
+          <div style="font-weight:600;font-size:14px;margin-bottom:6px;color:#a78bfa;">${label}</div>
           <div style="font-size:12px;color:#9ca3af;">${wp.address}</div>
           ${wp.city ? `<div style="margin-top:4px;font-size:11px;color:#818cf8;">${wp.city}${wp.district ? ` — ${wp.district}` : ''}</div>` : ''}
         </div>`;
@@ -296,6 +298,30 @@ const OptimisationRdvClient = () => {
       if (routePoints.length > 1) {
         L.polyline(routePoints, { color: '#a78bfa', weight: 4, opacity: 0.25, lineJoin: 'round', lineCap: 'round' }).addTo(map);
         L.polyline(routePoints, { color: '#8b5cf6', weight: 2.5, opacity: 0.85, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+
+        const optimizedRoute = clientData.statistics.dailyStats.optimizedRoute;
+        for (let i = 0; i < routePoints.length - 1; i++) {
+          let dur = 0;
+          if (optimizedRoute?.route?.legs && Array.isArray(optimizedRoute.route.legs) && optimizedRoute.route.legs[i]) {
+            dur = Math.round(optimizedRoute.route.legs[i].duration / 60);
+          }
+          if (dur > 0) {
+            const midLat = (routePoints[i][0] + routePoints[i + 1][0]) / 2;
+            const midLng = (routePoints[i][1] + routePoints[i + 1][1]) / 2;
+            const timeIcon = L.divIcon({
+              className: 'time-label',
+              html: `<div style="background:linear-gradient(135deg,rgba(139,92,246,0.9),rgba(99,102,241,0.9));color:white;
+                      font-size:9px;font-weight:600;padding:2px 5px;border-radius:4px;
+                      border:1px solid rgba(255,255,255,0.25);
+                      box-shadow:0 0 4px rgba(139,92,246,0.4),0 0 8px rgba(139,92,246,0.2);
+                      white-space:nowrap;text-align:center;
+                      text-shadow:0 0 2px rgba(255,255,255,0.6);">${dur} min</div>`,
+              iconSize: [0, 0],
+              iconAnchor: [12, 6]
+            });
+            L.marker([midLat, midLng], { icon: timeIcon, interactive: false, zIndexOffset: -1000 }).addTo(map);
+          }
+        }
       }
 
       if (sourceCoords) {
