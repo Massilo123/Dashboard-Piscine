@@ -953,18 +953,6 @@ const OptimisationRdvClient = () => {
                       </div>
                     </div>
 
-                    {/* Rangée badges — toujours sur sa propre ligne */}
-                    <div className="flex items-center justify-end gap-2">
-                      {clientData.statistics.dailyStats.optimizedRoute && (
-                        <span className="text-[11px] bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 text-emerald-200 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
-                          Optimisé
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1 text-[11px] text-amber-300">
-                        <span style={{width:9,height:9,borderRadius:5,background:'linear-gradient(135deg,#f59e0b,#f97316)',display:'inline-block',border:'1px solid rgba(255,255,255,0.7)',flexShrink:0}} />
-                        Nouveau client
-                      </span>
-                    </div>
                   </div>
 
                   {/* Carte */}
