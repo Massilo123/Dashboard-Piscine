@@ -299,11 +299,28 @@ const OptimisationRdvClient = () => {
         L.polyline(routePoints, { color: '#8b5cf6', weight: 2.5, opacity: 0.85, lineJoin: 'round', lineCap: 'round' }).addTo(map);
 
         const optimizedRoute = clientData.statistics.dailyStats.optimizedRoute;
-        for (let i = 0; i < routePoints.length - 1; i++) {
+        const localTravelTimes: number[] = [];
+        for (let i = 0; i < waypoints.length - 1; i++) {
           let dur = 0;
-          if (optimizedRoute?.route?.legs && Array.isArray(optimizedRoute.route.legs) && optimizedRoute.route.legs[i]) {
-            dur = Math.round(optimizedRoute.route.legs[i].duration / 60);
+          if (optimizedRoute?.route && typeof optimizedRoute.route === 'object' && 'legs' in optimizedRoute.route) {
+            const legs = (optimizedRoute.route as { legs: { duration: number }[] }).legs;
+            if (Array.isArray(legs) && legs[i] && 'duration' in legs[i]) {
+              dur = Math.round(legs[i].duration / 60);
+            }
           }
+          if (dur === 0 && optimizedRoute) {
+            const sp = waypoints[i].coordinates!;
+            const ep = waypoints[i + 1].coordinates!;
+            const dx = sp[1] - ep[1];
+            const dy = sp[0] - ep[0];
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const ratio = dist / ((optimizedRoute.totalDistance || 1) * 0.01);
+            dur = Math.round((optimizedRoute.totalDuration * ratio) / 10);
+          }
+          localTravelTimes.push(dur);
+        }
+        for (let i = 0; i < routePoints.length - 1; i++) {
+          const dur = localTravelTimes[i];
           if (dur > 0) {
             const midLat = (routePoints[i][0] + routePoints[i + 1][0]) / 2;
             const midLng = (routePoints[i][1] + routePoints[i + 1][1]) / 2;
@@ -898,12 +915,14 @@ const OptimisationRdvClient = () => {
                       <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500/30 to-indigo-600/30 border border-violet-400/50 shadow-lg shadow-violet-500/20">
                         <Users className="absolute h-3.5 w-3.5 text-violet-300 top-1.5 right-1.5 opacity-60" />
                         <span className="text-2xl font-extrabold text-white leading-none">
-                          {clientData.statistics.dailyStats.clientCount}
+                          {clientData.statistics.dailyStats.optimizedRoute
+                            ? clientData.statistics.dailyStats.optimizedRoute.waypoints.length - 1
+                            : clientData.statistics.dailyStats.clientCount}
                         </span>
                       </div>
                       <div>
                         <div className="text-sm font-semibold text-violet-200 leading-tight">
-                          client{clientData.statistics.dailyStats.clientCount > 1 ? 's' : ''}
+                          planifiés ce jour
                         </div>
                         <div className="text-xs text-gray-400">{clientData.booking.date}</div>
                       </div>
