@@ -320,9 +320,19 @@ const Appointments = () => {
                       )}
 
                       {appointment.user_name && (
-                        <div className="mt-4 pt-4 border-t border-gray-700/50 flex items-center text-xs text-gray-500">
-                          <User className="w-3 h-3 mr-1" />
-                          <span>Booké par: {appointment.user_name}</span>
+                        <div className="mt-4 pt-4 border-t border-gray-700/50 flex items-center gap-1.5 text-xs text-gray-500">
+                          <User className="w-3 h-3 shrink-0" />
+                          <span>Booké par : {appointment.user_name}</span>
+                          {appointment.created_at && (
+                            <>
+                              <span className="text-gray-600">·</span>
+                              <span className="text-gray-500">
+                                {new Date(appointment.created_at).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' })}
+                                {' à '}
+                                {new Date(appointment.created_at).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
