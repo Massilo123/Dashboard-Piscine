@@ -13,6 +13,8 @@ interface BookingDetail {
    address: string;
    startAt: string;
    phoneNumber: string;
+   serviceType?: string;
+   serviceVariationId?: string;
 }
 
 const router = Router();
@@ -122,13 +124,18 @@ router.post('/bookings', async (req: Request, res: Response) => {
                         // Log pour chaque client avec son numéro
                         console.log(`[TÉLÉPHONE] ${customer.givenName || 'Client'} - ${phoneNumber || 'NON DISPONIBLE'}`);
 
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const segments = (booking as any).appointmentSegments || [];
+                        const serviceVariationId = segments[0]?.serviceVariationId || undefined;
+
                         const bookingDetail = {
                             bookingId: booking.id || '',
                             customerId: booking.customerId || '',
                             customerName: `${customer.givenName || ''} ${customer.familyName || ''}`.trim(),
                             address: customer.address.addressLine1,
                             startAt: booking.startAt || '',
-                            phoneNumber: phoneNumber
+                            phoneNumber: phoneNumber,
+                            serviceVariationId
                         };
                         
                         bookingDetails.push(bookingDetail);
@@ -139,14 +146,43 @@ router.post('/bookings', async (req: Request, res: Response) => {
             }
         }
 
-        // Log des numéros de téléphone pour tous les clients
-        if (bookingDetails.length > 0) {
-            console.log('========================================');
-            console.log(`[TÉLÉPHONES] ${bookingDetails.length} client(s) trouvé(s):`);
-            bookingDetails.forEach((booking, index) => {
-                console.log(`  ${index + 1}. ${booking.customerName} - ${booking.phoneNumber || 'NON DISPONIBLE'}`);
-            });
-            console.log('========================================');
+        // Batch-fetch des noms de service depuis le catalogue Square
+        const serviceNames: Record<string, string> = {};
+        const variationIds = [...new Set(bookingDetails.map(b => b.serviceVariationId).filter(Boolean))] as string[];
+        if (variationIds.length > 0) {
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const catalogResponse = await squareClient.catalog.batchGet({
+                    objectIds: variationIds,
+                    includeRelatedObjects: true
+                });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const objects: any[] = (catalogResponse as any).objects || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const relatedObjects: any[] = (catalogResponse as any).relatedObjects || [];
+                // Construire un map id → nom pour les ITEM parents
+                const itemNameMap: Record<string, string> = {};
+                for (const obj of relatedObjects) {
+                    if (obj.type === 'ITEM' && obj.itemData?.name) {
+                        itemNameMap[obj.id] = obj.itemData.name;
+                    }
+                }
+                for (const obj of objects) {
+                    if (obj.type === 'ITEM_VARIATION') {
+                        const parentId = obj.itemVariationData?.itemId;
+                        const name = (parentId && itemNameMap[parentId]) || obj.itemVariationData?.name || '';
+                        if (name) serviceNames[obj.id] = name;
+                    }
+                }
+            } catch (err) {
+                console.error('[CATALOG] Erreur batch-retrieve:', err);
+            }
+        }
+        // Injecter serviceType dans chaque bookingDetail
+        for (const bd of bookingDetails) {
+            if (bd.serviceVariationId && serviceNames[bd.serviceVariationId]) {
+                bd.serviceType = serviceNames[bd.serviceVariationId];
+            }
         }
 
         if (bookingDetails.length === 0) {
@@ -205,7 +241,8 @@ router.post('/bookings', async (req: Request, res: Response) => {
                     type: 'booking',
                     customerName: bookingDetail.customerName,
                     startAt: bookingDetail.startAt,
-                    phoneNumber: bookingDetail.phoneNumber || undefined
+                    phoneNumber: bookingDetail.phoneNumber || undefined,
+                    serviceType: bookingDetail.serviceType || undefined
                 };
                 
                 // Log pour vérifier que le phoneNumber est bien ajouté
