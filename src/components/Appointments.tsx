@@ -174,11 +174,13 @@ const Appointments = () => {
     return acc;
   }, {} as Record<string, Appointment[]>);
 
+  // Trier les groupes par date de booking la plus récente dans chaque groupe (descendant)
   const sortedDates = Object.keys(groupedAppointments).sort((a, b) => {
     if (a === 'Sans date') return 1;
     if (b === 'Sans date') return -1;
-    // Comparer directement les strings au format YYYY-MM-DD pour éviter les problèmes de fuseau horaire
-    return a.localeCompare(b);
+    const maxA = Math.max(...groupedAppointments[a].map(apt => new Date(apt.created_at || 0).getTime()));
+    const maxB = Math.max(...groupedAppointments[b].map(apt => new Date(apt.created_at || 0).getTime()));
+    return maxB - maxA;
   });
 
   if (loading) {
@@ -238,7 +240,7 @@ const Appointments = () => {
                 </h2>
                 
                 <div className="space-y-4">
-                  {groupedAppointments[date].map((appointment) => {
+                  {[...groupedAppointments[date]].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).map((appointment) => {
                     const noteItems = importantNotesToItems(appointment.important_notes);
                     return (
                     <div
