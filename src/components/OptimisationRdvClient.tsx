@@ -298,7 +298,23 @@ const OptimisationRdvClient = () => {
         L.polyline(routePoints, { color: '#a78bfa', weight: 4, opacity: 0.25, lineJoin: 'round', lineCap: 'round' }).addTo(map);
         L.polyline(routePoints, { color: '#8b5cf6', weight: 2.5, opacity: 0.85, lineJoin: 'round', lineCap: 'round' }).addTo(map);
 
-        const legDurations = clientData.statistics.dailyStats.optimizedRoute?.legDurations || [];
+        const optimizedRoute = clientData.statistics.dailyStats.optimizedRoute!;
+        let legDurations: number[] = optimizedRoute.legDurations || [];
+        if (legDurations.length === 0 && waypoints.length > 1) {
+          // Fallback: distribuer totalDuration proportionnellement aux distances entre waypoints
+          const segDists: number[] = [];
+          for (let i = 0; i < waypoints.length - 1; i++) {
+            const sp = waypoints[i].coordinates!;   // [lng, lat]
+            const ep = waypoints[i + 1].coordinates!;
+            const dLat = (ep[1] - sp[1]) * 111;              // ° → km
+            const dLng = (ep[0] - sp[0]) * 111 * Math.cos(sp[1] * Math.PI / 180);
+            segDists.push(Math.sqrt(dLat * dLat + dLng * dLng));
+          }
+          const totalSegDist = segDists.reduce((s, d) => s + d, 0);
+          legDurations = segDists.map(d =>
+            totalSegDist > 0 ? Math.round((d / totalSegDist) * optimizedRoute.totalDuration) : 0
+          );
+        }
         for (let i = 0; i < routePoints.length - 1; i++) {
           const dur = legDurations[i];
           if (dur > 0) {

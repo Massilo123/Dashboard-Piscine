@@ -127,7 +127,8 @@ async function getDetailedRoute(locations: { address: string; coordinates: numbe
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const legs: any[] = response.body.routes[0].legs || [];
+    const route0 = response.body.routes[0] as any;
+    const legs: any[] = route0.legs || [];
     const legDurations: number[] = legs.map((leg: { duration: number }) => Math.round(leg.duration / 60));
 
     return {
