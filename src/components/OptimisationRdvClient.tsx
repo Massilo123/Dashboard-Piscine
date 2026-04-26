@@ -320,15 +320,16 @@ const OptimisationRdvClient = () => {
           if (dur > 0) {
             const midLat = (routePoints[i][0] + routePoints[i + 1][0]) / 2;
             const midLng = (routePoints[i][1] + routePoints[i + 1][1]) / 2;
+            const labelW = 52, labelH = 18;
             const timeIcon = L.divIcon({
               className: '',
-              html: `<div style="transform:translate(-50%,-50%);background:linear-gradient(135deg,rgba(139,92,246,0.92),rgba(99,102,241,0.92));color:white;
-                      font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;
+              html: `<div style="width:${labelW}px;height:${labelH}px;line-height:${labelH}px;background:linear-gradient(135deg,rgba(139,92,246,0.92),rgba(99,102,241,0.92));color:white;
+                      font-size:9px;font-weight:700;border-radius:10px;
                       border:1px solid rgba(255,255,255,0.25);
                       box-shadow:0 2px 6px rgba(99,102,241,0.5);
                       white-space:nowrap;text-align:center;">${dur} min</div>`,
-              iconSize: [0, 0],
-              iconAnchor: [0, 0]
+              iconSize: [labelW, labelH],
+              iconAnchor: [labelW / 2, labelH / 2]
             });
             L.marker([midLat, midLng], { icon: timeIcon, interactive: false, zIndexOffset: -1000 }).addTo(map);
           }
