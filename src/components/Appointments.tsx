@@ -31,7 +31,10 @@ interface Appointment {
 // phone normalisé + date YYYY-MM-DD = clé de lookup Square
 type SquareKey = string; // `${phone}_${date}`
 
-const normalizePhone = (phone: string) => phone.replace(/\D/g, '');
+const normalizePhone = (phone: string) => {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+};
 
 const Appointments = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);

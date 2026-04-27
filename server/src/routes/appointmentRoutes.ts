@@ -192,8 +192,11 @@ router.get('/square-status', async (req: Request, res: Response) => {
       ],
     }).lean();
 
-    // Dédoublonner par (phone normalisé, date)
-    const normalize = (p: string) => (p || '').replace(/\D/g, '');
+    // Normaliser en 10 chiffres (retirer le +1 ou 1 du début si présent)
+    const normalize = (p: string) => {
+      const digits = (p || '').replace(/\D/g, '');
+      return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+    };
     const targets = new Map<string, Set<string>>(); // phone normalisé → Set de dates
     for (const apt of appointments as any[]) {
       const phone = normalize(apt.phone);
