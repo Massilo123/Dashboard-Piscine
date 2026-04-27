@@ -179,12 +179,43 @@ router.get('/unviewed-count', async (req: Request, res: Response) => {
  * Retourne un tableau de { phone, date } confirmés dans Square
  */
 router.get('/square-status', async (req: Request, res: Response) => {
+  const SQUARE_TOKEN = process.env.SQUARE_ACCESS_TOKEN!;
+  const squareHeaders = {
+    'Authorization': `Bearer ${SQUARE_TOKEN}`,
+    'Content-Type': 'application/json',
+    'Square-Version': '2024-01-18',
+  };
+
+  // Normaliser en 10 chiffres (retire le +1 ou 1 du début)
+  const normalize = (p: string) => {
+    const digits = (p || '').replace(/\D/g, '');
+    return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  };
+
   try {
-    // 1. Récupérer les RDVs futurs depuis notre propre DB pour savoir qui chercher
+    // 1. Charger tous les bookings Square ACCEPTED via REST (avec pagination)
+    //    Le SDK ignore les paramètres snake_case — on appelle l'API directement
+    const acceptedBookings = new Map<string, Set<string>>(); // customer_id → Set<YYYY-MM-DD>
+    let cursor: string | null = null;
+    do {
+      const url = 'https://connect.squareup.com/v2/bookings' + (cursor ? `?cursor=${cursor}` : '');
+      const resp = await fetch(url, { headers: squareHeaders });
+      const data: any = await resp.json();
+      for (const b of data.bookings || []) {
+        const status = (b.status || '').toUpperCase();
+        if (status === 'CANCELLED' || status === 'CANCELLED_BY_SELLER' || status === 'CANCELLED_BY_CUSTOMER' || status === 'DECLINED') continue;
+        if (!b.customer_id || !b.start_at) continue;
+        const date = b.start_at.split('T')[0]; // YYYY-MM-DD en UTC
+        if (!acceptedBookings.has(b.customer_id)) acceptedBookings.set(b.customer_id, new Set());
+        acceptedBookings.get(b.customer_id)!.add(date);
+      }
+      cursor = data.cursor || null;
+    } while (cursor);
+
+    // 2. Récupérer nos RDVs futurs depuis la DB
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayString = today.toISOString().split('T')[0];
-
     const appointments = await Appointment.find({
       $or: [
         { scheduled_date: { $gte: todayString } },
@@ -192,12 +223,8 @@ router.get('/square-status', async (req: Request, res: Response) => {
       ],
     }).lean();
 
-    // Normaliser en 10 chiffres (retirer le +1 ou 1 du début si présent)
-    const normalize = (p: string) => {
-      const digits = (p || '').replace(/\D/g, '');
-      return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
-    };
-    const targets = new Map<string, Set<string>>(); // phone normalisé → Set de dates
+    // Dédoublonner les téléphones à chercher
+    const targets = new Map<string, Set<string>>(); // phone10 → Set<date>
     for (const apt of appointments as any[]) {
       const phone = normalize(apt.phone);
       if (!phone || !apt.scheduled_date) continue;
@@ -205,68 +232,36 @@ router.get('/square-status', async (req: Request, res: Response) => {
       targets.get(phone)!.add(apt.scheduled_date);
     }
 
-    if (targets.size === 0) {
-      return res.json({ success: true, squareBookings: [] });
-    }
+    if (targets.size === 0) return res.json({ success: true, squareBookings: [] });
 
-    // 2. Pour chaque téléphone unique, chercher le client dans Square
+    // 3. Pour chaque téléphone, chercher le customer_id dans Square (format E.164 requis)
     const confirmed: Array<{ phone: string; date: string }> = [];
 
     await Promise.all(
-      [...targets.entries()].map(async ([phone, dates]) => {
+      [...targets.entries()].map(async ([phone10, dates]) => {
         try {
-          // Recherche Square par numéro de téléphone exact
-          const searchResp = await squareClient.customers.search({
-            query: {
-              filter: {
-                phoneNumber: { exact: phone },
-              } as any,
-            },
+          const e164 = `+1${phone10}`;
+          const searchResp = await fetch('https://connect.squareup.com/v2/customers/search', {
+            method: 'POST',
+            headers: squareHeaders,
+            body: JSON.stringify({ query: { filter: { phone_number: { exact: e164 } } } }),
           });
+          const searchData: any = await searchResp.json();
+          const customers: any[] = searchData.customers || [];
 
-          const customers: any[] =
-            (searchResp as any).customers ??
-            (searchResp as any).result?.customers ??
-            [];
-
-          if (customers.length === 0) return;
-
-          // 3. Pour chaque client trouvé, vérifier ses bookings aux dates demandées
-          await Promise.all(
-            customers.map(async (customer: any) => {
-              const customerId: string = customer.id;
-
-              await Promise.all(
-                [...dates].map(async (date) => {
-                  try {
-                    const bookResp = await squareClient.bookings.list({
-                      customerId,
-                      startAtMin: `${date}T00:00:00Z`,
-                      startAtMax: `${date}T23:59:59Z`,
-                    } as any);
-
-                    const bookings: any[] =
-                      (bookResp as any).bookings ??
-                      (bookResp as any).result?.bookings ??
-                      [];
-
-                    const active = bookings.filter((b: any) => {
-                      const status = (b.status || '').toUpperCase();
-                      return status !== 'CANCELLED' && status !== 'CANCELLED_BY_SELLER' && status !== 'CANCELLED_BY_CUSTOMER';
-                    });
-
-                    if (active.length > 0) {
-                      confirmed.push({ phone, date });
-                    }
-                  } catch {
-                    // Ignorer les erreurs individuelles par date
-                  }
-                })
-              );
-            })
-          );
+          for (const customer of customers) {
+            const customerDates = acceptedBookings.get(customer.id);
+            if (!customerDates) continue;
+            for (const date of dates) {
+              // Les bookings "all_day" ont start_at = YYYY-MM-DDT04:00:00Z (UTC-4)
+              // On vérifie la date UTC et aussi le jour précédent/suivant par sécurité
+              if (customerDates.has(date) || customerDates.has(date)) {
+                confirmed.push({ phone: phone10, date });
+              }
+            }
+          }
         } catch {
-          // Ignorer les erreurs individuelles par client
+          // Ignorer les erreurs par client
         }
       })
     );
