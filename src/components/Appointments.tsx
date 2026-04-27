@@ -28,12 +28,18 @@ interface Appointment {
   dataHash?: string; // Hash pour détecter les changements
 }
 
+// phone normalisé + date YYYY-MM-DD = clé de lookup Square
+type SquareKey = string; // `${phone}_${date}`
+
+const normalizePhone = (phone: string) => phone.replace(/\D/g, '');
+
 const Appointments = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [hasViewed, setHasViewed] = useState(false);
   const hasMarkedAsViewed = useRef(false);
+  const [squareKeys, setSquareKeys] = useState<Set<SquareKey>>(new Set());
 
   const handleView = () => {
     setHasViewed(true);
@@ -53,11 +59,27 @@ const Appointments = () => {
     window.dispatchEvent(new Event('appointments_viewed'));
   };
 
+  const fetchSquareStatus = async () => {
+    try {
+      const response = await axios.get(API_CONFIG.endpoints.appointmentsSquareStatus);
+      if (response.data.success && Array.isArray(response.data.squareBookings)) {
+        const keys = new Set<SquareKey>(
+          response.data.squareBookings.map(
+            (b: { phone: string; date: string }) => `${normalizePhone(b.phone)}_${b.date}`
+          )
+        );
+        setSquareKeys(keys);
+      }
+    } catch (err) {
+      console.error('Erreur Square status:', err);
+    }
+  };
+
   const fetchAppointments = async () => {
     try {
       setLoading(true);
       const response = await axios.get(API_CONFIG.endpoints.appointmentsFuture);
-      
+
       if (response.data.success) {
         const raw = response.data.appointments;
         setAppointments(Array.isArray(raw) ? raw : []);
@@ -74,6 +96,7 @@ const Appointments = () => {
 
   useEffect(() => {
     fetchAppointments();
+    fetchSquareStatus();
   }, []);
 
   // Calculer la date d'aujourd'hui à chaque rendu pour s'assurer que le filtre est toujours à jour
@@ -242,6 +265,8 @@ const Appointments = () => {
                 <div className="space-y-4">
                   {[...groupedAppointments[date]].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).map((appointment) => {
                     const noteItems = importantNotesToItems(appointment.important_notes);
+                    const squareKey = `${normalizePhone(appointment.phone || '')}_${appointment.scheduled_date || ''}`;
+                    const isInSquare = appointment.phone && appointment.scheduled_date && squareKeys.has(squareKey);
                     return (
                     <div
                       key={appointment._id}
@@ -249,11 +274,21 @@ const Appointments = () => {
                     >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <h3 className="text-lg font-semibold text-white">
                               {appointment.name || 'Nom non disponible'}
                             </h3>
                             {getStatusBadge(appointment.status)}
+                            {isInSquare ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-400/20 text-emerald-300 border border-emerald-400/50 shadow-sm shadow-emerald-500/20">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Booké Square
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700/40 text-gray-500 border border-gray-600/30">
+                                À rentrer Square
+                              </span>
+                            )}
                           </div>
                           
                           <div className="text-sm text-gray-400 mb-3">

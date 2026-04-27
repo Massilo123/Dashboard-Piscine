@@ -1,6 +1,7 @@
 // Routes pour gérer les appointments (rendez-vous bookés par le bot)
 import { Router, Request, Response } from 'express';
 import Appointment from '../models/Appointment';
+import squareClient from '../config/square';
 
 const router = Router();
 
@@ -164,6 +165,116 @@ router.get('/unviewed-count', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Erreur inconnue'
+    });
+  }
+});
+
+/**
+ * Route pour vérifier quels appointments du bot ont déjà été bookés dans Square.
+ * On part des RDVs qu'on a déjà (avec leurs téléphones et dates), on cherche
+ * directement ces clients dans Square par téléphone, puis on vérifie s'ils ont
+ * un booking à la date demandée.
+ *
+ * GET /api/appointments/square-status
+ * Retourne un tableau de { phone, date } confirmés dans Square
+ */
+router.get('/square-status', async (req: Request, res: Response) => {
+  try {
+    // 1. Récupérer les RDVs futurs depuis notre propre DB pour savoir qui chercher
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayString = today.toISOString().split('T')[0];
+
+    const appointments = await Appointment.find({
+      $or: [
+        { scheduled_date: { $gte: todayString } },
+        { scheduled_date: { $exists: false } },
+      ],
+    }).lean();
+
+    // Dédoublonner par (phone normalisé, date)
+    const normalize = (p: string) => (p || '').replace(/\D/g, '');
+    const targets = new Map<string, Set<string>>(); // phone normalisé → Set de dates
+    for (const apt of appointments as any[]) {
+      const phone = normalize(apt.phone);
+      if (!phone || !apt.scheduled_date) continue;
+      if (!targets.has(phone)) targets.set(phone, new Set());
+      targets.get(phone)!.add(apt.scheduled_date);
+    }
+
+    if (targets.size === 0) {
+      return res.json({ success: true, squareBookings: [] });
+    }
+
+    // 2. Pour chaque téléphone unique, chercher le client dans Square
+    const confirmed: Array<{ phone: string; date: string }> = [];
+
+    await Promise.all(
+      [...targets.entries()].map(async ([phone, dates]) => {
+        try {
+          // Recherche Square par numéro de téléphone exact
+          const searchResp = await squareClient.customers.search({
+            query: {
+              filter: {
+                phoneNumber: { exact: phone },
+              } as any,
+            },
+          });
+
+          const customers: any[] =
+            (searchResp as any).customers ??
+            (searchResp as any).result?.customers ??
+            [];
+
+          if (customers.length === 0) return;
+
+          // 3. Pour chaque client trouvé, vérifier ses bookings aux dates demandées
+          await Promise.all(
+            customers.map(async (customer: any) => {
+              const customerId: string = customer.id;
+
+              await Promise.all(
+                [...dates].map(async (date) => {
+                  try {
+                    const bookResp = await squareClient.bookings.list({
+                      customerId,
+                      startAtMin: `${date}T00:00:00Z`,
+                      startAtMax: `${date}T23:59:59Z`,
+                    } as any);
+
+                    const bookings: any[] =
+                      (bookResp as any).bookings ??
+                      (bookResp as any).result?.bookings ??
+                      [];
+
+                    const active = bookings.filter((b: any) => {
+                      const status = (b.status || '').toUpperCase();
+                      return status !== 'CANCELLED' && status !== 'CANCELLED_BY_SELLER' && status !== 'CANCELLED_BY_CUSTOMER';
+                    });
+
+                    if (active.length > 0) {
+                      confirmed.push({ phone, date });
+                    }
+                  } catch {
+                    // Ignorer les erreurs individuelles par date
+                  }
+                })
+              );
+            })
+          );
+        } catch {
+          // Ignorer les erreurs individuelles par client
+        }
+      })
+    );
+
+    res.json({ success: true, squareBookings: confirmed });
+  } catch (error) {
+    console.error('❌ Erreur Square status:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur Square API',
+      squareBookings: [],
     });
   }
 });
