@@ -40,6 +40,14 @@ const Appointments = () => {
   const [hasViewed, setHasViewed] = useState(false);
   const hasMarkedAsViewed = useRef(false);
   const [squareKeys, setSquareKeys] = useState<Set<SquareKey>>(new Set());
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1500);
+    });
+  };
 
   const handleView = () => {
     setHasViewed(true);
@@ -309,21 +317,30 @@ const Appointments = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           {appointment.phone && (
-                            <div className="flex items-center text-sm text-gray-300">
-                              <Phone className="w-4 h-4 mr-2 text-cyan-400" />
-                              <a 
-                                href={`tel:${appointment.phone}`}
-                                className="hover:text-cyan-300 transition-colors"
-                              >
-                                {appointment.phone}
-                              </a>
+                            <div
+                              className="flex items-center text-sm text-gray-300 cursor-pointer select-none group"
+                              onClick={() => copyToClipboard(appointment.phone, `phone_${appointment._id}`)}
+                            >
+                              <Phone className="w-4 h-4 mr-2 text-cyan-400 flex-shrink-0" />
+                              {copiedId === `phone_${appointment._id}` ? (
+                                <span className="text-green-400 font-medium">Copié !</span>
+                              ) : (
+                                <span className="group-hover:text-cyan-300 transition-colors">{appointment.phone}</span>
+                              )}
                             </div>
                           )}
-                          
+
                           {appointment.address && (
-                            <div className="flex items-start text-sm text-gray-300">
+                            <div
+                              className="flex items-start text-sm text-gray-300 cursor-pointer select-none group"
+                              onClick={() => copyToClipboard(appointment.address, `addr_${appointment._id}`)}
+                            >
                               <MapPin className="w-4 h-4 mr-2 text-cyan-400 mt-0.5 flex-shrink-0" />
-                              <span>{appointment.address}</span>
+                              {copiedId === `addr_${appointment._id}` ? (
+                                <span className="text-green-400 font-medium">Copié !</span>
+                              ) : (
+                                <span className="group-hover:text-cyan-300 transition-colors">{appointment.address}</span>
+                              )}
                             </div>
                           )}
                         </div>
