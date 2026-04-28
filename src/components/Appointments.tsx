@@ -70,44 +70,37 @@ const Appointments = () => {
     window.dispatchEvent(new Event('appointments_viewed'));
   };
 
-  const fetchSquareStatus = async () => {
-    try {
-      const response = await axios.get(API_CONFIG.endpoints.appointmentsSquareStatus);
-      if (response.data.success && Array.isArray(response.data.squareBookings)) {
-        const keys = new Set<SquareKey>(
-          response.data.squareBookings.map(
-            (b: { phone: string; date: string }) => `${normalizePhone(b.phone)}_${b.date}`
-          )
-        );
-        setSquareKeys(keys);
-      }
-    } catch (err) {
-      console.error('Erreur Square status:', err);
-    }
-  };
-
-  const fetchAppointments = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(API_CONFIG.endpoints.appointmentsFuture);
-
-      if (response.data.success) {
-        const raw = response.data.appointments;
-        setAppointments(Array.isArray(raw) ? raw : []);
-      } else {
-        setError('Erreur lors de la récupération des rendez-vous');
-      }
-    } catch (err) {
-      console.error('Erreur:', err);
-      setError('Impossible de charger les rendez-vous');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchAppointments();
-    fetchSquareStatus();
+    const loadAll = async () => {
+      setLoading(true);
+      try {
+        const [aptResp, squareResp] = await Promise.all([
+          axios.get(API_CONFIG.endpoints.appointmentsFuture),
+          axios.get(API_CONFIG.endpoints.appointmentsSquareStatus).catch(() => null),
+        ]);
+
+        if (aptResp.data.success) {
+          setAppointments(Array.isArray(aptResp.data.appointments) ? aptResp.data.appointments : []);
+        } else {
+          setError('Erreur lors de la récupération des rendez-vous');
+        }
+
+        if (squareResp?.data?.success && Array.isArray(squareResp.data.squareBookings)) {
+          setSquareKeys(new Set<SquareKey>(
+            squareResp.data.squareBookings.map(
+              (b: { phone: string; date: string }) => `${normalizePhone(b.phone)}_${b.date}`
+            )
+          ));
+        }
+      } catch (err) {
+        console.error('Erreur:', err);
+        setError('Impossible de charger les rendez-vous');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAll();
   }, []);
 
   // Calculer la date d'aujourd'hui à chaque rendu pour s'assurer que le filtre est toujours à jour
