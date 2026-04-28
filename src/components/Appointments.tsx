@@ -43,6 +43,7 @@ const Appointments = () => {
   const [hasViewed, setHasViewed] = useState(false);
   const hasMarkedAsViewed = useRef(false);
   const [squareKeys, setSquareKeys] = useState<Set<SquareKey>>(new Set());
+  const [squareLoading, setSquareLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
@@ -71,26 +72,15 @@ const Appointments = () => {
   };
 
   useEffect(() => {
-    const loadAll = async () => {
+    // Charger les RDVs immédiatement
+    const loadAppointments = async () => {
       setLoading(true);
       try {
-        const [aptResp, squareResp] = await Promise.all([
-          axios.get(API_CONFIG.endpoints.appointmentsFuture),
-          axios.get(API_CONFIG.endpoints.appointmentsSquareStatus).catch(() => null),
-        ]);
-
-        if (aptResp.data.success) {
-          setAppointments(Array.isArray(aptResp.data.appointments) ? aptResp.data.appointments : []);
+        const response = await axios.get(API_CONFIG.endpoints.appointmentsFuture);
+        if (response.data.success) {
+          setAppointments(Array.isArray(response.data.appointments) ? response.data.appointments : []);
         } else {
           setError('Erreur lors de la récupération des rendez-vous');
-        }
-
-        if (squareResp?.data?.success && Array.isArray(squareResp.data.squareBookings)) {
-          setSquareKeys(new Set<SquareKey>(
-            squareResp.data.squareBookings.map(
-              (b: { phone: string; date: string }) => `${normalizePhone(b.phone)}_${b.date}`
-            )
-          ));
         }
       } catch (err) {
         console.error('Erreur:', err);
@@ -100,7 +90,27 @@ const Appointments = () => {
       }
     };
 
-    loadAll();
+    // Vérifier Square en arrière-plan — met à jour les badges quand c'est prêt
+    const loadSquareStatus = async () => {
+      setSquareLoading(true);
+      try {
+        const response = await axios.get(API_CONFIG.endpoints.appointmentsSquareStatus);
+        if (response.data.success && Array.isArray(response.data.squareBookings)) {
+          setSquareKeys(new Set<SquareKey>(
+            response.data.squareBookings.map(
+              (b: { phone: string; date: string }) => `${normalizePhone(b.phone)}_${b.date}`
+            )
+          ));
+        }
+      } catch (err) {
+        console.error('Erreur Square status:', err);
+      } finally {
+        setSquareLoading(false);
+      }
+    };
+
+    loadAppointments();
+    loadSquareStatus();
   }, []);
 
   // Calculer la date d'aujourd'hui à chaque rendu pour s'assurer que le filtre est toujours à jour
@@ -283,7 +293,12 @@ const Appointments = () => {
                               {appointment.name || 'Nom non disponible'}
                             </h3>
                             {getStatusBadge(appointment.status)}
-                            {isInSquare ? (
+                            {squareLoading ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700/40 text-gray-500 border border-gray-600/30">
+                                <span className="w-2 h-2 rounded-full bg-gray-500 animate-pulse mr-1.5" />
+                                Square…
+                              </span>
+                            ) : isInSquare ? (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-400/20 text-emerald-300 border border-emerald-400/50 shadow-sm shadow-emerald-500/20">
                                 <CheckCircle className="w-3 h-3 mr-1" />
                                 Booké Square
