@@ -217,26 +217,27 @@ const OptimisationRdvClient = () => {
   // Initialisation de la carte Leaflet
   useEffect(() => {
     const optimizedRoute = clientData?.statistics.dailyStats.optimizedRoute;
-    const hasCoords = optimizedRoute?.waypoints?.some(wp => wp.coordinates);
+    const waypoints = optimizedRoute?.waypoints?.filter(wp => wp.coordinates) ?? [];
 
     if (mapRef.current) {
       mapRef.current.remove();
       mapRef.current = null;
     }
 
-    if (!clientData || !hasCoords || !mapContainerRef.current) return;
+    if (!clientData || waypoints.length === 0 || !mapContainerRef.current) return;
+
+    let cancelled = false;
 
     const initMap = () => {
-      if (!mapContainerRef.current) return;
+      if (cancelled || !mapContainerRef.current) return;
       const rect = mapContainerRef.current.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) {
         setTimeout(initMap, 100);
         return;
       }
 
+      if (cancelled) return;
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
-
-      const waypoints = optimizedRoute!.waypoints.filter(wp => wp.coordinates);
       const sourceCoords = clientData.sourceCoordinates;
 
       const allCoords: [number, number][] = [
@@ -366,6 +367,7 @@ const OptimisationRdvClient = () => {
 
     const timeoutId = setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(initMap)), 200);
     return () => {
+      cancelled = true;
       clearTimeout(timeoutId);
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
     };
@@ -914,7 +916,7 @@ const OptimisationRdvClient = () => {
                           <Users className="absolute h-3 w-3 text-violet-300 top-1 right-1 opacity-60" />
                           <span className="text-xl sm:text-2xl font-extrabold text-white leading-none">
                             {clientData.statistics.dailyStats.optimizedRoute
-                              ? clientData.statistics.dailyStats.optimizedRoute.waypoints.length - 1
+                              ? clientData.statistics.dailyStats.optimizedRoute.waypoints.filter((wp: any) => wp.coordinates).length - 1
                               : clientData.statistics.dailyStats.clientCount}
                           </span>
                         </div>
