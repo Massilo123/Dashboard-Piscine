@@ -17,6 +17,7 @@ const appointmentSchema = new mongoose.Schema({
     // Chaîne unique (legacy) ou tableau de phrases (recommandé)
     important_notes: { type: mongoose.Schema.Types.Mixed },
     status: { type: String, default: 'confirmed' },
+    square_booked: { type: Boolean, default: false },
     extracted_at: { type: Date },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now }

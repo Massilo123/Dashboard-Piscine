@@ -22,19 +22,13 @@ interface Appointment {
   pool_type: string;
   important_notes?: string | string[];
   status: string;
+  square_booked: boolean;
   extracted_at: string;
   created_at: string;
   updated_at: string;
   dataHash?: string; // Hash pour détecter les changements
 }
 
-// phone normalisé + date YYYY-MM-DD = clé de lookup Square
-type SquareKey = string; // `${phone}_${date}`
-
-const normalizePhone = (phone: string) => {
-  const digits = phone.replace(/\D/g, '');
-  return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
-};
 
 const Appointments = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -42,8 +36,6 @@ const Appointments = () => {
   const [error, setError] = useState('');
   const [hasViewed, setHasViewed] = useState(false);
   const hasMarkedAsViewed = useRef(false);
-  const [squareKeys, setSquareKeys] = useState<Set<SquareKey>>(new Set());
-  const [squareLoading, setSquareLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
@@ -72,8 +64,7 @@ const Appointments = () => {
   };
 
   useEffect(() => {
-    // Charger les RDVs immédiatement
-    const loadAppointments = async () => {
+    const load = async () => {
       setLoading(true);
       try {
         const response = await axios.get(API_CONFIG.endpoints.appointmentsFuture);
@@ -89,28 +80,7 @@ const Appointments = () => {
         setLoading(false);
       }
     };
-
-    // Vérifier Square en arrière-plan — met à jour les badges quand c'est prêt
-    const loadSquareStatus = async () => {
-      setSquareLoading(true);
-      try {
-        const response = await axios.get(API_CONFIG.endpoints.appointmentsSquareStatus);
-        if (response.data.success && Array.isArray(response.data.squareBookings)) {
-          setSquareKeys(new Set<SquareKey>(
-            response.data.squareBookings.map(
-              (b: { phone: string; date: string }) => `${normalizePhone(b.phone)}_${b.date}`
-            )
-          ));
-        }
-      } catch (err) {
-        console.error('Erreur Square status:', err);
-      } finally {
-        setSquareLoading(false);
-      }
-    };
-
-    loadAppointments();
-    loadSquareStatus();
+    load();
   }, []);
 
   // Calculer la date d'aujourd'hui à chaque rendu pour s'assurer que le filtre est toujours à jour
@@ -279,13 +249,12 @@ const Appointments = () => {
                 <div className="space-y-4">
                   {[...groupedAppointments[date]].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).map((appointment) => {
                     const noteItems = importantNotesToItems(appointment.important_notes);
-                    const squareKey = `${normalizePhone(appointment.phone || '')}_${appointment.scheduled_date || ''}`;
-                    const isInSquare = appointment.phone && appointment.scheduled_date && squareKeys.has(squareKey);
+                    const isInSquare = appointment.square_booked === true;
                     return (
                     <div
                       key={appointment._id}
-                      className={`rounded-lg p-5 transition-all duration-500 ${
-                        !squareLoading && isInSquare
+                      className={`rounded-lg p-5 transition-all duration-300 ${
+                        isInSquare
                           ? 'bg-emerald-950/40 border-2 border-emerald-400/70 shadow-md shadow-emerald-500/20'
                           : 'bg-gray-800/50 border border-gray-700/50 hover:border-cyan-500/50'
                       }`}
@@ -297,12 +266,7 @@ const Appointments = () => {
                               {appointment.name || 'Nom non disponible'}
                             </h3>
                             {getStatusBadge(appointment.status)}
-                            {squareLoading ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700/40 text-gray-500 border border-gray-600/30">
-                                <span className="w-2 h-2 rounded-full bg-gray-500 animate-pulse mr-1.5" />
-                                Square…
-                              </span>
-                            ) : isInSquare ? (
+                            {isInSquare ? (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-400/20 text-emerald-300 border border-emerald-400/50 shadow-sm shadow-emerald-500/20">
                                 <CheckCircle className="w-3 h-3 mr-1" />
                                 Booké Square

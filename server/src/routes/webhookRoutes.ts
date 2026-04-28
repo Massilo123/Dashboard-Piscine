@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import squareClient from '../config/square';
 import Client from '../models/Client';
+import Appointment from '../models/Appointment';
 // Plus besoin des fonctions de cache - on utilise directement MongoDB maintenant
 
 const router = Router();
@@ -76,6 +77,49 @@ async function upsertClientInMongo(squareCustomerId: string, webhookCustomerData
         console.error('❌ Erreur lors de la mise à jour du client:', error);
         throw error;
     }
+}
+
+// Normalise un numéro de téléphone en 10 chiffres (retire le +1 ou 1 du début)
+function normalizePhone(p: string): string {
+    const digits = (p || '').replace(/\D/g, '');
+    return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+}
+
+// Met à jour square_booked sur les appointments qui correspondent au booking Square
+async function syncSquareBookedStatus(customerId: string, bookingDate: string, booked: boolean) {
+    try {
+        // Récupérer le téléphone du client depuis Square
+        const customerResp = await squareClient.customers.get({ customerId });
+        const phone = (customerResp as any).customer?.phoneNumber || (customerResp as any).customer?.phone_number || '';
+        if (!phone) {
+            console.warn(`⚠️ Pas de téléphone pour le client ${customerId}`);
+            return;
+        }
+        const phone10 = normalizePhone(phone);
+
+        // Trouver les appointments correspondants (même téléphone, même date)
+        const allAppointments = await Appointment.find({ scheduled_date: bookingDate }).lean();
+        const matches = (allAppointments as any[]).filter(apt => normalizePhone(apt.phone || '') === phone10);
+
+        if (matches.length === 0) {
+            console.log(`ℹ️ Aucun appointment bot trouvé pour ${phone10} le ${bookingDate}`);
+            return;
+        }
+
+        const ids = matches.map((a: any) => a._id);
+        await Appointment.updateMany({ _id: { $in: ids } }, { $set: { square_booked: booked } });
+        console.log(`✅ square_booked=${booked} pour ${matches.length} appointment(s) — ${phone10} le ${bookingDate}`);
+    } catch (err) {
+        console.error('❌ Erreur syncSquareBookedStatus:', err);
+    }
+}
+
+// Extrait la date YYYY-MM-DD depuis un objet booking Square (start_at ou startAt)
+function extractBookingDate(data: any): string | null {
+    const booking = data?.object?.booking || data?.booking || data?.object || {};
+    const startAt: string = booking.startAt || booking.start_at || '';
+    if (!startAt) return null;
+    return startAt.split('T')[0]; // YYYY-MM-DD en UTC
 }
 
 // Fonction pour extraire l'ID du client depuis différents formats de webhook
@@ -310,6 +354,8 @@ async function processWebhookEvent(type: string, data: any): Promise<{ success: 
                 if (bookingCreatedCustomerId) {
                     try {
                         await incrementBookingCount(bookingCreatedCustomerId);
+                        const createdDate = extractBookingDate(data);
+                        if (createdDate) syncSquareBookedStatus(bookingCreatedCustomerId, createdDate, true);
                         return { success: true };
                     } catch (error) {
                         const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
@@ -353,6 +399,9 @@ async function processWebhookEvent(type: string, data: any): Promise<{ success: 
                             });
                     });
 
+                    const updatedDate = extractBookingDate(data);
+                    if (updatedDate) syncSquareBookedStatus(bookingUpdatedCustomerId, updatedDate, !isCancelled);
+
                     return { success: true };
                 } else {
                     const errorMsg = 'booking.updated reçu mais pas d\'ID client trouvé';
@@ -366,6 +415,8 @@ async function processWebhookEvent(type: string, data: any): Promise<{ success: 
                 const bookingCancelledCustomerId = extractCustomerIdFromBooking(data);
                 if (bookingCancelledCustomerId) {
                     await decrementBookingCount(bookingCancelledCustomerId);
+                    const cancelledDate = extractBookingDate(data);
+                    if (cancelledDate) syncSquareBookedStatus(bookingCancelledCustomerId, cancelledDate, false);
                 } else {
                     console.warn('⚠️ booking.cancelled reçu mais pas d\'ID client trouvé. Structure data:', JSON.stringify(data, null, 2));
                 }
