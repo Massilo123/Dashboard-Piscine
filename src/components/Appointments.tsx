@@ -284,7 +284,11 @@ const Appointments = () => {
                     return (
                     <div
                       key={appointment._id}
-                      className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-5 hover:border-cyan-500/50 transition-all duration-200"
+                      className={`rounded-lg p-5 transition-all duration-500 ${
+                        !squareLoading && isInSquare
+                          ? 'bg-emerald-950/40 border-2 border-emerald-400/70 shadow-md shadow-emerald-500/20'
+                          : 'bg-gray-800/50 border border-gray-700/50 hover:border-cyan-500/50'
+                      }`}
                     >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
