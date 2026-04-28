@@ -220,15 +220,15 @@ router.get('/sync-square-initial', async (req: Request, res: Response) => {
       } catch { /* ignorer */ }
     }));
 
-    // 3. Mettre à jour les appointments dans MongoDB
+    // 3. Mettre à jour les appointments dans MongoDB dans les deux sens
     const appointments = await Appointment.find({ scheduled_date: { $exists: true } }).lean();
     let updated = 0;
     for (const apt of appointments as any[]) {
       const phone10 = normalize(apt.phone || '');
       const dates = phoneToBookings.get(phone10);
       const shouldBeBooked = dates ? dates.has(apt.scheduled_date) : false;
-      if (shouldBeBooked && !apt.square_booked) {
-        await Appointment.updateOne({ _id: apt._id }, { $set: { square_booked: true } });
+      if (shouldBeBooked !== !!apt.square_booked) {
+        await Appointment.updateOne({ _id: apt._id }, { $set: { square_booked: shouldBeBooked } });
         updated++;
       }
     }
