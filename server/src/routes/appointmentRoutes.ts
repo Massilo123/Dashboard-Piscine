@@ -170,6 +170,78 @@ router.get('/unviewed-count', async (req: Request, res: Response) => {
 });
 
 /**
+ * Route de synchronisation initiale : met square_booked=true sur tous les
+ * appointments qui ont déjà un booking ACCEPTED dans Square.
+ * À appeler une seule fois après le déploiement du webhook.
+ * GET /api/appointments/sync-square-initial
+ */
+router.get('/sync-square-initial', async (req: Request, res: Response) => {
+  const SQUARE_TOKEN = process.env.SQUARE_ACCESS_TOKEN!;
+  const squareHeaders = {
+    'Authorization': `Bearer ${SQUARE_TOKEN}`,
+    'Content-Type': 'application/json',
+    'Square-Version': '2024-01-18',
+  };
+  const normalize = (p: string) => {
+    const digits = (p || '').replace(/\D/g, '');
+    return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  };
+
+  try {
+    // 1. Fetch tous les bookings Square ACCEPTED
+    const acceptedBookings = new Map<string, Set<string>>(); // customer_id → Set<date>
+    let cursor: string | null = null;
+    do {
+      const url = 'https://connect.squareup.com/v2/bookings' + (cursor ? `?cursor=${cursor}` : '');
+      const resp = await fetch(url, { headers: squareHeaders });
+      const data: any = await resp.json();
+      for (const b of data.bookings || []) {
+        const status = (b.status || '').toUpperCase();
+        if (['CANCELLED', 'CANCELLED_BY_SELLER', 'CANCELLED_BY_CUSTOMER', 'DECLINED'].includes(status)) continue;
+        if (!b.customer_id || !b.start_at) continue;
+        const date: string = b.start_at.split('T')[0];
+        if (!acceptedBookings.has(b.customer_id)) acceptedBookings.set(b.customer_id, new Set());
+        acceptedBookings.get(b.customer_id)!.add(date);
+      }
+      cursor = data.cursor || null;
+    } while (cursor);
+
+    // 2. Récupérer les téléphones en parallèle
+    const phoneToBookings = new Map<string, Set<string>>(); // phone10 → Set<date>
+    await Promise.all([...acceptedBookings.entries()].map(async ([customerId, dates]) => {
+      try {
+        const r = await fetch(`https://connect.squareup.com/v2/customers/${customerId}`, { headers: squareHeaders });
+        const d: any = await r.json();
+        const phone = d.customer?.phone_number || '';
+        if (!phone) return;
+        const phone10 = normalize(phone);
+        if (!phoneToBookings.has(phone10)) phoneToBookings.set(phone10, new Set());
+        for (const date of dates) phoneToBookings.get(phone10)!.add(date);
+      } catch { /* ignorer */ }
+    }));
+
+    // 3. Mettre à jour les appointments dans MongoDB
+    const appointments = await Appointment.find({ scheduled_date: { $exists: true } }).lean();
+    let updated = 0;
+    for (const apt of appointments as any[]) {
+      const phone10 = normalize(apt.phone || '');
+      const dates = phoneToBookings.get(phone10);
+      const shouldBeBooked = dates ? dates.has(apt.scheduled_date) : false;
+      if (shouldBeBooked && !apt.square_booked) {
+        await Appointment.updateOne({ _id: apt._id }, { $set: { square_booked: true } });
+        updated++;
+      }
+    }
+
+    console.log(`✅ Sync initiale Square terminée: ${updated} appointment(s) mis à jour`);
+    res.json({ success: true, updated, total: appointments.length });
+  } catch (error) {
+    console.error('❌ Erreur sync initiale Square:', error);
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Erreur inconnue' });
+  }
+});
+
+/**
  * Route pour vérifier quels appointments du bot ont déjà été bookés dans Square.
  * On part des RDVs qu'on a déjà (avec leurs téléphones et dates), on cherche
  * directement ces clients dans Square par téléphone, puis on vérifie s'ils ont
