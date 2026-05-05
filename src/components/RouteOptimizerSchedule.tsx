@@ -447,6 +447,12 @@ const RouteOptimizerSchedule = () => {
       </svg>
     )
 
+    const SmsIcon = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    )
+
     return (
       <>
         <div className="hidden lg:block w-full max-w-7xl mx-auto p-2 sm:p-4 space-y-4">
@@ -840,6 +846,20 @@ const RouteOptimizerSchedule = () => {
                                 <span className="flex-1 flex items-center justify-center gap-1.5 bg-gray-700/50 text-gray-500 text-sm font-semibold py-2.5 rounded-xl border border-gray-600/30 cursor-not-allowed">
                                   <PhoneIcon />
                                   Appeler
+                                </span>
+                              )}
+                              {waypoint.phoneNumber ? (
+                                <a
+                                  href={`sms:${waypoint.phoneNumber}`}
+                                  className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-green-500/80 to-emerald-700/80 hover:from-green-500 hover:to-emerald-700 text-white text-sm font-semibold py-2.5 rounded-xl border border-green-400/40 shadow-lg shadow-green-500/25 drop-shadow-[0_0_6px_rgba(34,197,94,0.4)] transition-all active:scale-95"
+                                >
+                                  <SmsIcon />
+                                  Texto
+                                </a>
+                              ) : (
+                                <span className="flex-1 flex items-center justify-center gap-1.5 bg-gray-700/50 text-gray-500 text-sm font-semibold py-2.5 rounded-xl border border-gray-600/30 cursor-not-allowed">
+                                  <SmsIcon />
+                                  Texto
                                 </span>
                               )}
                               <a
