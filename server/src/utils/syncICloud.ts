@@ -182,7 +182,11 @@ function customerToVCard(c: any, poolType: string): { uid: string; vcard: string
     const phone  = (c.phoneNumber || '').trim();
     const norm   = normalizePhone(phone);
 
-    const uid         = norm ? `cli-${norm}` : `cli-${c.squareId || String(c._id)}`;
+    // UID basé sur squareId (stable, ne change jamais).
+    // Fallback sur le téléphone si pas de squareId, puis sur _id.
+    const uid = c.squareId
+        ? `cli-${c.squareId}`
+        : (norm ? `cli-${norm}` : `cli-${String(c._id)}`);
     const displayName = full ? `CLI ${full}` : uid;
 
     const lines: string[] = [
@@ -197,6 +201,8 @@ function customerToVCard(c: any, poolType: string): { uid: string; vcard: string
     const city = (c.city || '').trim();
     if (addr || city) lines.push(`ADR;TYPE=HOME:;;${addr};${city};;;CA`);
     if (poolType) lines.push(`NOTE:Piscine ${poolType}`);
+    // Marqueur custom pour traçabilité (utile pour détecter les doublons)
+    if (c.squareId) lines.push(`X-SQUAREID:${c.squareId}`);
     lines.push('END:VCARD');
 
     return { uid, vcard: lines.join('\r\n') };
