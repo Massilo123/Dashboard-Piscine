@@ -56,16 +56,39 @@ async function propfind(url: string, body: string, depth = '0'): Promise<string>
     return resp.text();
 }
 
-// Extrait le texte d'un tag XML (supporte les namespaces)
-function extractXmlTag(xml: string, localName: string): string | null {
-    const regex = new RegExp(`<[^>]*:?${localName}[^>]*>([^<]+)<\\/[^>]*:?${localName}>`, 'i');
-    const m = xml.match(regex);
+// Extrait le premier <href> situé à l'intérieur d'un tag parent donné
+// Gère les balises avec ou sans attributs (ex: <href xmlns="DAV:">)
+function extractHrefInsideTag(xml: string, parentTag: string): string | null {
+    const lower = xml.toLowerCase();
+    const tagIdx = lower.indexOf(parentTag.toLowerCase());
+    if (tagIdx === -1) return null;
+    const sub = xml.substring(tagIdx);
+    const lSub = sub.toLowerCase();
+    // Trouve <href ou <d:href (avec éventuel attribut)
+    const hrefTagStart = lSub.indexOf('<href');
+    if (hrefTagStart === -1) return null;
+    const hrefTagEnd = lSub.indexOf('>', hrefTagStart);  // fin de la balise ouvrante
+    if (hrefTagEnd === -1) return null;
+    const hrefClose = lSub.indexOf('</href>', hrefTagEnd);
+    if (hrefClose === -1) return null;
+    return sub.substring(hrefTagEnd + 1, hrefClose).trim();
+}
+
+// Découpe le XML en blocs <response>...</response> (avec ou sans préfixe namespace)
+function splitResponses(xml: string): string[] {
+    return xml.match(/<(?:[a-zA-Z0-9_-]+:)?response[\s>][\s\S]*?<\/(?:[a-zA-Z0-9_-]+:)?response>/gi) || [];
+}
+
+// Extrait le premier <href> d'un bloc XML
+function extractHref(block: string): string | null {
+    const m = block.match(/<(?:[a-zA-Z0-9_-]+:)?href>([^<]+)<\/(?:[a-zA-Z0-9_-]+:)?href>/i);
     return m ? m[1].trim() : null;
 }
 
-// Découpe le XML en blocs <response>...</response>
-function splitResponses(xml: string): string[] {
-    return xml.match(/<[^>]*:response[^>]*>[\s\S]*?<\/[^>]*:response>/gi) || [];
+// Extrait le premier <getetag> d'un bloc XML
+function extractEtag(block: string): string | null {
+    const m = block.match(/<(?:[a-zA-Z0-9_-]+:)?getetag>([^<]+)<\/(?:[a-zA-Z0-9_-]+:)?getetag>/i);
+    return m ? m[1].trim() : null;
 }
 
 // ── Découverte CardDAV ────────────────────────────────────────────────────────
@@ -75,11 +98,9 @@ async function getBookUrl(): Promise<string> {
     const principalXml = await propfind(CARDDAV_BASE, `<?xml version="1.0" encoding="UTF-8"?>
 <d:propfind xmlns:d="DAV:"><d:prop><d:current-user-principal/></d:prop></d:propfind>`);
 
-    const pMatch = principalXml.match(
-        /<[^>]*current-user-principal[^>]*>\s*<[^>]*href[^>]*>([^<]+)<\/[^>]*href>/i
-    );
-    if (!pMatch) throw new Error('CardDAV: impossible de trouver le principal');
-    const principalUrl = makeUrl(CARDDAV_BASE, pMatch[1].trim());
+    const principalHref = extractHrefInsideTag(principalXml, 'current-user-principal');
+    if (!principalHref) throw new Error('CardDAV: impossible de trouver le principal');
+    const principalUrl = makeUrl(CARDDAV_BASE, principalHref);
 
     // 2. addressbook-home-set
     const homeXml = await propfind(principalUrl, `<?xml version="1.0" encoding="UTF-8"?>
@@ -87,11 +108,9 @@ async function getBookUrl(): Promise<string> {
   <d:prop><card:addressbook-home-set/></d:prop>
 </d:propfind>`);
 
-    const hMatch = homeXml.match(
-        /<[^>]*addressbook-home-set[^>]*>\s*<[^>]*href[^>]*>([^<]+)<\/[^>]*href>/i
-    );
-    if (!hMatch) throw new Error('CardDAV: impossible de trouver addressbook-home-set');
-    const homeUrl = makeUrl(principalUrl, hMatch[1].trim());
+    const homeHref = extractHrefInsideTag(homeXml, 'addressbook-home-set');
+    if (!homeHref) throw new Error('CardDAV: impossible de trouver addressbook-home-set');
+    const homeUrl = makeUrl(principalUrl, homeHref);
 
     // 3. Premier carnet d'adresses
     const booksXml = await propfind(homeUrl, `<?xml version="1.0" encoding="UTF-8"?>
@@ -101,9 +120,9 @@ async function getBookUrl(): Promise<string> {
 
     for (const block of splitResponses(booksXml)) {
         if (block.toLowerCase().includes('addressbook')) {
-            const href = block.match(/<[^>]*:href[^>]*>([^<]+)<\/[^>]*:href>/i);
+            const href = extractHref(block);
             if (href) {
-                const bookUrl = makeUrl(homeUrl, href[1].trim());
+                const bookUrl = makeUrl(homeUrl, href);
                 return bookUrl.endsWith('/') ? bookUrl : bookUrl + '/';
             }
         }
@@ -119,13 +138,12 @@ async function listExistingContacts(bookUrl: string): Promise<Record<string, str
 
     const contacts: Record<string, string> = {};
     for (const block of splitResponses(xml)) {
-        const hrefMatch = block.match(/<[^>]*:href[^>]*>([^<]+)<\/[^>]*:href>/i);
-        const etagMatch = block.match(/<[^>]*:getetag[^>]*>([^<]+)<\/[^>]*:getetag>/i);
-        if (!hrefMatch || !etagMatch) continue;
-        const href = hrefMatch[1].trim();
+        const href = extractHref(block);
+        const etag = extractEtag(block);
+        if (!href || !etag) continue;
         if (href.endsWith('.vcf')) {
             const uid = href.split('/').pop()!.replace('.vcf', '');
-            contacts[uid] = etagMatch[1].trim();
+            contacts[uid] = etag;
         }
     }
     return contacts;
@@ -313,10 +331,11 @@ export async function syncSingleClient(squareId: string): Promise<void> {
     const ok = await putVCard(`${bookUrl}${uid}.vcf`, vcard);
     if (!ok) { console.error(`❌ syncSingleClient: PUT échoué pour ${uid}`); return; }
 
-    // 4. Mettre à jour le groupe avec ce nouveau membre
+    // 4. Tenter de mettre à jour le groupe (non-bloquant)
     const allUids = new Set(Object.keys(existing).filter(u => u.startsWith('cli-') && u !== GROUP_UID));
     allUids.add(uid);
-    await putVCard(`${bookUrl}${GROUP_UID}.vcf`, buildGroupVCard([...allUids]));
+    const groupOk = await putVCard(`${bookUrl}${GROUP_UID}.vcf`, buildGroupVCard([...allUids]));
+    if (!groupOk) console.warn(`⚠️  Groupe iCloud non mis à jour (non-bloquant)`);
 
     console.log(`✅ Contact iCloud ${existing[uid] ? 'mis à jour' : 'ajouté'} : ${uid}`);
 }
