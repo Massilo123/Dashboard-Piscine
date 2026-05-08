@@ -1,26 +1,19 @@
 // webhookRoutes.ts
 import { Router, Request, Response } from 'express';
-import { exec } from 'child_process';
-import path from 'path';
 import squareClient from '../config/square';
 import Client from '../models/Client';
 import Appointment from '../models/Appointment';
+import { syncICloud } from '../utils/syncICloud';
 // Plus besoin des fonctions de cache - on utilise directement MongoDB maintenant
 
 const router = Router();
 
-// Lance le script Python de sync iCloud en arrière-plan (fire-and-forget)
+// Lance la sync iCloud en arrière-plan (fire-and-forget, TypeScript natif)
 function triggerICloudSync(): void {
-    const scriptPath = path.resolve(__dirname, '../../../sync_contacts_to_icloud.py');
-    exec(`python "${scriptPath}"`, (error, stdout, stderr) => {
-        if (error) {
-            console.error('❌ Sync iCloud échouée:', error.message);
-            return;
-        }
-        if (stderr) console.warn('⚠️ Sync iCloud stderr:', stderr);
-        console.log('✅ Sync iCloud terminée');
-    });
     console.log('🔄 Sync iCloud lancée en arrière-plan...');
+    syncICloud()
+        .then(() => console.log('✅ Sync iCloud terminée'))
+        .catch(err => console.error('❌ Sync iCloud échouée:', err?.message || err));
 }
 
 // Fonction pour mettre à jour ou créer un client dans MongoDB
