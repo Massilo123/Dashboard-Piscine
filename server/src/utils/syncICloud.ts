@@ -212,61 +212,80 @@ async function putVCard(url: string, vcard: string): Promise<boolean> {
     return [200, 201, 204].includes(resp.status);
 }
 
-// ── Square : catalogue + bookings ─────────────────────────────────────────────
+// ── Square : catalogue + bookings (via REST API directe) ─────────────────────
+
+const SQUARE_TOKEN   = process.env.SQUARE_ACCESS_TOKEN || '';
+const SQUARE_HEADERS = {
+    'Authorization': `Bearer ${SQUARE_TOKEN}`,
+    'Content-Type':  'application/json',
+    'Square-Version': '2024-01-17',
+};
 
 async function buildCatalogIndex(): Promise<Record<string, string>> {
-    const variationPool: Record<string, string> = {};
+    const resp = await fetch(
+        'https://connect.squareup.com/v2/catalog/list?types=ITEM,ITEM_VARIATION',
+        { headers: SQUARE_HEADERS }
+    );
+    const objects: any[] = ((await resp.json()) as any).objects || [];
+
     const itemPool: Record<string, string> = {};
-
-    for await (const obj of squareClient.catalog.list({ types: ['ITEM', 'ITEM_VARIATION'] })) {
-        if ((obj as any).type === 'ITEM') {
-            const name = (obj as any).itemData?.name || '';
-            const pool = extractPoolType(name);
-            if (pool) itemPool[(obj as any).id] = pool;
+    for (const obj of objects) {
+        if (obj.type === 'ITEM') {
+            const pool = extractPoolType(obj.item_data?.name || '');
+            if (pool) itemPool[obj.id] = pool;
         }
     }
 
-    for await (const obj of squareClient.catalog.list({ types: ['ITEM'] })) {
-        const pool = itemPool[(obj as any).id] || '';
-        for (const v of (obj as any).itemData?.variations || []) {
-            variationPool[v.id] = pool;
+    const variationPool: Record<string, string> = {};
+    for (const obj of objects) {
+        if (obj.type === 'ITEM') {
+            const pool = itemPool[obj.id] || '';
+            for (const v of obj.item_data?.variations || []) {
+                variationPool[v.id] = pool;
+            }
         }
     }
-
     return variationPool;
 }
 
 async function buildPoolTypeIndex(catalogIndex: Record<string, string>): Promise<Record<string, string>> {
     const byCustomer: Record<string, any[]> = {};
 
-    const start = new Date('2024-01-01T00:00:00Z');
+    let cursor = new Date('2024-01-01T00:00:00Z');
     const endGlobal = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
 
-    let cursor = new Date(start);
     while (cursor < endGlobal) {
         const segEnd = new Date(Math.min(cursor.getTime() + 30 * 24 * 60 * 60 * 1000, endGlobal.getTime()));
-        for await (const booking of squareClient.bookings.list({
-            startAtMin: cursor.toISOString(),
-            startAtMax: segEnd.toISOString(),
-            limit: 100,
-        })) {
-            const cid = (booking as any).customerId;
-            if (cid) {
-                if (!byCustomer[cid]) byCustomer[cid] = [];
-                byCustomer[cid].push(booking);
+        let pageCursor: string | undefined;
+        do {
+            const params = new URLSearchParams({
+                limit: '100',
+                start_at_min: cursor.toISOString(),
+                start_at_max: segEnd.toISOString(),
+                ...(pageCursor ? { cursor: pageCursor } : {}),
+            });
+            const resp = await fetch(
+                `https://connect.squareup.com/v2/bookings?${params}`,
+                { headers: SQUARE_HEADERS }
+            );
+            const data = await resp.json() as any;
+            for (const b of data.bookings || []) {
+                if (b.customer_id) {
+                    if (!byCustomer[b.customer_id]) byCustomer[b.customer_id] = [];
+                    byCustomer[b.customer_id].push(b);
+                }
             }
-        }
+            pageCursor = data.cursor;
+        } while (pageCursor);
         cursor = new Date(segEnd.getTime() + 24 * 60 * 60 * 1000);
     }
 
     const customerPool: Record<string, string> = {};
     for (const [cid, bookings] of Object.entries(byCustomer)) {
-        const sorted = bookings.sort((a, b) =>
-            ((b as any).startAt || '').localeCompare((a as any).startAt || '')
-        );
+        const sorted = bookings.sort((a, b) => (b.start_at || '').localeCompare(a.start_at || ''));
         for (const booking of sorted.slice(0, 3)) {
-            for (const seg of (booking as any).appointmentSegments || []) {
-                const pool = catalogIndex[seg.serviceVariationId || ''];
+            for (const seg of booking.appointment_segments || []) {
+                const pool = catalogIndex[seg.service_variation_id || ''];
                 if (pool) { customerPool[cid] = pool; break; }
             }
             if (customerPool[cid]) break;
