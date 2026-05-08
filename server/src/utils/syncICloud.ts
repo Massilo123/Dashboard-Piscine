@@ -275,7 +275,34 @@ async function buildPoolTypeIndex(catalogIndex: Record<string, string>): Promise
     return customerPool;
 }
 
-// ── Export principal ──────────────────────────────────────────────────────────
+// ── Sync d'un seul client (rapide, ~5 sec) ───────────────────────────────────
+// Utilisé après un webhook customer.created / customer.updated.
+// Un nouveau client n'a pas encore de bookings → pool type vide pour l'instant ;
+// il sera rempli lors de la prochaine sync complète (manuelle ou planifiée).
+
+export async function syncSingleClient(squareId: string): Promise<void> {
+    // 1. Récupérer le client dans MongoDB
+    const c = await Client.findOne({ squareId });
+    if (!c) { console.warn(`⚠️  syncSingleClient: client ${squareId} introuvable dans MongoDB`); return; }
+
+    // 2. Connexion iCloud
+    const bookUrl  = await getBookUrl();
+    const existing = await listExistingContacts(bookUrl);
+
+    // 3. Construire et envoyer la vCard (sans pool type pour un nouveau client)
+    const { uid, vcard } = customerToVCard(c.toObject(), '');
+    const ok = await putVCard(`${bookUrl}${uid}.vcf`, vcard);
+    if (!ok) { console.error(`❌ syncSingleClient: PUT échoué pour ${uid}`); return; }
+
+    // 4. Mettre à jour le groupe avec ce nouveau membre
+    const allUids = new Set(Object.keys(existing).filter(u => u.startsWith('cli-') && u !== GROUP_UID));
+    allUids.add(uid);
+    await putVCard(`${bookUrl}${GROUP_UID}.vcf`, buildGroupVCard([...allUids]));
+
+    console.log(`✅ Contact iCloud ${existing[uid] ? 'mis à jour' : 'ajouté'} : ${uid}`);
+}
+
+// ── Sync complète (tous les clients + types de piscine) ───────────────────────
 
 export async function syncICloud(): Promise<void> {
     // 1. Clients MongoDB

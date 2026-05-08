@@ -3,17 +3,17 @@ import { Router, Request, Response } from 'express';
 import squareClient from '../config/square';
 import Client from '../models/Client';
 import Appointment from '../models/Appointment';
-import { syncICloud } from '../utils/syncICloud';
+import { syncSingleClient } from '../utils/syncICloud';
 // Plus besoin des fonctions de cache - on utilise directement MongoDB maintenant
 
 const router = Router();
 
-// Lance la sync iCloud en arrière-plan (fire-and-forget, TypeScript natif)
-function triggerICloudSync(): void {
-    console.log('🔄 Sync iCloud lancée en arrière-plan...');
-    syncICloud()
-        .then(() => console.log('✅ Sync iCloud terminée'))
-        .catch(err => console.error('❌ Sync iCloud échouée:', err?.message || err));
+// Sync iCloud d'un seul client en arrière-plan (~5 sec)
+function triggerICloudSync(squareId: string): void {
+    console.log(`🔄 Sync iCloud pour ${squareId}...`);
+    syncSingleClient(squareId)
+        .then(() => console.log(`✅ Sync iCloud terminée pour ${squareId}`))
+        .catch(err => console.error(`❌ Sync iCloud échouée pour ${squareId}:`, err?.message || err));
 }
 
 // Fonction pour mettre à jour ou créer un client dans MongoDB
@@ -289,7 +289,7 @@ async function processWebhookEvent(type: string, data: any): Promise<{ success: 
                     try {
                         await upsertClientInMongo(createdId, customerData);
                         console.log(`✅ Client créé/mis à jour dans MongoDB: ${createdId}`);
-                        triggerICloudSync();
+                        triggerICloudSync(createdId);
                         return { success: true };
                     } catch (error) {
                         const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
@@ -313,7 +313,7 @@ async function processWebhookEvent(type: string, data: any): Promise<{ success: 
                     try {
                         await upsertClientInMongo(updatedId, customerData);
                         console.log(`✅ Client mis à jour dans MongoDB: ${updatedId}`);
-                        triggerICloudSync();
+                        triggerICloudSync(updatedId);
                         return { success: true };
                     } catch (error) {
                         const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
