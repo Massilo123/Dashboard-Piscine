@@ -1,11 +1,27 @@
 // webhookRoutes.ts
 import { Router, Request, Response } from 'express';
+import { exec } from 'child_process';
+import path from 'path';
 import squareClient from '../config/square';
 import Client from '../models/Client';
 import Appointment from '../models/Appointment';
 // Plus besoin des fonctions de cache - on utilise directement MongoDB maintenant
 
 const router = Router();
+
+// Lance le script Python de sync iCloud en arrière-plan (fire-and-forget)
+function triggerICloudSync(): void {
+    const scriptPath = path.resolve(__dirname, '../../../sync_contacts_to_icloud.py');
+    exec(`python "${scriptPath}"`, (error, stdout, stderr) => {
+        if (error) {
+            console.error('❌ Sync iCloud échouée:', error.message);
+            return;
+        }
+        if (stderr) console.warn('⚠️ Sync iCloud stderr:', stderr);
+        console.log('✅ Sync iCloud terminée');
+    });
+    console.log('🔄 Sync iCloud lancée en arrière-plan...');
+}
 
 // Fonction pour mettre à jour ou créer un client dans MongoDB
 // Peut utiliser soit les données du webhook directement, soit récupérer depuis Square API
@@ -280,6 +296,7 @@ async function processWebhookEvent(type: string, data: any): Promise<{ success: 
                     try {
                         await upsertClientInMongo(createdId, customerData);
                         console.log(`✅ Client créé/mis à jour dans MongoDB: ${createdId}`);
+                        triggerICloudSync();
                         return { success: true };
                     } catch (error) {
                         const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
@@ -303,6 +320,7 @@ async function processWebhookEvent(type: string, data: any): Promise<{ success: 
                     try {
                         await upsertClientInMongo(updatedId, customerData);
                         console.log(`✅ Client mis à jour dans MongoDB: ${updatedId}`);
+                        triggerICloudSync();
                         return { success: true };
                     } catch (error) {
                         const errorMsg = error instanceof Error ? error.message : 'Erreur inconnue';
