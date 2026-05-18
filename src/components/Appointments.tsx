@@ -122,6 +122,7 @@ const Appointments = () => {
     if (!m) {
       const d = new Date(dateString);
       return Number.isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('fr-CA', {
+        weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -134,6 +135,7 @@ const Appointments = () => {
     return Number.isNaN(date.getTime())
       ? 'N/A'
       : date.toLocaleDateString('fr-CA', {
+          weekday: 'long',
           year: 'numeric',
           month: 'long',
           day: 'numeric',

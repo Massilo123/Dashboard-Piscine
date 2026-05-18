@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom'
-import { Calendar, Clock, MapPin, Navigation, CheckCircle, Timer } from 'lucide-react'
+import { Calendar, Clock, MapPin, Navigation, CheckCircle, Timer, Users, X } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -43,13 +43,32 @@ interface RouteData {
   } | unknown
 }
 
+const CACHE_KEY = (date: string) => `planning_route_${date}`
+
+const getCachedRoute = (date: string): RouteData | null => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY(date))
+    return raw ? (JSON.parse(raw) as RouteData) : null
+  } catch {
+    return null
+  }
+}
+
+const setCachedRoute = (date: string, data: RouteData) => {
+  try {
+    localStorage.setItem(CACHE_KEY(date), JSON.stringify(data))
+  } catch {}
+}
+
 const RouteOptimizerSchedule = () => {
     const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0])
     const [loading, setLoading] = useState<boolean>(false)
+    const [refreshing, setRefreshing] = useState<boolean>(false)
     const [routeData, setRouteData] = useState<RouteData | null>(null)
     const [error, setError] = useState<string>('')
     const [shouldFetch, setShouldFetch] = useState<boolean>(false)
     const [currentCardIndex, setCurrentCardIndex] = useState<number>(0)
+    const [showSummary, setShowSummary] = useState<boolean>(false)
 
     const mapRef = useRef<L.Map | null>(null)
     const mapContainerDesktop = useRef<HTMLDivElement>(null)
@@ -71,9 +90,11 @@ const RouteOptimizerSchedule = () => {
         }
     }, [shouldFetch, date])
 
-    // Auto-fetch today's route on mobile mount
+    // Auto-fetch today's route on mobile mount — show cache instantly, then refresh in background
     useEffect(() => {
         if (window.innerWidth < 1024) {
+            const cached = getCachedRoute(date)
+            if (cached) setRouteData(cached)
             fetchOptimizedRoute()
         }
     }, [])
@@ -247,7 +268,7 @@ const RouteOptimizerSchedule = () => {
                     });
                 }
 
-                const wazeUrl = `https://waze.com/ul?ll=${waypoint.coordinates[1]},${waypoint.coordinates[0]}&navigate=yes`;
+                const wazeUrl = `https://waze.com/ul?ll=${waypoint.coordinates[1]},${waypoint.coordinates[0]}&navigate=yes&q=${encodeURIComponent(waypoint.address)}`;
                 const phoneDisplay = waypoint.phoneNumber && waypoint.phoneNumber.trim()
                     ? `<div style="font-size: 0.85rem; margin-bottom: 5px; color: #9ca3af; display: flex; align-items: center; gap: 4px;">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
@@ -397,7 +418,12 @@ const RouteOptimizerSchedule = () => {
         setError('Veuillez sélectionner une date')
         return
       }
-      setLoading(true)
+      const cached = getCachedRoute(date)
+      if (cached) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
       setError('')
       try {
         const response = await fetch(API_CONFIG.endpoints.optimizeBookings, {
@@ -417,11 +443,13 @@ const RouteOptimizerSchedule = () => {
         if (!response.ok) {
           throw new Error(data.error || 'Une erreur est survenue')
         }
+        setCachedRoute(date, data.data)
         setRouteData(data.data)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+        if (!cached) setError(err instanceof Error ? err.message : 'Une erreur est survenue')
       } finally {
         setLoading(false)
+        setRefreshing(false)
       }
     }
 
@@ -467,6 +495,16 @@ const RouteOptimizerSchedule = () => {
                   <h2 className="text-lg sm:text-xl font-semibold bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(139,92,246,0.6)]">
                     Optimisation des rendez-vous
                   </h2>
+                  {routeData && (
+                    <button
+                      onClick={() => setShowSummary(true)}
+                      className="ml-2 flex items-center gap-1.5 text-xs text-purple-300 hover:text-purple-200 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 px-2.5 py-1 rounded-lg transition-all duration-200"
+                      title="Résumé de la journée"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      <span>Résumé</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 min-w-0">
@@ -490,11 +528,13 @@ const RouteOptimizerSchedule = () => {
                     </button>
                     <button
                       onClick={fetchOptimizedRoute}
-                      disabled={loading}
+                      disabled={loading || refreshing}
                       className="flex-1 sm:flex-none bg-gradient-to-r from-indigo-500/20 to-purple-500/20 hover:from-indigo-500/30 hover:to-purple-500/30 disabled:from-gray-600/20 disabled:to-gray-600/20 backdrop-blur-sm text-indigo-200 px-4 py-2.5 rounded-lg disabled:text-gray-400 disabled:cursor-not-allowed transition-all duration-200 text-sm sm:text-base border border-indigo-400/40 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:-translate-y-0.5 disabled:opacity-50 flex items-center justify-center"
                     >
                       {loading ? (
                         <><LoadingSpinner /><span className="ml-2">Optimisation...</span></>
+                      ) : refreshing ? (
+                        <><LoadingSpinner /><span className="ml-2">Actualisation...</span></>
                       ) : (
                         <><CheckCircle className="h-4 w-4 mr-1.5 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />Optimiser</>
                       )}
@@ -650,6 +690,18 @@ const RouteOptimizerSchedule = () => {
                   onChange={handleDateChange}
                   className="flex-1 min-w-0 border border-indigo-500/30 rounded-lg px-3 py-2 bg-transparent text-white text-sm focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-400/60 appearance-none transition-all duration-200"
                 />
+                {refreshing && (
+                  <div className="flex-shrink-0 h-2 w-2 rounded-full bg-cyan-400 animate-pulse" title="Mise à jour…" />
+                )}
+                {routeData && (
+                  <button
+                    onClick={() => setShowSummary(true)}
+                    className="flex-shrink-0 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 hover:from-purple-500/30 hover:to-indigo-500/30 text-purple-200 p-2 rounded-lg border border-purple-400/40 shadow-lg shadow-purple-500/10 active:scale-95 transition-all duration-200"
+                    title="Résumé de la journée"
+                  >
+                    <Users className="h-4 w-4 drop-shadow-[0_0_3px_rgba(139,92,246,0.8)]" />
+                  </button>
+                )}
                 <button
                   onClick={() => { const today = new Date(); setDate(today.toISOString().split('T')[0]); setShouldFetch(true); }}
                   className="flex-shrink-0 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 hover:from-cyan-500/30 hover:to-indigo-500/30 text-cyan-200 p-2 rounded-lg border border-cyan-400/40 shadow-lg shadow-cyan-500/10 active:scale-95 transition-all duration-200"
@@ -716,7 +768,7 @@ const RouteOptimizerSchedule = () => {
                 }}
               >
                 {routeData.waypoints.map((waypoint, index) => {
-                  const wazeUrl = `https://waze.com/ul?ll=${waypoint.coordinates[1]},${waypoint.coordinates[0]}&navigate=yes`;
+                  const wazeUrl = `https://waze.com/ul?ll=${waypoint.coordinates[1]},${waypoint.coordinates[0]}&navigate=yes&q=${encodeURIComponent(waypoint.address)}`;
                   const timeStr = waypoint.startAt
                     ? (new Date(waypoint.startAt).getHours() === 0
                         ? 'Toute la journée'
@@ -883,6 +935,92 @@ const RouteOptimizerSchedule = () => {
               </div>
 
             </div>}
+          </div>,
+          document.body
+        )}
+
+        {/* ===== SUMMARY OVERLAY ===== */}
+        {showSummary && routeData && createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex flex-col"
+            style={{ background: 'rgba(5,5,15,0.85)', backdropFilter: 'blur(8px)' }}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowSummary(false) }}
+          >
+            <div className="flex flex-col h-full max-w-lg w-full mx-auto" style={{ paddingTop: 'calc(4rem + env(safe-area-inset-top, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-indigo-500/30">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-purple-400 drop-shadow-[0_0_4px_rgba(139,92,246,0.8)]" />
+                  <span className="font-semibold text-white">
+                    {routeData.waypoints.filter(w => w.type !== 'starting_point').length} client{routeData.waypoints.filter(w => w.type !== 'starting_point').length > 1 ? 's' : ''} — {new Date(date + 'T12:00:00').toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowSummary(false)}
+                  className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-all active:scale-90"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Client list */}
+              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                {routeData.waypoints
+                  .filter(w => w.type !== 'starting_point')
+                  .map((w, i) => {
+                    const timeStr = w.startAt
+                      ? (new Date(w.startAt).getHours() === 0
+                          ? 'Toute la journée'
+                          : new Date(w.startAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
+                      : null;
+                    return (
+                      <div key={i} className="bg-gradient-to-br from-gray-900/90 to-gray-800/80 border border-indigo-500/20 rounded-xl p-4 space-y-2.5">
+                        {/* Name + time */}
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-semibold text-white text-base leading-tight">{w.customerName || '—'}</span>
+                          {timeStr && (
+                            <span className="flex-shrink-0 flex items-center gap-1 text-xs text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">
+                              <Clock className="h-3 w-3" />
+                              {timeStr}
+                            </span>
+                          )}
+                        </div>
+                        {/* Service */}
+                        {w.serviceType && (
+                          <div className="flex items-center gap-2 text-sm text-purple-300">
+                            <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-purple-400" />
+                            <span>{w.serviceType}</span>
+                          </div>
+                        )}
+                        {/* Address */}
+                        <div className="flex items-start gap-2 text-sm text-gray-400">
+                          <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-gray-500" />
+                          <span className="leading-snug">{w.address}</span>
+                        </div>
+                        {/* Phone */}
+                        {w.phoneNumber ? (
+                          <a
+                            href={`tel:${w.phoneNumber}`}
+                            className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                            {w.phoneNumber}
+                          </a>
+                        ) : (
+                          <span className="flex items-center gap-2 text-sm text-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                            Aucun numéro
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
           </div>,
           document.body
         )}
