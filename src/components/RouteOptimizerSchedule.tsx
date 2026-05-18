@@ -993,10 +993,15 @@ const RouteOptimizerSchedule = () => {
                           </div>
                         )}
                         {/* Address */}
-                        <div className="flex items-start gap-2 text-sm text-gray-400">
+                        <a
+                          href={`https://waze.com/ul?ll=${w.coordinates[1]},${w.coordinates[0]}&navigate=yes&q=${encodeURIComponent(w.address)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-start gap-2 text-sm text-gray-400 hover:text-cyan-300 transition-colors"
+                        >
                           <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-gray-500" />
                           <span className="leading-snug">{w.address}</span>
-                        </div>
+                        </a>
                         {/* Phone */}
                         {w.phoneNumber ? (
                           <a
