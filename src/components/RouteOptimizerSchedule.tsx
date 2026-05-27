@@ -132,29 +132,6 @@ const RouteOptimizerSchedule = () => {
         const waypoints = routeData?.waypoints
         if (!waypoints) return
 
-        // Zoom léger vers le point sélectionné (mobile uniquement)
-        if (mapRef.current && window.innerWidth < 1024) {
-            const wp = waypoints[selectedIndex]
-            if (wp) {
-                if (wp.type === 'starting_point') {
-                    const points: L.LatLngExpression[] = waypoints.map(w => [w.coordinates[1], w.coordinates[0]] as L.LatLngExpression)
-                    if (points.length > 0) {
-                        mapRef.current.flyToBounds(L.latLngBounds(points), {
-                            paddingTopLeft: [40, 40],
-                            paddingBottomRight: [40, 220],
-                            duration: 0.5
-                        })
-                    }
-                } else {
-                    mapRef.current.flyTo(
-                        [wp.coordinates[1], wp.coordinates[0]],
-                        12,
-                        { duration: 0.4 }
-                    )
-                }
-            }
-        }
-
         waypoints.forEach((_, i) => {
             const el = document.getElementById(`planning-marker-${i}`)
             if (!el) return
