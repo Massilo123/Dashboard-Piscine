@@ -79,6 +79,22 @@ const RouteOptimizerSchedule = () => {
     const ignoreScroll = useRef<boolean>(false)
     const scrollToIndexRef = useRef<(index: number, smooth?: boolean) => void>(() => {})
 
+    useEffect(() => {
+        const style = document.createElement('style')
+        style.textContent = `
+            @keyframes plannerMarkerPulse {
+                0%, 100% { box-shadow: 0 0 0 4px rgba(99,102,241,0.45), 0 0 16px rgba(99,102,241,1), 0 0 32px rgba(99,102,241,0.65); }
+                50%       { box-shadow: 0 0 0 8px rgba(99,102,241,0.2), 0 0 26px rgba(99,102,241,1), 0 0 52px rgba(99,102,241,0.45); }
+            }
+            @keyframes plannerMarkerPulseStart {
+                0%, 100% { box-shadow: 0 0 0 4px rgba(139,92,246,0.45), 0 0 16px rgba(139,92,246,1), 0 0 32px rgba(139,92,246,0.65); }
+                50%       { box-shadow: 0 0 0 8px rgba(139,92,246,0.2), 0 0 26px rgba(139,92,246,1), 0 0 52px rgba(139,92,246,0.45); }
+            }
+        `
+        document.head.appendChild(style)
+        return () => { document.head.removeChild(style) }
+    }, [])
+
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setDate(e.target.value)
       setError('')
@@ -115,25 +131,51 @@ const RouteOptimizerSchedule = () => {
     const highlightMarker = useCallback((selectedIndex: number) => {
         const waypoints = routeData?.waypoints
         if (!waypoints) return
+
+        // Zoom léger vers le point sélectionné (mobile uniquement)
+        if (mapRef.current && window.innerWidth < 1024) {
+            const wp = waypoints[selectedIndex]
+            if (wp) {
+                if (wp.type === 'starting_point') {
+                    const points: L.LatLngExpression[] = waypoints.map(w => [w.coordinates[1], w.coordinates[0]] as L.LatLngExpression)
+                    if (points.length > 0) {
+                        mapRef.current.flyToBounds(L.latLngBounds(points), {
+                            paddingTopLeft: [40, 40],
+                            paddingBottomRight: [40, 220],
+                            duration: 0.5
+                        })
+                    }
+                } else {
+                    mapRef.current.flyTo(
+                        [wp.coordinates[1], wp.coordinates[0]],
+                        12,
+                        { duration: 0.4 }
+                    )
+                }
+            }
+        }
+
         waypoints.forEach((_, i) => {
             const el = document.getElementById(`planning-marker-${i}`)
             if (!el) return
             const isSelected = i === selectedIndex
             if (i === 0) {
-                el.style.width = isSelected ? '28px' : '22px'
-                el.style.height = isSelected ? '28px' : '22px'
-                el.style.border = isSelected ? '2px solid rgba(255,255,255,0.95)' : '1px solid rgba(255,255,255,0.8)'
+                el.style.width = isSelected ? '34px' : '22px'
+                el.style.height = isSelected ? '34px' : '22px'
+                el.style.border = isSelected ? '2.5px solid rgba(255,255,255,1)' : '1px solid rgba(255,255,255,0.8)'
                 el.style.boxShadow = isSelected
-                    ? '0 0 0 3px rgba(139,92,246,0.35), 0 0 14px rgba(139,92,246,0.9), 0 0 28px rgba(139,92,246,0.6)'
+                    ? '0 0 0 4px rgba(139,92,246,0.4), 0 0 16px rgba(139,92,246,1), 0 0 32px rgba(139,92,246,0.7)'
                     : '0 0 4px rgba(139,92,246,0.5), 0 0 8px rgba(139,92,246,0.3)'
+                el.style.animation = isSelected ? 'plannerMarkerPulseStart 1.8s ease-in-out infinite' : 'none'
             } else {
-                el.style.width = isSelected ? '28px' : '20px'
-                el.style.height = isSelected ? '28px' : '20px'
-                el.style.border = isSelected ? '2px solid rgba(255,255,255,0.95)' : '1px solid rgba(255,255,255,0.8)'
+                el.style.width = isSelected ? '34px' : '20px'
+                el.style.height = isSelected ? '34px' : '20px'
+                el.style.border = isSelected ? '2.5px solid rgba(255,255,255,1)' : '1px solid rgba(255,255,255,0.8)'
                 el.style.boxShadow = isSelected
-                    ? '0 0 0 3px rgba(99,102,241,0.35), 0 0 14px rgba(99,102,241,0.9), 0 0 28px rgba(99,102,241,0.6)'
+                    ? '0 0 0 4px rgba(99,102,241,0.4), 0 0 16px rgba(99,102,241,1), 0 0 32px rgba(99,102,241,0.7)'
                     : '0 0 4px rgba(99,102,241,0.5), 0 0 8px rgba(99,102,241,0.3)'
-                el.style.fontSize = isSelected ? '12px' : '11px'
+                el.style.animation = isSelected ? 'plannerMarkerPulse 1.8s ease-in-out infinite' : 'none'
+                el.style.fontSize = isSelected ? '13px' : '11px'
             }
         })
     }, [routeData])

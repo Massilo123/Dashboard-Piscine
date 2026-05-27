@@ -40,6 +40,7 @@ const Appointments = () => {
   const [showPast, setShowPast] = useState(false);
   const [pastAppointments, setPastAppointments] = useState<Appointment[]>([]);
   const [loadingPast, setLoadingPast] = useState(false);
+  const [errorPast, setErrorPast] = useState(false);
   const hasFetchedPast = useRef(false);
 
   const copyToClipboard = (text: string, id: string) => {
@@ -50,16 +51,20 @@ const Appointments = () => {
   };
 
   const fetchPastAppointments = async () => {
-    if (hasFetchedPast.current) return;
     hasFetchedPast.current = true;
     setLoadingPast(true);
+    setErrorPast(false);
     try {
       const response = await axios.get(API_CONFIG.endpoints.appointmentsPast);
       if (response.data.success) {
         setPastAppointments(Array.isArray(response.data.appointments) ? response.data.appointments : []);
+      } else {
+        setErrorPast(true);
       }
     } catch (err) {
       console.error('Erreur historique:', err);
+      setErrorPast(true);
+      hasFetchedPast.current = false; // Permettre retry
     } finally {
       setLoadingPast(false);
     }
@@ -445,6 +450,17 @@ const Appointments = () => {
               {loadingPast ? (
                 <div className="flex items-center justify-center py-10">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-600"></div>
+                </div>
+              ) : errorPast ? (
+                <div className="text-center py-8 space-y-3">
+                  <p className="text-sm text-gray-500">Impossible de charger l'historique.</p>
+                  <p className="text-xs text-gray-600">Le serveur est probablement en cours de mise à jour — réessaie dans quelques minutes.</p>
+                  <button
+                    onClick={fetchPastAppointments}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    Réessayer
+                  </button>
                 </div>
               ) : pastAppointments.length === 0 ? (
                 <p className="text-center text-gray-600 py-8 text-sm">Aucun ancien rendez-vous</p>
