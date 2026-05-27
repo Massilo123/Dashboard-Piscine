@@ -71,6 +71,32 @@ router.get('/future', async (req: Request, res: Response) => {
 });
 
 /**
+ * Route pour récupérer les anciens rendez-vous (date passée)
+ * GET /api/appointments/past
+ */
+router.get('/past', async (req: Request, res: Response) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayString = today.toISOString().split('T')[0];
+
+    const appointments = await Appointment.find({
+      scheduled_date: { $lt: todayString }
+    })
+    .sort({ scheduled_date: -1, scheduled_time: -1 })
+    .lean();
+
+    res.json({ success: true, appointments });
+  } catch (error) {
+    console.error('❌ Erreur lors de la récupération des anciens appointments:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur inconnue'
+    });
+  }
+});
+
+/**
  * Route pour récupérer tous les appointments
  * GET /api/appointments
  */

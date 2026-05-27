@@ -15,6 +15,7 @@ interface BookingDetail {
    phoneNumber: string;
    serviceType?: string;
    serviceVariationId?: string;
+   price?: number;
 }
 
 const router = Router();
@@ -146,8 +147,9 @@ router.post('/bookings', async (req: Request, res: Response) => {
             }
         }
 
-        // Batch-fetch des noms de service depuis le catalogue Square
+        // Batch-fetch des noms et prix de service depuis le catalogue Square
         const serviceNames: Record<string, string> = {};
+        const servicePrices: Record<string, number> = {};
         const variationIds = [...new Set(bookingDetails.map(b => b.serviceVariationId).filter(Boolean))] as string[];
         if (variationIds.length > 0) {
             try {
@@ -172,16 +174,21 @@ router.post('/bookings', async (req: Request, res: Response) => {
                         const parentId = obj.itemVariationData?.itemId;
                         const name = (parentId && itemNameMap[parentId]) || obj.itemVariationData?.name || '';
                         if (name) serviceNames[obj.id] = name;
+                        const amount = obj.itemVariationData?.priceMoney?.amount;
+                        if (amount !== undefined && amount !== null) {
+                            servicePrices[obj.id] = Number(amount);
+                        }
                     }
                 }
             } catch (err) {
                 console.error('[CATALOG] Erreur batch-retrieve:', err);
             }
         }
-        // Injecter serviceType dans chaque bookingDetail
+        // Injecter serviceType et price dans chaque bookingDetail
         for (const bd of bookingDetails) {
-            if (bd.serviceVariationId && serviceNames[bd.serviceVariationId]) {
-                bd.serviceType = serviceNames[bd.serviceVariationId];
+            if (bd.serviceVariationId) {
+                if (serviceNames[bd.serviceVariationId]) bd.serviceType = serviceNames[bd.serviceVariationId];
+                if (servicePrices[bd.serviceVariationId] !== undefined) bd.price = servicePrices[bd.serviceVariationId];
             }
         }
 
@@ -242,7 +249,8 @@ router.post('/bookings', async (req: Request, res: Response) => {
                     customerName: bookingDetail.customerName,
                     startAt: bookingDetail.startAt,
                     phoneNumber: bookingDetail.phoneNumber || undefined,
-                    serviceType: bookingDetail.serviceType || undefined
+                    serviceType: bookingDetail.serviceType || undefined,
+                    price: bookingDetail.price !== undefined ? bookingDetail.price : undefined
                 };
                 
                 // Log pour vérifier que le phoneNumber est bien ajouté

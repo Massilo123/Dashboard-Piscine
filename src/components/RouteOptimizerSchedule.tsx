@@ -25,6 +25,7 @@ interface Waypoint {
   startAt?: string
   phoneNumber?: string
   serviceType?: string
+  price?: number
   coordinates: [number, number]
 }
 
@@ -76,6 +77,7 @@ const RouteOptimizerSchedule = () => {
     const carouselRef = useRef<HTMLDivElement>(null)
     const scrollRaf = useRef<number>(0)
     const ignoreScroll = useRef<boolean>(false)
+    const scrollToIndexRef = useRef<(index: number, smooth?: boolean) => void>(() => {})
 
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setDate(e.target.value)
@@ -110,25 +112,30 @@ const RouteOptimizerSchedule = () => {
         }, 50)
     }, [routeData])
 
-    const flyToWaypoint = useCallback((index: number) => {
-        if (!mapRef.current || window.innerWidth >= 1024) return
+    const highlightMarker = useCallback((selectedIndex: number) => {
         const waypoints = routeData?.waypoints
         if (!waypoints) return
-        const wp = waypoints[index]
-        if (!wp) return
-        // Starting point → overview of the full route
-        if (wp.type === 'starting_point') {
-            const points: L.LatLngExpression[] = waypoints.map(w => [w.coordinates[1], w.coordinates[0]])
-            if (points.length > 0) {
-                mapRef.current.flyToBounds(L.latLngBounds(points), { paddingTopLeft: [40, 40], paddingBottomRight: [40, 220], duration: 0.7 })
+        waypoints.forEach((_, i) => {
+            const el = document.getElementById(`planning-marker-${i}`)
+            if (!el) return
+            const isSelected = i === selectedIndex
+            if (i === 0) {
+                el.style.width = isSelected ? '28px' : '22px'
+                el.style.height = isSelected ? '28px' : '22px'
+                el.style.border = isSelected ? '2px solid rgba(255,255,255,0.95)' : '1px solid rgba(255,255,255,0.8)'
+                el.style.boxShadow = isSelected
+                    ? '0 0 0 3px rgba(139,92,246,0.35), 0 0 14px rgba(139,92,246,0.9), 0 0 28px rgba(139,92,246,0.6)'
+                    : '0 0 4px rgba(139,92,246,0.5), 0 0 8px rgba(139,92,246,0.3)'
+            } else {
+                el.style.width = isSelected ? '28px' : '20px'
+                el.style.height = isSelected ? '28px' : '20px'
+                el.style.border = isSelected ? '2px solid rgba(255,255,255,0.95)' : '1px solid rgba(255,255,255,0.8)'
+                el.style.boxShadow = isSelected
+                    ? '0 0 0 3px rgba(99,102,241,0.35), 0 0 14px rgba(99,102,241,0.9), 0 0 28px rgba(99,102,241,0.6)'
+                    : '0 0 4px rgba(99,102,241,0.5), 0 0 8px rgba(99,102,241,0.3)'
+                el.style.fontSize = isSelected ? '12px' : '11px'
             }
-            return
-        }
-        mapRef.current.flyTo(
-            [wp.coordinates[1], wp.coordinates[0]],
-            14,
-            { duration: 0.7 }
-        )
+        })
     }, [routeData])
 
     const scrollToIndex = useCallback((index: number, smooth = true) => {
@@ -137,9 +144,13 @@ const RouteOptimizerSchedule = () => {
         ignoreScroll.current = true
         el.scrollTo({ left: index * el.clientWidth, behavior: smooth ? 'smooth' : 'auto' })
         setCurrentCardIndex(index)
-        flyToWaypoint(index)
+        highlightMarker(index)
         setTimeout(() => { ignoreScroll.current = false }, smooth ? 320 : 80)
-    }, [flyToWaypoint])
+    }, [highlightMarker])
+
+    useEffect(() => {
+        scrollToIndexRef.current = scrollToIndex
+    }, [scrollToIndex])
 
     const handleCarouselScroll = () => {
         if (ignoreScroll.current) return
@@ -153,7 +164,7 @@ const RouteOptimizerSchedule = () => {
             const clamped = Math.max(0, Math.min(total - 1, idx))
             if (clamped !== currentCardIndex) {
                 setCurrentCardIndex(clamped)
-                flyToWaypoint(clamped)
+                highlightMarker(clamped)
             }
         })
     }
@@ -242,11 +253,12 @@ const RouteOptimizerSchedule = () => {
                 if (index === 0) {
                     customIcon = L.divIcon({
                         className: 'custom-icon',
-                        html: `<div style="background: linear-gradient(135deg, #8b5cf6, #6366f1); width: 22px; height: 22px; border-radius: 11px;
+                        html: `<div id="planning-marker-0" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); width: 22px; height: 22px; border-radius: 50%;
                                 display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, 0.8);
-                                box-shadow: 0 0 4px rgba(139, 92, 246, 0.5), 0 0 8px rgba(139, 92, 246, 0.3);">
+                                box-shadow: 0 0 4px rgba(139, 92, 246, 0.5), 0 0 8px rgba(139, 92, 246, 0.3);
+                                transition: width 0.2s ease, height 0.2s ease, box-shadow 0.2s ease, border 0.2s ease;">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
-                                stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 1px rgba(255,255,255,0.8));">
+                                stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 1px rgba(255,255,255,0.8)); pointer-events: none;">
                                 <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
                                 <circle cx="12" cy="10" r="3"/>
                                 </svg>
@@ -257,10 +269,11 @@ const RouteOptimizerSchedule = () => {
                 } else {
                     customIcon = L.divIcon({
                         className: 'custom-icon',
-                        html: `<div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 20px; height: 20px; border-radius: 10px;
+                        html: `<div id="planning-marker-${index}" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); width: 20px; height: 20px; border-radius: 50%;
                                 display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 11px;
                                 border: 1px solid rgba(255, 255, 255, 0.8);
-                                box-shadow: 0 0 4px rgba(99, 102, 241, 0.5), 0 0 8px rgba(99, 102, 241, 0.3);">
+                                box-shadow: 0 0 4px rgba(99, 102, 241, 0.5), 0 0 8px rgba(99, 102, 241, 0.3);
+                                transition: width 0.2s ease, height 0.2s ease, box-shadow 0.2s ease, border 0.2s ease, font-size 0.2s ease;">
                                 ${index}
                                 </div>`,
                         iconSize: [20, 20],
@@ -268,45 +281,10 @@ const RouteOptimizerSchedule = () => {
                     });
                 }
 
-                const wazeUrl = `https://waze.com/ul?ll=${waypoint.coordinates[1]},${waypoint.coordinates[0]}&navigate=yes&q=${encodeURIComponent(waypoint.address)}`;
-                const phoneDisplay = waypoint.phoneNumber && waypoint.phoneNumber.trim()
-                    ? `<div style="font-size: 0.85rem; margin-bottom: 5px; color: #9ca3af; display: flex; align-items: center; gap: 4px;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
-                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                        </svg>
-                        <a href="tel:${waypoint.phoneNumber}" style="color: #818cf8; text-decoration: none;">
-                            ${waypoint.phoneNumber}
-                        </a>
-                    </div>`
-                    : '';
-
-                const popupContent = `
-                    <div style="max-width: 200px; padding: 12px 16px;">
-                        <div style="font-weight: 600; margin-bottom: 8px; font-size: 16px; background: linear-gradient(135deg, #a78bfa, #22d3ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6);">
-                            ${waypoint.customerName || 'Point de départ'}
-                        </div>
-                        <a href="${wazeUrl}" target="_blank" rel="noopener noreferrer"
-                           style="font-size: 0.85rem; margin-bottom: 6px; color: #60a5fa; text-decoration: underline; cursor: pointer; display: block; text-shadow: 0 0 4px rgba(96, 165, 250, 0.6);">
-                           ${waypoint.address}
-                        </a>
-                        ${phoneDisplay}
-                        ${waypoint.startAt ? `
-                            <div style="font-size: 0.85rem; color: #9ca3af; margin-top: 6px;">
-                                Heure: ${new Date(waypoint.startAt).getHours() === 0
-                                    ? "Toute la journée"
-                                    : new Date(waypoint.startAt).toLocaleTimeString('fr-FR', {
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    })
-                                }
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
-
-                L.marker(position, { icon: customIcon })
-                    .addTo(newMap)
-                    .bindPopup(popupContent);
+                const marker = L.marker(position, { icon: customIcon }).addTo(newMap)
+                marker.on('click', () => {
+                    scrollToIndexRef.current(index)
+                })
             } catch (err) {
                 console.error(`Erreur lors de l'ajout du marqueur ${index}:`, err);
             }
@@ -385,6 +363,7 @@ const RouteOptimizerSchedule = () => {
             }
 
             mapRef.current = newMap;
+            requestAnimationFrame(() => highlightMarker(0))
         };
 
         const timeoutId = setTimeout(() => {
@@ -608,10 +587,19 @@ const RouteOptimizerSchedule = () => {
                                 <div className="font-medium text-xs text-white mb-1 drop-shadow-[0_0_3px_rgba(139,92,246,0.6)] break-words">
                                   {waypoint.customerName}
                                 </div>
-                                {waypoint.serviceType && (
-                                  <span className="inline-block text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 mb-1">
-                                    {waypoint.serviceType}
-                                  </span>
+                                {(waypoint.serviceType || waypoint.price !== undefined) && (
+                                  <div className="flex items-center gap-1 mb-1">
+                                    {waypoint.serviceType && (
+                                      <span className="inline-block text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                                        {waypoint.serviceType}
+                                      </span>
+                                    )}
+                                    {waypoint.price !== undefined && (
+                                      <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                                        {(waypoint.price / 100).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                                 <a
                                   href={`https://www.waze.com/ul?q=${encodeURIComponent(waypoint.address)}`}
@@ -674,11 +662,16 @@ const RouteOptimizerSchedule = () => {
 
             {/* Map background (only when route data exists) */}
             {routeData && (
-              <div
-                ref={mapContainerMobile}
-                className="absolute inset-0 w-full h-full"
-                style={{ zIndex: 0, isolation: 'isolate' }}
-              />
+              <>
+                <div
+                  ref={mapContainerMobile}
+                  className="absolute inset-0 w-full h-full"
+                  style={{ zIndex: 0, isolation: 'isolate' }}
+                />
+                {loading && (
+                  <div className="absolute inset-0" style={{ zIndex: 5, background: 'rgba(8,8,20,0.55)', backdropFilter: 'blur(1px)' }} />
+                )}
+              </>
             )}
 
             {/* Top controls bar — always visible */}
@@ -712,8 +705,8 @@ const RouteOptimizerSchedule = () => {
               </div>
             </div>
 
-            {/* Loading state */}
-            {loading && (
+            {/* Loading state — only when no existing route to display */}
+            {loading && !routeData && (
               <div className="flex-1 flex flex-col items-center justify-center gap-3" style={{ zIndex: 1000 }}>
                 <div className="animate-spin h-10 w-10 rounded-full border-2 border-indigo-500/30 border-t-indigo-400" />
                 <span className="text-sm text-gray-400">Optimisation en cours…</span>
@@ -740,8 +733,16 @@ const RouteOptimizerSchedule = () => {
             {/* Bottom carousel stack */}
             {routeData && <div className="relative" style={{ zIndex: 1000, background: 'linear-gradient(to top, rgba(8,8,20,0.95) 0%, rgba(8,8,20,0.80) 60%, transparent 100%)', paddingTop: '2rem', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
 
+              {/* Loading overlay replaces cards when re-fetching */}
+              {loading && (
+                <div className="flex flex-col items-center justify-center gap-3 px-4" style={{ height: '250px' }}>
+                  <div className="animate-spin h-9 w-9 rounded-full border-2 border-indigo-500/30 border-t-indigo-400" />
+                  <span className="text-sm text-gray-400">Optimisation en cours…</span>
+                </div>
+              )}
+
               {/* Stop indicator */}
-              <div className="flex justify-between items-center px-4 mb-1.5">
+              <div className="flex justify-between items-center px-4 mb-1.5" style={{ display: loading ? 'none' : undefined }}>
                 <span className="text-xs font-semibold text-white/80 bg-gray-900/60 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-indigo-500/25">
                   {routeData.waypoints[currentCardIndex]?.type === 'starting_point'
                     ? 'Point de départ'
@@ -765,6 +766,7 @@ const RouteOptimizerSchedule = () => {
                   WebkitOverflowScrolling: 'touch',
                   touchAction: 'pan-x',
                   scrollbarWidth: 'none',
+                  display: loading ? 'none' : undefined,
                 }}
               >
                 {routeData.waypoints.map((waypoint, index) => {
@@ -855,10 +857,19 @@ const RouteOptimizerSchedule = () => {
                                 </span>
                               )}
                             </div>
-                            {waypoint.serviceType && (
-                              <span className="inline-block text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 mb-2">
-                                {waypoint.serviceType}
-                              </span>
+                            {(waypoint.serviceType || waypoint.price !== undefined) && (
+                              <div className="flex items-center gap-1.5 mb-2">
+                                {waypoint.serviceType && (
+                                  <span className="inline-block text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                                    {waypoint.serviceType}
+                                  </span>
+                                )}
+                                {waypoint.price !== undefined && (
+                                  <span className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                                    {(waypoint.price / 100).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })}
+                                  </span>
+                                )}
+                              </div>
                             )}
 
                             {/* Address */}

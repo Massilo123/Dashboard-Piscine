@@ -18,6 +18,7 @@ export const API_CONFIG = {
     searchClients: `${API_BASE_URL}/api/clients/search`,
     appointments: `${API_BASE_URL}/api/appointments`,
     appointmentsFuture: `${API_BASE_URL}/api/appointments/future`,
+    appointmentsPast: `${API_BASE_URL}/api/appointments/past`,
     appointmentsUnviewedCount: `${API_BASE_URL}/api/appointments/unviewed-count`,
     appointmentsSquareStatus: `${API_BASE_URL}/api/appointments/square-status`,
   }
