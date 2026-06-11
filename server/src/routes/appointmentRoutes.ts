@@ -388,13 +388,13 @@ router.post('/seed-test', async (req: Request, res: Response) => {
 
     const existing = await Appointment.findOne({ conversation_id: 'test-seed-bouton' });
     if (existing) {
-      await Appointment.updateOne({ conversation_id: 'test-seed-bouton' }, { $set: { scheduled_date: scheduledDate } });
+      await Appointment.updateOne({ conversation_id: 'test-seed-bouton' }, { $set: { scheduled_date: scheduledDate, phone: '5148762345' } });
       return res.json({ success: true, action: 'updated', id: existing._id, scheduled_date: scheduledDate });
     }
 
     const doc = await Appointment.create({
       name: 'Jean-Philippe Tremblay',
-      phone: '5141234567',
+      phone: '5148762345',
       address: '742 Evergreen Terrace, Laval, QC H7G 2R3',
       scheduled_date: scheduledDate,
       scheduled_time: '10:00',
