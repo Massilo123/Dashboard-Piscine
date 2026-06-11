@@ -438,7 +438,7 @@ router.post('/:id/create-square-client', async (req: Request, res: Response) => 
   const squareHeaders = {
     'Authorization': `Bearer ${SQUARE_TOKEN}`,
     'Content-Type': 'application/json',
-    'Square-Version': '2024-01-18',
+    'Square-Version': '2025-01-23',
   };
 
   const normalize = (p: string) => {
@@ -454,17 +454,22 @@ router.post('/:id/create-square-client', async (req: Request, res: Response) => 
 
     const phone10 = normalize(appointment.phone || '');
     if (!phone10 || phone10.length !== 10) {
-      return res.status(400).json({ success: false, error: 'Numéro de téléphone invalide ou manquant' });
+      return res.status(400).json({ success: false, error: `Téléphone invalide: "${appointment.phone}"` });
     }
     const e164 = `+1${phone10}`;
 
-    // 1. Vérifier si le client existe déjà dans Square par numéro de téléphone
-    const searchResp = await fetch('https://connect.squareup.com/v2/customers/search', {
-      method: 'POST',
-      headers: squareHeaders,
-      body: JSON.stringify({ query: { filter: { phone_number: { exact: e164 } } } }),
-    });
-    const searchData: any = await searchResp.json();
+    // 1. Vérifier si le client existe déjà par téléphone
+    let searchData: any = {};
+    try {
+      const searchResp = await fetch('https://connect.squareup.com/v2/customers/search', {
+        method: 'POST',
+        headers: squareHeaders,
+        body: JSON.stringify({ query: { filter: { phone_number: { exact: e164 } } } }),
+      });
+      searchData = await searchResp.json();
+    } catch (searchErr) {
+      console.warn('⚠️  Recherche Square échouée (on continue):', searchErr);
+    }
 
     if (searchData.customers && searchData.customers.length > 0) {
       const existing = searchData.customers[0];
@@ -500,6 +505,8 @@ router.post('/:id/create-square-client', async (req: Request, res: Response) => 
     if (appointment.scheduled_time) noteParts.push(`Heure: ${appointment.scheduled_time}`);
     if (noteParts.length > 0) customerBody.note = noteParts.join(' | ');
 
+    console.log('📤 Création client Square:', JSON.stringify(customerBody));
+
     const createResp = await fetch('https://connect.squareup.com/v2/customers', {
       method: 'POST',
       headers: squareHeaders,
@@ -507,9 +514,14 @@ router.post('/:id/create-square-client', async (req: Request, res: Response) => 
     });
     const createData: any = await createResp.json();
 
+    console.log('📥 Réponse Square create:', createResp.status, JSON.stringify(createData));
+
     if (!createResp.ok || !createData.customer) {
-      const errorMsg = createData.errors?.[0]?.detail || 'Erreur lors de la création du client Square';
-      return res.status(500).json({ success: false, error: errorMsg });
+      const squareError = createData.errors?.[0]?.detail
+        || createData.errors?.[0]?.code
+        || JSON.stringify(createData.errors || createData);
+      console.error('❌ Square create error:', squareError);
+      return res.status(500).json({ success: false, error: squareError });
     }
 
     const newCustomer = createData.customer;

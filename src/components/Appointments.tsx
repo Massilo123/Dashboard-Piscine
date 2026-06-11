@@ -44,8 +44,11 @@ const Appointments = () => {
   const [errorPast, setErrorPast] = useState(false);
   const hasFetchedPast = useRef(false);
 
+  const [createClientError, setCreateClientError] = useState<Record<string, string>>({});
+
   const handleCreateSquareClient = async (appointment: Appointment) => {
     setCreateClientStatus(prev => ({ ...prev, [appointment._id]: 'loading' }));
+    setCreateClientError(prev => ({ ...prev, [appointment._id]: '' }));
     try {
       const response = await axios.post(
         `${API_CONFIG.baseUrl}/api/appointments/${appointment._id}/create-square-client`
@@ -57,9 +60,12 @@ const Appointments = () => {
         }));
       } else {
         setCreateClientStatus(prev => ({ ...prev, [appointment._id]: 'error' }));
+        setCreateClientError(prev => ({ ...prev, [appointment._id]: response.data.error || '' }));
       }
-    } catch {
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || '';
       setCreateClientStatus(prev => ({ ...prev, [appointment._id]: 'error' }));
+      setCreateClientError(prev => ({ ...prev, [appointment._id]: msg }));
     }
   };
 
@@ -452,14 +458,20 @@ const Appointments = () => {
                             );
                           }
                           if (clientStatus === 'error') {
+                            const errMsg = createClientError[appointment._id];
                             return (
-                              <button
-                                onClick={() => handleCreateSquareClient(appointment)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25 transition-colors"
-                              >
-                                <AlertCircle className="w-3 h-3" />
-                                Erreur — Réessayer
-                              </button>
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  onClick={() => handleCreateSquareClient(appointment)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25 transition-colors"
+                                >
+                                  <AlertCircle className="w-3 h-3" />
+                                  Erreur — Réessayer
+                                </button>
+                                {errMsg && (
+                                  <span className="text-xs text-red-400/70 max-w-[200px] text-right leading-tight">{errMsg}</span>
+                                )}
+                              </div>
                             );
                           }
                           if (clientStatus === 'loading') {
