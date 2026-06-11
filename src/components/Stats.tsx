@@ -104,14 +104,13 @@ const HBar = ({
 
 const Stats = () => {
   const year = new Date().getFullYear();
-  const defaultSeason = year >= 2026 ? year - 1 : year;
 
-  const [startDate, setStartDate] = useState(getSeason(defaultSeason).start);
-  const [endDate,   setEndDate]   = useState(getSeason(defaultSeason).end);
+  const [startDate, setStartDate] = useState(getSeason(year).start);
+  const [endDate,   setEndDate]   = useState(getSeason(year).end);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState('');
   const [stats,     setStats]     = useState<StatsData | null>(null);
-  const [activePreset, setActivePreset] = useState(`Saison ${defaultSeason}`);
+  const [activePreset, setActivePreset] = useState(`Saison ${year}`);
 
   const presets = [
     { label: '30 jours',          getRange: () => getLastNDays(30) },
