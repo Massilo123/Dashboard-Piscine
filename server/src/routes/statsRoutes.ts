@@ -28,15 +28,8 @@ function utcToMontrealDate(utcString: string): string {
   return d.toISOString().split('T')[0];
 }
 
-// Récupère tous les bookings Square pour la plage de dates (pagination incluse)
-async function fetchSquareBookings(startDate: string, endDate: string): Promise<any[]> {
-  // Montréal EDT = UTC-4 → minuit local = 04:00 UTC
-  const startAtMin = `${startDate}T04:00:00.000Z`;
-  // Dernier jour : fin de journée locale = lendemain 03:59:59 UTC
-  const endDay = new Date(endDate + 'T12:00:00Z');
-  endDay.setDate(endDay.getDate() + 1);
-  const startAtMax = `${endDay.toISOString().split('T')[0]}T03:59:59.999Z`;
-
+// Récupère tous les bookings Square pour une plage ≤31 jours (pagination incluse)
+async function fetchSquareBookingsChunk(startAtMin: string, startAtMax: string): Promise<any[]> {
   const all: any[] = [];
   let cursor: string | null = null;
 
@@ -61,6 +54,35 @@ async function fetchSquareBookings(startDate: string, endDate: string): Promise<
   } while (cursor);
 
   return all;
+}
+
+// Découpe la plage en chunks de 30 jours (limite Square) et combine les résultats
+async function fetchSquareBookings(startDate: string, endDate: string): Promise<any[]> {
+  const CHUNK_DAYS = 30;
+  const chunks: { min: string; max: string }[] = [];
+
+  const cur = new Date(startDate + 'T12:00:00Z');
+  const end = new Date(endDate + 'T12:00:00Z');
+
+  while (cur <= end) {
+    const chunkEnd = new Date(cur);
+    chunkEnd.setDate(chunkEnd.getDate() + CHUNK_DAYS - 1);
+    if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+
+    const minDate = cur.toISOString().split('T')[0];
+    const maxDay = new Date(chunkEnd);
+    maxDay.setDate(maxDay.getDate() + 1);
+
+    chunks.push({
+      min: `${minDate}T04:00:00.000Z`,
+      max: `${maxDay.toISOString().split('T')[0]}T03:59:59.999Z`,
+    });
+
+    cur.setDate(cur.getDate() + CHUNK_DAYS);
+  }
+
+  const results = await Promise.all(chunks.map(c => fetchSquareBookingsChunk(c.min, c.max)));
+  return results.flat();
 }
 
 type ServiceInfo = { name: string; price: number }; // price en cents CAD
