@@ -488,14 +488,14 @@ router.post('/:id/create-square-client', async (req: Request, res: Response) => 
     const familyName = nameParts.slice(1).join(' ') || '';
 
     const customerBody: any = {
-      idempotency_key: `appt-${appointment._id.toString()}`,
-      given_name: givenName,
-      family_name: familyName,
-      phone_number: e164,
+      idempotencyKey: `appt-${appointment._id.toString()}`,
+      givenName,
+      familyName,
+      phoneNumber: e164,
     };
 
     if (appointment.address) {
-      customerBody.address = { address_line_1: appointment.address, country: 'CA' };
+      customerBody.address = { addressLine1: appointment.address, country: 'CA' };
     }
 
     const noteParts: string[] = [];
