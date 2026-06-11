@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import API_CONFIG from '../config/api';
 import {
-  BarChart2, Users, DollarSign, Droplets, CheckSquare, TrendingUp, Calendar,
+  BarChart2, Users, DollarSign, Droplets, TrendingUp, Calendar,
   Waves, ChevronDown,
 } from 'lucide-react';
 
@@ -17,7 +17,6 @@ interface StatsData {
   summary: {
     totalAppointments: number;
     uniqueClients: number;
-    squareBooked: number;
     revenue: { total: number; currency: string; count: number; available: boolean };
   };
   services: {
@@ -29,6 +28,7 @@ interface StatsData {
     fermeturesTotal: number;
     autre: number;
     breakdown: ServiceBreakdownItem[];
+    autreDetails: ServiceBreakdownItem[];
     poolType: { creusee: number; horsTerre: number };
   };
   sectors: SectorItem[];
@@ -255,7 +255,7 @@ const Stats = () => {
                 icon={<BarChart2 className="w-4 h-4 text-cyan-400" />}
                 label="Services réalisés"
                 value={stats.summary.totalAppointments}
-                sub={`${stats.summary.squareBooked} entrés dans Square`}
+                sub={`${stats.summary.uniqueClients} clients distincts`}
                 border="border-cyan-500/30"
                 textColor="text-cyan-300"
               />
@@ -397,29 +397,13 @@ const Stats = () => {
                   </div>
                 )}
 
-                {/* Square booked ratio */}
-                {stats.summary.totalAppointments > 0 && (
+                {/* Détail des "Autre" services */}
+                {stats.services.autreDetails.length > 0 && (
                   <div className="mt-6 pt-5 border-t border-gray-700/40 space-y-3">
-                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Statut Square</p>
-                    {[
-                      {
-                        label: 'Entrés dans Square',
-                        val: stats.summary.squareBooked,
-                        tot: stats.summary.totalAppointments,
-                        color: 'bg-emerald-500',
-                      },
-                      {
-                        label: 'À rentrer dans Square',
-                        val: stats.summary.totalAppointments - stats.summary.squareBooked,
-                        tot: stats.summary.totalAppointments,
-                        color: 'bg-gray-600',
-                      },
-                    ].map(s => {
-                      const pct = Math.round((s.val / s.tot) * 100);
-                      return (
-                        <HBar key={s.label} label={s.label} count={s.val} percentage={pct} barColor={s.color} textColor="text-gray-400" />
-                      );
-                    })}
+                    <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Détail — autres services</p>
+                    {stats.services.autreDetails.map(s => (
+                      <HBar key={s.label} label={s.label} count={s.count} percentage={s.percentage} barColor="bg-gray-500" textColor="text-gray-400" />
+                    ))}
                   </div>
                 )}
               </div>
