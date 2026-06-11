@@ -376,6 +376,58 @@ router.get('/square-status', async (req: Request, res: Response) => {
 });
 
 /**
+ * Insère un rendez-vous fictif pour tester le bouton "Créer client Square"
+ * POST /api/appointments/seed-test
+ * DELETE /api/appointments/seed-test  → supprime le test
+ */
+router.post('/seed-test', async (req: Request, res: Response) => {
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const scheduledDate = tomorrow.toISOString().split('T')[0];
+
+    const existing = await Appointment.findOne({ conversation_id: 'test-seed-bouton' });
+    if (existing) {
+      await Appointment.updateOne({ conversation_id: 'test-seed-bouton' }, { $set: { scheduled_date: scheduledDate } });
+      return res.json({ success: true, action: 'updated', id: existing._id, scheduled_date: scheduledDate });
+    }
+
+    const doc = await Appointment.create({
+      name: 'Jean-Philippe Tremblay',
+      phone: '5141234567',
+      address: '742 Evergreen Terrace, Laval, QC H7G 2R3',
+      scheduled_date: scheduledDate,
+      scheduled_time: '10:00',
+      sector: 'Laval',
+      district: 'Laval-des-Rapides',
+      city: 'Laval',
+      user_name: 'Bot Aquarius (TEST)',
+      user_id: 'bot',
+      conversation_id: 'test-seed-bouton',
+      listing_title: 'Ouverture de piscine creusée',
+      pool_type: 'Creusée',
+      important_notes: ['⚠️ Client test — à supprimer après validation du bouton'],
+      status: 'confirmed',
+      square_booked: false,
+    });
+
+    res.json({ success: true, action: 'created', id: doc._id, scheduled_date: scheduledDate,
+      message: 'RDV test créé. Va dans /appointments pour voir le bouton "Créer client Square".' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Erreur' });
+  }
+});
+
+router.delete('/seed-test', async (req: Request, res: Response) => {
+  try {
+    const result = await Appointment.deleteOne({ conversation_id: 'test-seed-bouton' });
+    res.json({ success: true, deleted: result.deletedCount > 0 });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Erreur' });
+  }
+});
+
+/**
  * Créer un client Square à partir d'un appointment
  * POST /api/appointments/:id/create-square-client
  * - Vérifie si le client existe déjà (par téléphone)
