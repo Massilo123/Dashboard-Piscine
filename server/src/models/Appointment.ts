@@ -18,6 +18,7 @@ const appointmentSchema = new mongoose.Schema({
     important_notes: { type: mongoose.Schema.Types.Mixed },
     status: { type: String, default: 'confirmed' },
     square_booked: { type: Boolean, default: false },
+    square_client_id: { type: String, default: null },
     extracted_at: { type: Date },
     created_at: { type: Date, default: Date.now },
     updated_at: { type: Date, default: Date.now }

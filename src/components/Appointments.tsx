@@ -23,10 +23,11 @@ interface Appointment {
   important_notes?: string | string[];
   status: string;
   square_booked: boolean;
+  square_client_id?: string | null;
   extracted_at: string;
   created_at: string;
   updated_at: string;
-  dataHash?: string; // Hash pour détecter les changements
+  dataHash?: string;
 }
 
 
@@ -125,7 +126,14 @@ const Appointments = () => {
       try {
         const response = await axios.get(API_CONFIG.endpoints.appointmentsFuture);
         if (response.data.success) {
-          setAppointments(Array.isArray(response.data.appointments) ? response.data.appointments : []);
+          const apts = Array.isArray(response.data.appointments) ? response.data.appointments : [];
+          setAppointments(apts);
+          // Pré-remplir le statut vert pour les appointments dont le client a déjà été créé
+          const initialStatus: Record<string, 'idle' | 'loading' | 'success' | 'exists' | 'error'> = {};
+          for (const apt of apts) {
+            if (apt.square_client_id) initialStatus[apt._id] = 'success';
+          }
+          setCreateClientStatus(initialStatus);
         } else {
           setError('Erreur lors de la récupération des rendez-vous');
         }

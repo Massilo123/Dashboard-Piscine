@@ -473,6 +473,7 @@ router.post('/:id/create-square-client', async (req: Request, res: Response) => 
 
     if (searchData.customers && searchData.customers.length > 0) {
       const existing = searchData.customers[0];
+      await Appointment.updateOne({ _id: appointment._id }, { $set: { square_client_id: existing.id } });
       return res.json({
         success: true,
         status: 'exists',
@@ -540,6 +541,7 @@ router.post('/:id/create-square-client', async (req: Request, res: Response) => 
 
     const newCustomer = createData.customer;
     console.log(`✅ Client Square créé: ${givenName} ${familyName} (${e164}) → ${newCustomer.id}`);
+    await Appointment.updateOne({ _id: appointment._id }, { $set: { square_client_id: newCustomer.id } });
 
     res.json({
       success: true,
