@@ -505,16 +505,30 @@ router.post('/:id/create-square-client', async (req: Request, res: Response) => 
     if (appointment.scheduled_time) noteParts.push(`Heure: ${appointment.scheduled_time}`);
     if (noteParts.length > 0) customerBody.note = noteParts.join(' | ');
 
+    const attemptCreate = async (body: any) => {
+      const r = await fetch('https://connect.squareup.com/v2/customers', {
+        method: 'POST',
+        headers: squareHeaders,
+        body: JSON.stringify(body),
+      });
+      return { resp: r, data: await r.json() as any };
+    };
+
     console.log('📤 Création client Square:', JSON.stringify(customerBody));
-
-    const createResp = await fetch('https://connect.squareup.com/v2/customers', {
-      method: 'POST',
-      headers: squareHeaders,
-      body: JSON.stringify(customerBody),
-    });
-    const createData: any = await createResp.json();
-
+    let { resp: createResp, data: createData } = await attemptCreate(customerBody);
     console.log('📥 Réponse Square create:', createResp.status, JSON.stringify(createData));
+
+    // Fallback : si Square rejette le téléphone, on crée sans et on l'ajoute dans la note
+    const isPhoneError = createData.errors?.[0]?.code === 'INVALID_PHONE_NUMBER';
+    if (!createResp.ok && isPhoneError) {
+      console.warn(`⚠️  Téléphone rejeté par Square (${e164}), création sans téléphone`);
+      const bodyWithoutPhone = { ...customerBody, idempotency_key: `appt-${appointment._id.toString()}-nophone` };
+      delete bodyWithoutPhone.phone_number;
+      if (!bodyWithoutPhone.note) bodyWithoutPhone.note = '';
+      bodyWithoutPhone.note = (`Tél: ${appointment.phone} | ` + bodyWithoutPhone.note).replace(/ \| $/, '');
+      ({ resp: createResp, data: createData } = await attemptCreate(bodyWithoutPhone));
+      console.log('📥 Réponse Square (sans tél):', createResp.status, JSON.stringify(createData));
+    }
 
     if (!createResp.ok || !createData.customer) {
       const squareError = createData.errors?.[0]?.detail

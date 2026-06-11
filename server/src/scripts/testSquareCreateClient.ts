@@ -68,13 +68,22 @@ async function main() {
   if (id2) createdIds.push(id2);
 
   // Test 3 : snake_case + E.164 (l'ancien format bugué)
-  const id3 = await tryCreate('snake_case + E.164 (ancien format)', {
+  const id3 = await tryCreate('snake_case + E.164 (+15148762345)', {
     idempotency_key: `test-create-3-${Date.now()}`,
     given_name: 'Test',
     family_name: 'Aquarius3',
     phone_number: '+15148762345',
   });
   if (id3) createdIds.push(id3);
+
+  // Test 4 : snake_case + numéro "fictif" 514-123-4567
+  const id4 = await tryCreate('snake_case + 514-123-4567 (le numéro original)', {
+    idempotency_key: `test-create-4-${Date.now()}`,
+    given_name: 'Test',
+    family_name: 'Aquarius4',
+    phone_number: '+15141234567',
+  });
+  if (id4) createdIds.push(id4);
 
   // Nettoyage
   console.log('\n\n--- Nettoyage ---');
