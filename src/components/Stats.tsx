@@ -270,10 +270,7 @@ const Stats = () => {
               <div className={`bg-gradient-to-br from-gray-900/60 to-gray-800/60 backdrop-blur-sm rounded-xl border border-emerald-500/30 p-5 flex flex-col gap-2 col-span-2 md:col-span-1`}>
                 <div className="flex items-center gap-2 text-gray-400 text-xs font-medium uppercase tracking-wide">
                   <DollarSign className="w-4 h-4 text-emerald-400" />
-                  <span>Revenus Square</span>
-                  {!stats.summary.revenue.available && (
-                    <span className="text-gray-600 normal-case">(non dispo.)</span>
-                  )}
+                  <span>Revenus estimés</span>
                 </div>
                 <div className="text-3xl font-bold text-emerald-300">
                   {stats.summary.revenue.available
@@ -282,7 +279,7 @@ const Stats = () => {
                 </div>
                 {stats.summary.revenue.available && stats.summary.revenue.count > 0 && (
                   <div className="text-xs text-gray-500">
-                    {stats.summary.revenue.count} paiements · moy.{' '}
+                    basé sur les prix du catalogue · moy.{' '}
                     {fmtCurrency(Math.round(stats.summary.revenue.total / stats.summary.revenue.count))}
                   </div>
                 )}

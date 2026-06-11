@@ -63,8 +63,10 @@ async function fetchSquareBookings(startDate: string, endDate: string): Promise<
   return all;
 }
 
-// Résout les noms de services depuis le catalogue Square (batch)
-async function fetchServiceNames(variationIds: string[]): Promise<Record<string, string>> {
+type ServiceInfo = { name: string; price: number }; // price en cents CAD
+
+// Résout les noms et prix de services depuis le catalogue Square (batch)
+async function fetchServiceInfo(variationIds: string[]): Promise<Record<string, ServiceInfo>> {
   if (variationIds.length === 0) return {};
   try {
     const resp = await fetch('https://connect.squareup.com/v2/catalog/batch-retrieve', {
@@ -80,11 +82,13 @@ async function fetchServiceNames(variationIds: string[]): Promise<Record<string,
     for (const obj of data.related_objects || []) {
       if (obj.type === 'ITEM' && obj.item_data?.name) itemNames[obj.id] = obj.item_data.name;
     }
-    const result: Record<string, string> = {};
+    const result: Record<string, ServiceInfo> = {};
     for (const obj of data.objects || []) {
       if (obj.type === 'ITEM_VARIATION') {
         const parentId = obj.item_variation_data?.item_id;
-        result[obj.id] = (parentId && itemNames[parentId]) || obj.item_variation_data?.name || '';
+        const name = (parentId && itemNames[parentId]) || obj.item_variation_data?.name || '';
+        const price = obj.item_variation_data?.price_money?.amount ?? 0;
+        result[obj.id] = { name, price: Number(price) };
       }
     }
     return result;
@@ -93,39 +97,6 @@ async function fetchServiceNames(variationIds: string[]): Promise<Record<string,
   }
 }
 
-// Revenus Square (paiements complétés dans la plage)
-async function fetchSquareRevenue(startDate: string, endDate: string) {
-  // Montréal UTC-4
-  const beginTime = `${startDate}T04:00:00.000Z`;
-  const endDay = new Date(endDate + 'T12:00:00Z');
-  endDay.setDate(endDay.getDate() + 1);
-  const endTime = `${endDay.toISOString().split('T')[0]}T03:59:59.999Z`;
-
-  let total = 0, count = 0;
-  let cursor: string | null = null;
-  do {
-    const url = new URL('https://connect.squareup.com/v2/payments');
-    url.searchParams.set('begin_time', beginTime);
-    url.searchParams.set('end_time', endTime);
-    url.searchParams.set('location_id', LOCATION_ID);
-    url.searchParams.set('limit', '200');
-    if (cursor) url.searchParams.set('cursor', cursor);
-
-    const resp = await fetch(url.toString(), { headers: HEADERS() });
-    if (!resp.ok) throw new Error(`Square payments ${resp.status}`);
-    const data: any = await resp.json();
-
-    for (const p of data.payments || []) {
-      if (p.status === 'COMPLETED' && p.amount_money?.amount) {
-        total += Number(p.amount_money.amount);
-        count++;
-      }
-    }
-    cursor = data.cursor || null;
-  } while (cursor);
-
-  return { total, currency: 'CAD', count, available: true };
-}
 
 function computeTimeline(
   localDates: string[],
@@ -209,7 +180,7 @@ router.get('/overview', async (req: Request, res: Response) => {
       bookings.map(b => b.customer_id || b.customerId).filter(Boolean)
     );
 
-    // 4. Variation IDs → noms de services
+    // 4. Variation IDs → noms et prix de services
     const variationIds = [...new Set(
       bookings.flatMap(b =>
         ((b.appointment_segments || b.appointmentSegments || []) as any[])
@@ -217,22 +188,24 @@ router.get('/overview', async (req: Request, res: Response) => {
           .filter(Boolean)
       )
     )] as string[];
-    const serviceNames = await fetchServiceNames(variationIds);
+    const serviceInfo = await fetchServiceInfo(variationIds);
 
-    // 5. Classification des services
+    // 5. Classification des services + calcul revenu catalogue
     const counts: Record<ServiceKey, number> = {
       ouvertureCreusee: 0, ouvertureHorsTerre: 0,
       fermetureCreusee: 0, fermetureHorsTerre: 0, autre: 0,
     };
     // Détail complet par nom de service
     const serviceDetail: Record<string, number> = {};
+    let catalogRevenueCents = 0;
 
     for (const b of bookings) {
       const segs: any[] = b.appointment_segments || b.appointmentSegments || [];
       const varId = segs[0]?.service_variation_id || segs[0]?.serviceVariationId;
-      const svcName = (varId && serviceNames[varId]) || '';
-      counts[classifyService(svcName)]++;
-      if (svcName) serviceDetail[svcName] = (serviceDetail[svcName] || 0) + 1;
+      const info = (varId && serviceInfo[varId]) || { name: '', price: 0 };
+      counts[classifyService(info.name)]++;
+      if (info.name) serviceDetail[info.name] = (serviceDetail[info.name] || 0) + 1;
+      catalogRevenueCents += info.price;
     }
 
     const serviceBreakdown = [
@@ -271,13 +244,13 @@ router.get('/overview', async (req: Request, res: Response) => {
     // 7. Timeline
     const timeline = computeTimeline(localDates, startDate, endDate);
 
-    // 8. Revenus Square
-    let revenue = { total: 0, currency: 'CAD', count: 0, available: false };
-    try {
-      revenue = await fetchSquareRevenue(startDate, endDate);
-    } catch (e) {
-      console.warn('⚠️  Revenus Square non disponibles:', (e as Error).message);
-    }
+    // 8. Revenus calculés depuis le catalogue Square (prix × nombre de services)
+    const revenue = {
+      total: catalogRevenueCents,
+      currency: 'CAD',
+      count: total,
+      available: true,
+    };
 
     res.json({
       success: true,
