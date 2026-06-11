@@ -438,7 +438,7 @@ router.post('/:id/create-square-client', async (req: Request, res: Response) => 
   const squareHeaders = {
     'Authorization': `Bearer ${SQUARE_TOKEN}`,
     'Content-Type': 'application/json',
-    'Square-Version': '2025-01-23',
+    'Square-Version': '2024-01-18',
   };
 
   const normalize = (p: string) => {
