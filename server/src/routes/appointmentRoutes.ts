@@ -375,5 +375,109 @@ router.get('/square-status', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Créer un client Square à partir d'un appointment
+ * POST /api/appointments/:id/create-square-client
+ * - Vérifie si le client existe déjà (par téléphone)
+ * - Sinon, le crée avec nom, téléphone, adresse et note de service/date
+ */
+router.post('/:id/create-square-client', async (req: Request, res: Response) => {
+  const SQUARE_TOKEN = process.env.SQUARE_ACCESS_TOKEN!;
+  const squareHeaders = {
+    'Authorization': `Bearer ${SQUARE_TOKEN}`,
+    'Content-Type': 'application/json',
+    'Square-Version': '2024-01-18',
+  };
+
+  const normalize = (p: string) => {
+    const digits = (p || '').replace(/\D/g, '');
+    return digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  };
+
+  try {
+    const appointment = await Appointment.findById(req.params.id).lean() as any;
+    if (!appointment) {
+      return res.status(404).json({ success: false, error: 'Appointment non trouvé' });
+    }
+
+    const phone10 = normalize(appointment.phone || '');
+    if (!phone10 || phone10.length !== 10) {
+      return res.status(400).json({ success: false, error: 'Numéro de téléphone invalide ou manquant' });
+    }
+    const e164 = `+1${phone10}`;
+
+    // 1. Vérifier si le client existe déjà dans Square par numéro de téléphone
+    const searchResp = await fetch('https://connect.squareup.com/v2/customers/search', {
+      method: 'POST',
+      headers: squareHeaders,
+      body: JSON.stringify({ query: { filter: { phone_number: { exact: e164 } } } }),
+    });
+    const searchData: any = await searchResp.json();
+
+    if (searchData.customers && searchData.customers.length > 0) {
+      const existing = searchData.customers[0];
+      return res.json({
+        success: true,
+        status: 'exists',
+        message: 'Ce client existe déjà dans Square',
+        squareId: existing.id,
+        customerName: [existing.given_name, existing.family_name].filter(Boolean).join(' '),
+      });
+    }
+
+    // 2. Créer le client dans Square
+    const nameParts = (appointment.name || '').trim().split(/\s+/);
+    const givenName = nameParts[0] || '';
+    const familyName = nameParts.slice(1).join(' ') || '';
+
+    const customerBody: any = {
+      idempotency_key: `appt-${appointment._id.toString()}`,
+      given_name: givenName,
+      family_name: familyName,
+      phone_number: e164,
+    };
+
+    if (appointment.address) {
+      customerBody.address = { address_line_1: appointment.address, country: 'CA' };
+    }
+
+    const noteParts: string[] = [];
+    if (appointment.listing_title) noteParts.push(`Service: ${appointment.listing_title}`);
+    if (appointment.pool_type) noteParts.push(`Piscine: ${appointment.pool_type}`);
+    if (appointment.scheduled_date) noteParts.push(`Date prévue: ${appointment.scheduled_date}`);
+    if (appointment.scheduled_time) noteParts.push(`Heure: ${appointment.scheduled_time}`);
+    if (noteParts.length > 0) customerBody.note = noteParts.join(' | ');
+
+    const createResp = await fetch('https://connect.squareup.com/v2/customers', {
+      method: 'POST',
+      headers: squareHeaders,
+      body: JSON.stringify(customerBody),
+    });
+    const createData: any = await createResp.json();
+
+    if (!createResp.ok || !createData.customer) {
+      const errorMsg = createData.errors?.[0]?.detail || 'Erreur lors de la création du client Square';
+      return res.status(500).json({ success: false, error: errorMsg });
+    }
+
+    const newCustomer = createData.customer;
+    console.log(`✅ Client Square créé: ${givenName} ${familyName} (${e164}) → ${newCustomer.id}`);
+
+    res.json({
+      success: true,
+      status: 'created',
+      message: 'Client créé avec succès dans Square',
+      squareId: newCustomer.id,
+      customerName: [newCustomer.given_name, newCustomer.family_name].filter(Boolean).join(' '),
+    });
+  } catch (error) {
+    console.error('❌ Erreur création client Square:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Erreur inconnue',
+    });
+  }
+});
+
 export default router;
 

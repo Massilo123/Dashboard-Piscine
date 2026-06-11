@@ -6,9 +6,10 @@ import OptimisationRdvClient from './components/OptimisationRdvClient';
 import ClientsByCity from './components/ClientsByCity';
 import ClientsMap from './components/ClientsMap';
 import Appointments from './components/Appointments';
+import Stats from './components/Stats';
 import AppointmentNotification from './components/AppointmentNotification';
 import AuthGate from './components/AuthGate';
-import { Menu, X, Search, Calendar, MapPin, Building, Map, LogOut, Bell } from 'lucide-react';
+import { Menu, X, Search, Calendar, MapPin, Building, Map, LogOut, Bell, BarChart2 } from 'lucide-react';
 import logo_mauve from './assets/logo_mauve.png';
 import 'leaflet/dist/leaflet.css'
 
@@ -90,6 +91,7 @@ function App() {
           <MobileNavLink to="/clients-by-city" icon={Building}>Clients par Ville</MobileNavLink>
           <MobileNavLink to="/clients-map" icon={Map}>Carte des Clients</MobileNavLink>
           <MobileNavLink to="/appointments" icon={Bell}>Rendez-vous</MobileNavLink>
+          <MobileNavLink to="/stats" icon={BarChart2}>Stats</MobileNavLink>
           <button
             onClick={handleLogout}
             className="text-rose-200 bg-gradient-to-r from-rose-500/20 to-pink-500/20 hover:from-rose-500/30 hover:to-pink-500/30 border border-rose-400/40 shadow-lg shadow-rose-500/20 hover:shadow-rose-500/40 block px-3 py-2 rounded-md text-base font-medium flex items-center space-x-2 mt-2 transition-all duration-200 backdrop-blur-sm w-full"
@@ -147,6 +149,7 @@ function App() {
                 <NavLink to="/clients-by-city" icon={Building}>Clients par Ville</NavLink>
                 <NavLink to="/clients-map" icon={Map}>Carte des Clients</NavLink>
                 <NavLink to="/appointments" icon={Bell}>Rendez-vous</NavLink>
+                <NavLink to="/stats" icon={BarChart2}>Stats</NavLink>
               </nav>
               
               {/* Bouton RDV et menu mobile */}
@@ -191,6 +194,7 @@ function App() {
               <Route path="/clients-by-city" element={<ClientsByCity />} />
               <Route path="/clients-map" element={<ClientsMap />} />
               <Route path="/appointments" element={<Appointments />} />
+              <Route path="/stats" element={<Stats />} />
             </Routes>
           </AuthGate>
         </div>

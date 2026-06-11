@@ -21,6 +21,7 @@ export const API_CONFIG = {
     appointmentsPast: `${API_BASE_URL}/api/appointments/past`,
     appointmentsUnviewedCount: `${API_BASE_URL}/api/appointments/unviewed-count`,
     appointmentsSquareStatus: `${API_BASE_URL}/api/appointments/square-status`,
+    statsOverview: `${API_BASE_URL}/api/stats/overview`,
   }
 };
 

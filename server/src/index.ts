@@ -11,6 +11,7 @@ import webhookRoutes from './routes/webhookRoutes';
 import clientByCityRoutes from './routes/clientByCityRoutes';
 import bookingCountRoutes from './routes/bookingCountRoutes';
 import appointmentRoutes from './routes/appointmentRoutes';
+import statsRoutes from './routes/statsRoutes';
 
 
 
@@ -40,6 +41,7 @@ app.use('/api', webhookRoutes);
 app.use('/api/clients', clientByCityRoutes);
 app.use('/api/booking-counts', bookingCountRoutes);
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/stats', statsRoutes);
 
 
 

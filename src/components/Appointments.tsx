@@ -37,11 +37,31 @@ const Appointments = () => {
   const [hasViewed, setHasViewed] = useState(false);
   const hasMarkedAsViewed = useRef(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [createClientStatus, setCreateClientStatus] = useState<Record<string, 'idle' | 'loading' | 'success' | 'exists' | 'error'>>({});
   const [showPast, setShowPast] = useState(false);
   const [pastAppointments, setPastAppointments] = useState<Appointment[]>([]);
   const [loadingPast, setLoadingPast] = useState(false);
   const [errorPast, setErrorPast] = useState(false);
   const hasFetchedPast = useRef(false);
+
+  const handleCreateSquareClient = async (appointment: Appointment) => {
+    setCreateClientStatus(prev => ({ ...prev, [appointment._id]: 'loading' }));
+    try {
+      const response = await axios.post(
+        `${API_CONFIG.baseUrl}/api/appointments/${appointment._id}/create-square-client`
+      );
+      if (response.data.success) {
+        setCreateClientStatus(prev => ({
+          ...prev,
+          [appointment._id]: response.data.status === 'exists' ? 'exists' : 'success',
+        }));
+      } else {
+        setCreateClientStatus(prev => ({ ...prev, [appointment._id]: 'error' }));
+      }
+    } catch {
+      setCreateClientStatus(prev => ({ ...prev, [appointment._id]: 'error' }));
+    }
+  };
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -396,22 +416,71 @@ const Appointments = () => {
                         <ImportantNotesCollapsible items={noteItems} className="mt-4" />
                       )}
 
-                      {appointment.user_name && (
-                        <div className="mt-4 pt-4 border-t border-gray-700/50 flex items-center gap-1.5 text-xs text-gray-500">
-                          <User className="w-3 h-3 shrink-0" />
-                          <span>Booké par : {appointment.user_name}</span>
-                          {appointment.created_at && (
-                            <>
-                              <span className="text-gray-600">·</span>
-                              <span className="text-gray-500">
-                                {new Date(appointment.created_at).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' })}
-                                {' à '}
-                                {new Date(appointment.created_at).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' })}
+                      <div className="mt-4 pt-4 border-t border-gray-700/50 flex items-center justify-between gap-2 flex-wrap">
+                        {appointment.user_name && (
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                            <User className="w-3 h-3 shrink-0" />
+                            <span>Booké par : {appointment.user_name}</span>
+                            {appointment.created_at && (
+                              <>
+                                <span className="text-gray-600">·</span>
+                                <span className="text-gray-500">
+                                  {new Date(appointment.created_at).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' })}
+                                  {' à '}
+                                  {new Date(appointment.created_at).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {(() => {
+                          const clientStatus = createClientStatus[appointment._id] || 'idle';
+                          if (clientStatus === 'success') {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                <CheckCircle className="w-3 h-3" />
+                                Client créé dans Square
                               </span>
-                            </>
-                          )}
-                        </div>
-                      )}
+                            );
+                          }
+                          if (clientStatus === 'exists') {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                                <CheckCircle className="w-3 h-3" />
+                                Déjà dans Square
+                              </span>
+                            );
+                          }
+                          if (clientStatus === 'error') {
+                            return (
+                              <button
+                                onClick={() => handleCreateSquareClient(appointment)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25 transition-colors"
+                              >
+                                <AlertCircle className="w-3 h-3" />
+                                Erreur — Réessayer
+                              </button>
+                            );
+                          }
+                          if (clientStatus === 'loading') {
+                            return (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-700/50 text-gray-400 border border-gray-600/30">
+                                <span className="inline-block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                Création...
+                              </span>
+                            );
+                          }
+                          return (
+                            <button
+                              onClick={() => handleCreateSquareClient(appointment)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-violet-500/15 text-violet-300 border border-violet-500/30 hover:bg-violet-500/25 hover:text-violet-200 transition-colors"
+                            >
+                              <User className="w-3 h-3" />
+                              Créer client Square
+                            </button>
+                          );
+                        })()}
+                      </div>
                     </div>
                     );
                   })}
