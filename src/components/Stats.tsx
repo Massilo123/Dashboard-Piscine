@@ -56,7 +56,7 @@ const getCurrentMonth = () => {
   return { start: toDateStr(start), end: toDateStr(end) };
 };
 
-const getSeason = (year: number) => ({ start: `${year}-04-01`, end: `${year}-10-31` });
+const getSeason = (year: number) => ({ start: `${year}-04-01`, end: `${year}-11-30` });
 
 const fmtCurrency = (cents: number) =>
   new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(cents / 100);
